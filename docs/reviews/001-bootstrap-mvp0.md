@@ -6,7 +6,21 @@
 
 位置情報が拒否・無効・未取得でも MapLibre 地図は独立して表示される。位置取得後は自車アイコンを更新し、追従 ON の間だけカメラを更新する。MapLibre の移動ジェスチャ開始で追従を解除し、現在地ボタンで追従と再センタを再開する。
 
+### レビュー作成方法（git diff）
+
+レビュー内容はファイルシステムの目視列挙ではなく、Git の空ツリー `4b825dc642cb6eb9a060e54bf8d69288fbee4904` と実装後ワークツリーの差分を基準に作成・再監査した。レビューアーカイブ自身を統計から除外して自己参照による行数変動を避けた。
+
+```text
+git diff --name-status 4b825dc642cb6eb9a060e54bf8d69288fbee4904 -- . ':(exclude)docs/reviews/001-bootstrap-mvp0.md'
+git diff --stat 4b825dc642cb6eb9a060e54bf8d69288fbee4904 -- . ':(exclude)docs/reviews/001-bootstrap-mvp0.md'
+git diff --check 4b825dc642cb6eb9a060e54bf8d69288fbee4904
+```
+
+差分結果はレビューアーカイブを除いて 35 ファイル、1,920 行追加、全ファイルが新規追加 (`A`)。`--name-status` の結果を以下の変更ファイル一覧へ分類した。最初の `--check` で19ファイルの末尾余分空行を検出したため削除し、再実行では出力なし（whitespace error なし）を確認した。
+
 ## 2. 変更ファイル一覧
+
+以下は `git diff --name-status` の結果を責務別に整理した一覧である。
 
 ### ビルド / リポジトリ
 
@@ -113,6 +127,9 @@ Compose テストは作成・コンパイル対象に含めたが、接続端末
 ```text
 git status --short
 git log --oneline -n 10
+git diff --name-status 4b825dc642cb6eb9a060e54bf8d69288fbee4904 -- . ':(exclude)docs/reviews/001-bootstrap-mvp0.md'
+git diff --stat 4b825dc642cb6eb9a060e54bf8d69288fbee4904 -- . ':(exclude)docs/reviews/001-bootstrap-mvp0.md'
+git diff --check 4b825dc642cb6eb9a060e54bf8d69288fbee4904
 gradle 9.4.1 wrapper --gradle-version 9.4.1
 .\gradlew.bat test --stacktrace
 .\gradlew.bat lint
@@ -128,6 +145,8 @@ adb devices
 ## 10. 各コマンドの結果
 
 - 開始時 Git: master にコミットなし、作業ツリーに既存ファイル/変更なし。
+- `git diff --name-status/--stat`: レビューアーカイブを除いて新規35ファイル、1,920行追加。変更・削除ファイルなし。
+- 初回 `git diff --check`: 19ファイルの末尾余分空行を検出。削除後の再実行は出力なし。
 - Wrapper 生成: 成功。
 - 初回 `test --stacktrace`: 成功。非推奨 API 警告 3 件を確認し、その後修正。
 - 初回 `lint`: API 23 で API 27 の theme item を使用していたため 1 error で失敗。`values-v27` に分離して解消。
@@ -175,4 +194,6 @@ Valhalla、大型バス経路探索、PostgreSQL/PostGIS、バックエンド AP
 
 - 実装コミット: `0b3dc7be1eb3a6bccc504dc5f8107af9da3bc606`
 - コミットメッセージ: `feat: bootstrap Android navigation app`
-- このハッシュを記録する文書更新は後続の docs コミットとして分離した。
+- 初回ハッシュ記録コミット: `1e63e9538342715f875f98cba8caa4c3121e24ea`
+- git diff 監査の空白修正コミット: `17fe5acab6d327b0b7610062c544a6765987aa11`
+- レビューアーカイブの差分監査追記は後続の docs コミットとして分離した。
