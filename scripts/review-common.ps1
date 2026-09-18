@@ -532,11 +532,13 @@ function Update-LatestArchive {
         [Parameter(Mandatory = $true)][string]$LatestPath
     )
 
-    $temporaryLatest = $LatestPath + ".tmp-" + [Guid]::NewGuid().ToString("N")
+    $operationId = [Guid]::NewGuid().ToString("N")
+    $temporaryLatest = $LatestPath + ".tmp-" + $operationId
+    $backupLatest = $LatestPath + ".backup-" + $operationId
     Copy-Item -LiteralPath $SourceArchive -Destination $temporaryLatest
     try {
         if (Test-Path -LiteralPath $LatestPath) {
-            [System.IO.File]::Replace($temporaryLatest, $LatestPath, $null)
+            [System.IO.File]::Replace($temporaryLatest, $LatestPath, $backupLatest, $true)
         }
         else {
             [System.IO.File]::Move($temporaryLatest, $LatestPath)
@@ -545,6 +547,9 @@ function Update-LatestArchive {
     finally {
         if (Test-Path -LiteralPath $temporaryLatest) {
             Remove-Item -LiteralPath $temporaryLatest -Force
+        }
+        if (Test-Path -LiteralPath $backupLatest) {
+            Remove-Item -LiteralPath $backupLatest -Force
         }
     }
 }
