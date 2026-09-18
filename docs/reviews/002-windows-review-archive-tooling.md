@@ -53,15 +53,32 @@ HEAD の親を diff base として `git diff --check` を実行する。親が�
 
 ## 10. 各コマンド結果
 
-最終結果は実装コミット後に更新する。詳細ログは `build/review-checks/` と生成 ZIP の `checks/` に収録する。
+コミット `57e273835277c82cb8e267ef344352b58412c4c8` に対する Windows PowerShell 5.1 での結果は次のとおり。
+
+| チェック | 結果 |
+| --- | --- |
+| `git diff --check <diff-base> HEAD` | PASS |
+| `.\gradlew.bat test --console=plain` | PASS |
+| `.\gradlew.bat lint --console=plain` | PASS |
+| `.\gradlew.bat assembleDebug --console=plain` | PASS |
+| `.\gradlew.bat assembleDebugAndroidTest --console=plain` | PASS |
+| `connectedDebugAndroidTest` | SKIP（adb が PATH にないため） |
+| debug/androidTest APK inventory | PASS |
+
+Java は 21.0.6、Gradle は 9.7.1。詳細ログは `build/review-checks/` と生成 ZIP の `checks/` に収録した。
 
 ## 11. 実際に生成したアーカイブ名
 
-実装コミットに対する検証アーカイブ名を最終検証後に更新する。最終 HEAD の共有対象はリポジトリルートの `busnav-review-latest.zip` とする。
+- `busnav-review-57e273835277-20260918T063036839Z.zip`
+- `busnav-full-review-57e273835277-20260918T063038228Z.zip`
+- `busnav-review-latest.zip`
+- `busnav-full-review-latest.zip`
+
+この文書の最終化コミット後に latest 2ファイルを最終 HEAD で再生成する。通常の共有対象はリポジトリルートの `busnav-review-latest.zip` とする。
 
 ## 12. アーカイブ自己検査結果
 
-最終検証後に entry 数、禁止 entry 数、必須構成、Gradle wrapper JAR の確認結果を更新する。
+通常版は25 entries、Full版は59 entries。両方とも禁止 entry 0、必須構成 PASS。Full版に `repo/gradle/wrapper/gradle-wrapper.jar` が存在し、`local.properties`、APK、`build/` は存在しないことを確認した。
 
 ## 13. 未解決事項
 
@@ -77,4 +94,7 @@ Windows CI または専用 emulator を用意した段階で、同じスクリ�
 
 ## 16. コミットハッシュ
 
-実装コミット作成後に更新する。レビュー文書自身の最終化コミットは循環参照を避け、実装コミットとは分離する。
+- 実装コミット: `8fe17551a91ef4306d773e7b34a4fa9e9bfb1f32` (`chore: add Windows review archive tooling`)
+- Windows PowerShell 5.1 latest 置換修正: `57e273835277c82cb8e267ef344352b58412c4c8` (`fix: replace latest review archives on Windows`)
+
+レビュー文書自身の最終化コミットSHAは循環参照を避けるため本文に埋め込まず、最終報告とアーカイブの `meta/review-info.txt` に記録する。
