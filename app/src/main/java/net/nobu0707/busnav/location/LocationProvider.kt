@@ -6,4 +6,3 @@ interface LocationProvider {
     fun updates(): Flow<LocationUpdate>
     fun isLocationEnabled(): Boolean
 }
-

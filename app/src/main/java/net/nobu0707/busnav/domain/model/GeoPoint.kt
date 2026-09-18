@@ -9,4 +9,3 @@ data class GeoPoint(
         require(longitude in -180.0..180.0) { "Longitude must be between -180 and 180" }
     }
 }
-

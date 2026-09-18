@@ -23,4 +23,3 @@ fun BusNavTheme(content: @Composable () -> Unit) {
         content = content,
     )
 }
-

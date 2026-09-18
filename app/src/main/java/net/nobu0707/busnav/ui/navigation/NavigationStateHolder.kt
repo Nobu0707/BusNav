@@ -72,4 +72,3 @@ class NavigationStateHolder(
         _uiState.value = _uiState.value.transform()
     }
 }
-

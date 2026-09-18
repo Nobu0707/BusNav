@@ -11,4 +11,3 @@ val NightText = Color(0xFFD9E2E8)
 val NightMutedText = Color(0xFF9EADB7)
 val WarningAmber = Color(0xFFE6A84B)
 val AlertRed = Color(0xFFE27D7D)
-

@@ -31,4 +31,3 @@ fun resolveNavigationLayout(widthDp: Float, heightDp: Float): NavigationLayoutMo
     } else {
         NavigationLayoutMode.PortraitMap
     }
-

@@ -38,4 +38,3 @@ class NavigationStateHolderTest {
         assertTrue(holder.uiState.value.recenterRequestId > previousId)
     }
 }
-

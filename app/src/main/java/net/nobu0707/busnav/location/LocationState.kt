@@ -12,10 +12,8 @@ data class LocationState(
     val normalizedBearingDegrees: Float?
         get() = bearingDegrees?.let { ((it % 360f) + 360f) % 360f }
 }
-
 sealed interface LocationUpdate {
     data class Position(val location: LocationState) : LocationUpdate
     data class Error(val message: String) : LocationUpdate
     data object Disabled : LocationUpdate
 }
-

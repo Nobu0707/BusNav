@@ -76,4 +76,3 @@ AndroidLocationProvider
 - Google Play services Fused Location: MVP0 では Play services 非搭載端末も含めた依存の小ささを優先しました。
 - MapLibre LocationComponent: 位置取得と描画を同一コンポーネントへ閉じ込めず、将来のナビ向け更新・Fake 注入・自車表現を独立させるため使用していません。
 - Hilt / repository/use-case の全面導入: 現段階では抽象の数に対して複雑さが過大になるため見送りました。
-
