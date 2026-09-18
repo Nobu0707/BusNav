@@ -1,5 +1,34 @@
 # Review Archive Workflow
 
+## Phase scope and portable ZIP entries
+
+At the start of each Codex implementation task, record the current commit:
+
+```powershell
+$base = git rev-parse HEAD
+```
+
+Pass that value to every final check and archive command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run-review-checks.ps1 -BaseRef $base
+powershell -ExecutionPolicy Bypass -File scripts\make-review-archive.ps1 -BaseRef $base -SkipChecks
+powershell -ExecutionPolicy Bypass -File scripts\make-full-review-archive.ps1 -BaseRef $base -SkipChecks
+```
+
+`-BaseRef` defines the whole review phase, so a lightweight archive remains
+complete when implementation, fixes, and documentation use multiple commits.
+When omitted, the scripts retain the previous behavior of using `HEAD^` (or
+Git's empty tree for an initial commit).
+
+The lightweight archive stores `BaseRef..HEAD` metadata, a
+`diff/phase-full-diff.txt`, per-file diffs, and safe HEAD-side snapshots.
+`diff/head-full-diff.txt` is retained as a compatibility alias and contains
+the same phase-range diff. Full archives still store the complete tracked
+`HEAD` tree under `repo/`.
+
+All ZIP entry names use `/`, including archives produced on Windows. Archive
+self-checks reject raw entry names containing `\`. `-SkipChecks` accepts
 BusNav のレビュー資料は Windows 11 上の PowerShell で生成する。通常のレビューでは差分中心の軽量版を共有し、差分だけで判断できない場合に限り、Git 追跡済みのリポジトリ一式を含む Full 版を共有する。
 
 ## 通常の開発サイクル

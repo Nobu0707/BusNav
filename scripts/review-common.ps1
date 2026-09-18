@@ -190,17 +190,29 @@ function Get-GitText {
 }
 
 function Get-ReviewGitContext {
-    param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot,
+        [string]$BaseRef
+    )
 
     $headSha = Get-GitText -RepositoryRoot $RepositoryRoot -Arguments @("rev-parse", "HEAD")
     $headShortSha = Get-GitText -RepositoryRoot $RepositoryRoot -Arguments @("rev-parse", "--short=12", "HEAD")
     $headSubject = Get-GitText -RepositoryRoot $RepositoryRoot -Arguments @("log", "-1", "--format=%s", "HEAD")
-    $parentResult = Invoke-GitCapture -RepositoryRoot $RepositoryRoot -Arguments @("rev-parse", "HEAD^")
-    if ($parentResult.ExitCode -eq 0) {
-        $diffBase = $parentResult.StandardOutput.Trim()
+    if (-not [string]::IsNullOrWhiteSpace($BaseRef)) {
+        $baseResult = Invoke-GitCapture -RepositoryRoot $RepositoryRoot -Arguments @("rev-parse", "--verify", "$BaseRef^{commit}")
+        if ($baseResult.ExitCode -ne 0) {
+            throw "Unable to resolve BaseRef '$BaseRef' to a commit: $($baseResult.StandardError.Trim())"
+        }
+        $diffBase = $baseResult.StandardOutput.Trim()
     }
     else {
-        $diffBase = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+        $parentResult = Invoke-GitCapture -RepositoryRoot $RepositoryRoot -Arguments @("rev-parse", "HEAD^")
+        if ($parentResult.ExitCode -eq 0) {
+            $diffBase = $parentResult.StandardOutput.Trim()
+        }
+        else {
+            $diffBase = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+        }
     }
 
     return [PSCustomObject]@{
@@ -208,6 +220,20 @@ function Get-ReviewGitContext {
         HeadShortSha = $headShortSha
         HeadSubject = $headSubject
         DiffBase = $diffBase
+        BaseRefInput = $BaseRef
+    }
+}
+
+function Assert-ExpectedHeadSubject {
+    param(
+        [Parameter(Mandatory = $true)][string]$HeadSubject,
+        [string]$ExpectedHeadSubject
+    )
+
+    if (-not [string]::IsNullOrEmpty($ExpectedHeadSubject)) {
+        if ($HeadSubject.IndexOf($ExpectedHeadSubject, [StringComparison]::Ordinal) -lt 0) {
+            throw "HEAD subject mismatch. Expected substring '$ExpectedHeadSubject' but found '$HeadSubject'."
+        }
     }
 }
 
@@ -225,8 +251,24 @@ function Get-ReviewCheckStatus {
     return $lastMatch.Matches[0].Groups[1].Value
 }
 
+function Get-ReviewSummaryValue {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    $match = Select-String -LiteralPath $Path -Pattern ("^{0}: (.*)$" -f [Regex]::Escape($Name)) | Select-Object -First 1
+    if ($null -eq $match) {
+        throw "Review check summary is missing '$Name': $Path"
+    }
+    return $match.Matches[0].Groups[1].Value
+}
+
 function Assert-ReviewChecks {
-    param([Parameter(Mandatory = $true)][string]$ChecksDirectory)
+    param(
+        [Parameter(Mandatory = $true)][string]$ChecksDirectory,
+        [Parameter(Mandatory = $true)]$GitContext
+    )
 
     $requiredPassLogs = @(
         "git-diff-check.txt",
@@ -246,11 +288,93 @@ function Assert-ReviewChecks {
         }
     }
 
+    $summaryPath = Join-Path $ChecksDirectory "review-check-summary.txt"
+    $summaryHeadSha = Get-ReviewSummaryValue -Path $summaryPath -Name "HEAD SHA"
+    $summaryDiffBase = Get-ReviewSummaryValue -Path $summaryPath -Name "Diff base"
+    if ($summaryHeadSha -cne $GitContext.HeadSha) {
+        throw "Review checks are stale: summary HEAD SHA '$summaryHeadSha' does not match current HEAD '$($GitContext.HeadSha)'."
+    }
+    if ($summaryDiffBase -cne $GitContext.DiffBase) {
+        throw "Review checks are stale: summary Diff base '$summaryDiffBase' does not match current Diff base '$($GitContext.DiffBase)'."
+    }
+
     $connectedLog = Join-Path $ChecksDirectory "connected-debug-android-test.txt"
     $connectedStatus = Get-ReviewCheckStatus -Path $connectedLog
     if (($connectedStatus -ne "PASS") -and ($connectedStatus -ne "SKIP")) {
         throw "Connected Android test must be PASS or SKIP: connected-debug-android-test.txt ($connectedStatus)"
     }
+}
+
+function ConvertFrom-JavaPropertiesValue {
+    param([AllowEmptyString()][string]$Value)
+
+    $builder = New-Object System.Text.StringBuilder
+    for ($index = 0; $index -lt $Value.Length; $index++) {
+        $character = $Value[$index]
+        if (($character -ne '\') -or ($index + 1 -ge $Value.Length)) {
+            [void]$builder.Append($character)
+            continue
+        }
+
+        $index++
+        $escaped = $Value[$index]
+        switch ($escaped) {
+            't' { [void]$builder.Append([char]9) }
+            'r' { [void]$builder.Append([char]13) }
+            'n' { [void]$builder.Append([char]10) }
+            'f' { [void]$builder.Append([char]12) }
+            'u' {
+                if ($index + 4 -ge $Value.Length) {
+                    throw "Invalid Unicode escape in Java properties value."
+                }
+                $hex = $Value.Substring($index + 1, 4)
+                if ($hex -notmatch '^[0-9A-Fa-f]{4}$') {
+                    throw "Invalid Unicode escape in Java properties value: backslash-u$hex"
+                }
+                [void]$builder.Append([char][Convert]::ToInt32($hex, 16))
+                $index += 4
+            }
+            default { [void]$builder.Append($escaped) }
+        }
+    }
+    return $builder.ToString()
+}
+
+function Find-AndroidAdb {
+    param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
+
+    $pathCommand = Get-Command adb -ErrorAction SilentlyContinue
+    if ($null -ne $pathCommand) {
+        return [PSCustomObject]@{ Path = $pathCommand.Source; Discovery = "PATH" }
+    }
+
+    foreach ($environmentCandidate in @(
+        [PSCustomObject]@{ Value = $env:ANDROID_SDK_ROOT; Discovery = "ANDROID_SDK_ROOT" },
+        [PSCustomObject]@{ Value = $env:ANDROID_HOME; Discovery = "ANDROID_HOME" }
+    )) {
+        if (-not [string]::IsNullOrWhiteSpace($environmentCandidate.Value)) {
+            $candidatePath = Join-Path $environmentCandidate.Value "platform-tools\adb.exe"
+            if (Test-Path -LiteralPath $candidatePath -PathType Leaf) {
+                return [PSCustomObject]@{ Path = [System.IO.Path]::GetFullPath($candidatePath); Discovery = $environmentCandidate.Discovery }
+            }
+        }
+    }
+
+    $localPropertiesPath = Join-Path $RepositoryRoot "local.properties"
+    if (Test-Path -LiteralPath $localPropertiesPath -PathType Leaf) {
+        foreach ($line in [System.IO.File]::ReadAllLines($localPropertiesPath)) {
+            if ($line -match '^\s*sdk\.dir\s*[:=]\s*(.*)\s*$') {
+                $sdkDirectory = ConvertFrom-JavaPropertiesValue -Value $Matches[1]
+                $candidatePath = Join-Path $sdkDirectory "platform-tools\adb.exe"
+                if (Test-Path -LiteralPath $candidatePath -PathType Leaf) {
+                    return [PSCustomObject]@{ Path = [System.IO.Path]::GetFullPath($candidatePath); Discovery = "local.properties" }
+                }
+                break
+            }
+        }
+    }
+
+    return [PSCustomObject]@{ Path = $null; Discovery = "unavailable" }
 }
 
 function Get-RepositoryRelativePath {
@@ -465,7 +589,16 @@ function Assert-ReviewArchive {
     Initialize-ZipSupport
     $archive = [System.IO.Compression.ZipFile]::OpenRead($ArchivePath)
     try {
-        $entryNames = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
+        $rawEntryNames = @($archive.Entries | ForEach-Object { $_.FullName })
+        $backslashEntryNames = @($rawEntryNames | Where-Object { $_.Contains('\') })
+        if ($backslashEntryNames.Count -gt 0) {
+            throw "Archive contains entry names with backslashes: $($backslashEntryNames -join ', ')"
+        }
+        $entryNames = $rawEntryNames
+        $forwardSlashEntryCount = @($entryNames | Where-Object { $_.Contains('/') }).Count
+        if ($forwardSlashEntryCount -eq 0) {
+            throw "Archive does not contain any entry names using forward slashes."
+        }
         $requiredPrefixes = @("meta/", "checks/")
         if ($Kind -eq "review") {
             $requiredPrefixes += "diff/"
@@ -499,6 +632,8 @@ function Assert-ReviewArchive {
 
         return [PSCustomObject]@{
             EntryCount = $entryNames.Count
+            BackslashEntryCount = $backslashEntryNames.Count
+            ForwardSlashEntryCount = $forwardSlashEntryCount
             ProhibitedEntryCount = 0
             RequiredContent = "PASS"
         }
@@ -518,12 +653,30 @@ function New-ZipFromDirectory {
     if (Test-Path -LiteralPath $DestinationPath) {
         throw "Refusing to overwrite existing archive: $DestinationPath"
     }
-    [System.IO.Compression.ZipFile]::CreateFromDirectory(
-        $SourceDirectory,
-        $DestinationPath,
-        [System.IO.Compression.CompressionLevel]::Optimal,
-        $false
-    )
+    $sourceRoot = [System.IO.Path]::GetFullPath($SourceDirectory)
+    $archive = [System.IO.Compression.ZipFile]::Open($DestinationPath, [System.IO.Compression.ZipArchiveMode]::Create)
+    try {
+        Get-ChildItem -LiteralPath $sourceRoot -File -Recurse | Sort-Object FullName | ForEach-Object {
+            $entryName = Get-RepositoryRelativePath -RepositoryRoot $sourceRoot -FullPath $_.FullName
+            $entryName = $entryName.Replace('\', '/')
+            $entry = $archive.CreateEntry($entryName, [System.IO.Compression.CompressionLevel]::Optimal)
+            if ($_.LastWriteTime.Year -ge 1980) {
+                $entry.LastWriteTime = [DateTimeOffset]$_.LastWriteTime
+            }
+            $inputStream = [System.IO.File]::OpenRead($_.FullName)
+            $outputStream = $entry.Open()
+            try {
+                $inputStream.CopyTo($outputStream)
+            }
+            finally {
+                $outputStream.Dispose()
+                $inputStream.Dispose()
+            }
+        }
+    }
+    finally {
+        $archive.Dispose()
+    }
 }
 
 function Update-LatestArchive {

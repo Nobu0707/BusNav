@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$ExpectedHeadSubject,
+    [string]$BaseRef,
     [switch]$SkipChecks
 )
 
@@ -10,17 +11,15 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "review-common.ps1")
 
 $repositoryRoot = Resolve-ReviewRepositoryRoot
-$gitContext = Get-ReviewGitContext -RepositoryRoot $repositoryRoot
-if ($PSBoundParameters.ContainsKey("ExpectedHeadSubject") -and ($gitContext.HeadSubject -cne $ExpectedHeadSubject)) {
-    throw "HEAD subject mismatch. Expected '$ExpectedHeadSubject' but found '$($gitContext.HeadSubject)'."
-}
+$gitContext = Get-ReviewGitContext -RepositoryRoot $repositoryRoot -BaseRef $BaseRef
+Assert-ExpectedHeadSubject -HeadSubject $gitContext.HeadSubject -ExpectedHeadSubject $ExpectedHeadSubject
 
 $checksDirectory = Join-Path $repositoryRoot "build\review-checks"
 if (-not $SkipChecks) {
     Write-Host "Running review checks before full archive creation..."
-    & (Join-Path $PSScriptRoot "run-review-checks.ps1")
+    & (Join-Path $PSScriptRoot "run-review-checks.ps1") -BaseRef $BaseRef
 }
-Assert-ReviewChecks -ChecksDirectory $checksDirectory
+Assert-ReviewChecks -ChecksDirectory $checksDirectory -GitContext $gitContext
 
 $timestamp = [DateTime]::UtcNow.ToString("yyyyMMddTHHmmssfffZ")
 $archiveName = "busnav-full-review-$($gitContext.HeadShortSha)-$timestamp.zip"
@@ -48,6 +47,7 @@ try {
     $reviewInfo.Add("HEAD short SHA: $($gitContext.HeadShortSha)")
     $reviewInfo.Add("HEAD subject: $($gitContext.HeadSubject)")
     $reviewInfo.Add("Diff base: $($gitContext.DiffBase)")
+    $reviewInfo.Add("BaseRef input: $(if ([string]::IsNullOrWhiteSpace($BaseRef)) { 'not specified' } else { $BaseRef })")
     if ($PSBoundParameters.ContainsKey("ExpectedHeadSubject")) {
         $reviewInfo.Add("Expected subject: $ExpectedHeadSubject")
     }
@@ -60,6 +60,8 @@ try {
     Write-GitOutputFile -RepositoryRoot $repositoryRoot -Arguments @("status", "--short", "--untracked-files=all") -OutputPath (Join-Path $metaDirectory "git-status-short.txt")
     Write-GitOutputFile -RepositoryRoot $repositoryRoot -Arguments @("show", "--stat", "--format=fuller", "HEAD") -OutputPath (Join-Path $metaDirectory "head-stat.txt")
     Write-GitOutputFile -RepositoryRoot $repositoryRoot -Arguments @("diff-tree", "--root", "--no-commit-id", "--name-status", "-r", "HEAD") -OutputPath (Join-Path $metaDirectory "head-name-status.txt")
+    Write-GitOutputFile -RepositoryRoot $repositoryRoot -Arguments @("diff", "--name-status", "--no-renames", $gitContext.DiffBase, "HEAD") -OutputPath (Join-Path $metaDirectory "phase-name-status.txt")
+    Write-GitOutputFile -RepositoryRoot $repositoryRoot -Arguments @("diff", "--name-only", "--no-renames", $gitContext.DiffBase, "HEAD") -OutputPath (Join-Path $metaDirectory "phase-changed-files.txt")
 
     $sourceArchive = Join-Path $stagingDirectory "head-source.zip"
     $gitArchiveResult = Invoke-GitCapture -RepositoryRoot $repositoryRoot -Arguments @("archive", "--format=zip", "--output=$sourceArchive", "HEAD")
@@ -94,6 +96,8 @@ try {
         "Archive self-check",
         "Checked UTC: $([DateTime]::UtcNow.ToString('o'))",
         "Initial entry count: $($initialInspection.EntryCount)",
+        "Backslash entry names: $($initialInspection.BackslashEntryCount)",
+        "Forward-slash entry names: $($initialInspection.ForwardSlashEntryCount)",
         "Required content: $($initialInspection.RequiredContent)",
         "Prohibited entries: $($initialInspection.ProhibitedEntryCount)",
         "Gradle wrapper JAR: included",
@@ -111,7 +115,7 @@ try {
 
     Write-Host "Full review archive created: $archivePath"
     Write-Host "Latest full archive updated: $latestPath"
-    Write-Host "Archive entries: $($finalInspection.EntryCount); prohibited entries: $($finalInspection.ProhibitedEntryCount)"
+    Write-Host "Archive entries: $($finalInspection.EntryCount); backslash entries: $($finalInspection.BackslashEntryCount); prohibited entries: $($finalInspection.ProhibitedEntryCount)"
 }
 catch {
     if (Test-Path -LiteralPath $temporaryArchive) {

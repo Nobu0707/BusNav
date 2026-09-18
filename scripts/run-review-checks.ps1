@@ -1,5 +1,7 @@
 [CmdletBinding()]
-param()
+param(
+    [string]$BaseRef
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -28,7 +30,7 @@ foreach ($knownLog in $knownLogs) {
     }
 }
 
-$gitContext = Get-ReviewGitContext -RepositoryRoot $repositoryRoot
+$gitContext = Get-ReviewGitContext -RepositoryRoot $repositoryRoot -BaseRef $BaseRef
 $statuses = @{}
 $runUtc = [DateTime]::UtcNow
 
@@ -66,11 +68,11 @@ if (-not (Test-Path -LiteralPath $gradleWrapper -PathType Leaf)) {
 [void](Invoke-LoggedCheck -Name "assembleDebug" -FilePath $gradleWrapper -Arguments @("assembleDebug", "--console=plain") -LogName "gradle-assemble-debug.txt")
 [void](Invoke-LoggedCheck -Name "assembleDebugAndroidTest" -FilePath $gradleWrapper -Arguments @("assembleDebugAndroidTest", "--console=plain") -LogName "gradle-assemble-android-test.txt")
 
-$adbCommand = Get-Command adb -ErrorAction SilentlyContinue
-$adbAvailable = $null -ne $adbCommand
+$adbResolution = Find-AndroidAdb -RepositoryRoot $repositoryRoot
+$adbAvailable = $null -ne $adbResolution.Path
 if ($adbAvailable) {
     Write-Host "Checking connected Android devices..."
-    $adbResult = Invoke-CapturedCommand -FilePath $adbCommand.Source -Arguments @("devices") -WorkingDirectory $repositoryRoot
+    $adbResult = Invoke-CapturedCommand -FilePath $adbResolution.Path -Arguments @("devices") -WorkingDirectory $repositoryRoot
     if ($adbResult.ExitCode -eq 0) {
         $adbStatus = "PASS"
     }
@@ -108,10 +110,10 @@ else {
         StartUtc = [DateTime]::UtcNow
         EndUtc = [DateTime]::UtcNow
         ExitCode = 0
-        StandardOutput = "adb was not found on PATH."
+        StandardOutput = "adb was not found via PATH, Android SDK environment variables, or local.properties."
         StandardError = ""
     }
-    Write-Utf8File -Path (Join-Path $checksDirectory "adb-devices.txt") -Content (Format-CommandResult -Result $notFoundResult -Status "SKIP" -Reason "adb is not available on PATH")
+    Write-Utf8File -Path (Join-Path $checksDirectory "adb-devices.txt") -Content (Format-CommandResult -Result $notFoundResult -Status "SKIP" -Reason "adb is unavailable")
     $connectedSkip = [PSCustomObject]@{
         Command = "$gradleWrapper connectedDebugAndroidTest --console=plain"
         StartUtc = [DateTime]::UtcNow
@@ -120,7 +122,7 @@ else {
         StandardOutput = ""
         StandardError = ""
     }
-    Write-Utf8File -Path (Join-Path $checksDirectory "connected-debug-android-test.txt") -Content (Format-CommandResult -Result $connectedSkip -Status "SKIP" -Reason "adb is not available on PATH; no connected Android device or running emulator could be detected")
+    Write-Utf8File -Path (Join-Path $checksDirectory "connected-debug-android-test.txt") -Content (Format-CommandResult -Result $connectedSkip -Status "SKIP" -Reason "adb is unavailable; no connected Android device or running emulator could be detected")
     $statuses["connectedDebugAndroidTest"] = "SKIP"
 }
 
@@ -210,11 +212,14 @@ $summaryLines = @(
     "HEAD SHA: $($gitContext.HeadSha)",
     "HEAD subject: $($gitContext.HeadSubject)",
     "Diff base: $($gitContext.DiffBase)",
+    "BaseRef input: $(if ([string]::IsNullOrWhiteSpace($BaseRef)) { 'not specified' } else { $BaseRef })",
     "Run UTC: $($runUtc.ToString('o'))",
     "PowerShell version: $($PSVersionTable.PSVersion.ToString()) ($($PSVersionTable.PSEdition))",
     "Java version: $javaVersion",
     "Gradle version: $gradleVersion",
     "adb availability: $adbAvailable",
+    "ADB path: $(if ($adbAvailable) { $adbResolution.Path } else { 'unavailable' })",
+    "ADB discovery: $($adbResolution.Discovery)",
     "",
     "Git diff check: $($statuses['Git diff check'])",
     "Gradle test: $($statuses['Gradle test'])",
