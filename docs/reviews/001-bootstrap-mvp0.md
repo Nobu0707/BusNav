@@ -173,5 +173,6 @@ Valhalla、大型バス経路探索、PostgreSQL/PostGIS、バックエンド AP
 
 ## 17. コミットハッシュ
 
-- 実装コミット: `PENDING_AFTER_VALIDATION`
+- 実装コミット: `0b3dc7be1eb3a6bccc504dc5f8107af9da3bc606`
 - コミットメッセージ: `feat: bootstrap Android navigation app`
+- このハッシュを記録する文書更新は後続の docs コミットとして分離した。
