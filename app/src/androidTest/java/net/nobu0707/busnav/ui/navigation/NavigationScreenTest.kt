@@ -121,4 +121,26 @@ class NavigationScreenTest {
         composeRule.onNodeWithTag(NavigationTestTags.ROUTE_OVERVIEW).performClick()
         composeRule.runOnIdle { assertTrue(clicked) }
     }
+
+    @Test
+    fun routeEditEntryInvokesCallback() {
+        var clicked = false
+        composeRule.setContent {
+            BusNavTheme {
+                NavigationScreen(
+                    uiState = NavigationUiState(locationPermissionState = LocationPermissionState.Granted),
+                    onLayoutModeChanged = {},
+                    onRequestPermission = {},
+                    onCurrentLocation = {},
+                    onRouteOverview = {},
+                    onEditRoute = { clicked = true },
+                    modifier = Modifier.requiredSize(400.dp, 800.dp),
+                    mapContent = { Box(it) },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(NavigationTestTags.ROUTE_EDIT).performClick()
+        composeRule.runOnIdle { assertTrue(clicked) }
+    }
 }

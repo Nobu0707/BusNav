@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.CancellationException
 import net.nobu0707.busnav.data.route.createDevelopmentSampleRoute
 import net.nobu0707.busnav.domain.route.ScheduledRoute
 import net.nobu0707.busnav.domain.route.ScheduledRouteRepository
@@ -59,6 +60,14 @@ class NavigationStateHolderTest {
         assertNull(failedHolder.uiState.value.activeRoute)
         assertEquals("route unavailable", failedHolder.uiState.value.routeError)
         assertFalse(failedHolder.uiState.value.isRouteLoading)
+    }
+
+    @Test
+    fun `repository cancellation is not converted to route error`() {
+        val cancelledHolder = createHolder(error = CancellationException("cancelled"))
+
+        assertNull(cancelledHolder.uiState.value.routeError)
+        assertTrue(cancelledHolder.uiState.value.isRouteLoading)
     }
 
     @Test

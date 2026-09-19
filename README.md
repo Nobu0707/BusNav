@@ -2,7 +2,7 @@
 
 BusNav は、高速バス・夜行バスの実運用を想定した業務用ナビゲーションアプリです。通常は登録済みの所定経路を案内し、通行止めや運行管理上の指示がある場合だけ安全な迂回と所定経路への復帰を行うことを将来目標としています。
 
-このリポジトリの Phase 002 は、経路探索ではなく Android アプリ基盤と所定経路表示基盤を提供します。
+このリポジトリの Phase 003 は、所定経路表示基盤に加えて、将来の経路探索入力となる RoutePlan と専用編集画面を提供します。Valhalla 接続と実経路探索はまだ行いません。
 
 ## 現在の実装範囲
 
@@ -19,6 +19,10 @@ BusNav は、高速バス・夜行バスの実運用を想定した業務用ナ�
 - debug build の架空 sample route と repository 境界
 - GeoJSON LineString、casing/main line、START / STOP / DESTINATION marker による所定経路表示
 - style reload 時の overlay 復元と、位置追従を解除する「経路全体」bounds fit
+- Android/MapLibre/Valhalla 非依存の RoutePlan、validation、pure editing operations、RoutingRequest 境界
+- START / DESTINATION / VIA / SHAPING の追加、削除、上・下並べ替え、VIA/SHAPING 切替
+- Navigation と分離した縦横対応 RoutePlan editor、地図長押し、in-memory/回転保持
+- ScheduledRoute と共存する細い半透明の経路探索前 preview と 4 種 marker
 
 ## 開発環境
 
@@ -69,8 +73,8 @@ macOS / Linux / WSL:
 - 実端末での長時間走行、トンネル、GPS ロスト時の評価は未実施です。
 - 位置情報の権限を「今後表示しない」で拒否した場合の設定画面への直接リンクは未実装です。
 - 高頻度ナビ更新向けの平滑化、センサ融合、進行方向上固定は未実装です。
-- 経路探索、所定経路編集/保存、逸脱判定、VICS、音声案内、オフライン地図は対象外です。
+- Valhalla 実接続、道路沿いの経路探索、RoutePlan 永続保存、逸脱判定、VICS、音声案内、オフライン地図は対象外です。
 
 ## 次フェーズ候補
 
-所定経路編集、Valhalla 接続境界、VICS などの交通情報入力、所定経路復帰、JCT 専用案内、運行管理指示、設定画面、昼間テーマを段階的に追加します。接続点は [アーキテクチャ文書](docs/architecture.md) と [所定経路 domain](docs/domain/scheduled-route.md) を参照してください。
+Phase 004 では validated `RoutingRequest` を Valhalla または routing backend へ渡し、結果を `ScheduledRoute` へ変換する境界を実装します。その後、VICS、所定経路復帰、JCT 案内、運行管理指示を段階的に追加します。接続点は [アーキテクチャ文書](docs/architecture.md)、[RoutePlan domain](docs/domain/route-plan.md)、[所定経路 domain](docs/domain/scheduled-route.md) を参照してください。

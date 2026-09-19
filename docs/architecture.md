@@ -1,8 +1,8 @@
-# BusNav Phase 002 アーキテクチャ
+# BusNav Phase 003 アーキテクチャ
 
 ## 方針
 
-Phase 002 は単一 `app` モジュールを維持し、UI、所定経路 domain、地図 SDK、位置情報 API の境界を明確にします。不要な DI フレームワークや機械的な多層化は導入せず、依存は `MainActivity` と Compose のルートで手動生成できる規模に保っています。
+Phase 003 は単一 `app` モジュールを維持し、編集入力 RoutePlan、計算済み ScheduledRoute、UI、地図 SDK、位置情報 API の境界を明確にします。不要な DI フレームワークや機械的な多層化は導入せず、依存は `MainActivity` と Compose のルートで手動生成できる規模に保っています。
 
 ## パッケージ構成
 
@@ -11,6 +11,10 @@ net.nobu0707.busnav
 ├── MainActivity.kt
 ├── domain
 │   ├── model/GeoPoint.kt
+│   ├── routeplan
+│   │   ├── RoutePlan.kt / RoutePlanPoint.kt / RoutePlanPointType.kt
+│   │   ├── RoutePlanOperations.kt / RoutePlanValidation.kt / RoutePlanBounds.kt
+│   │   └── RoutingRequest.kt
 │   └── route
 │       ├── ScheduledRoute.kt
 │       ├── RouteGeometry.kt / RouteBounds.kt
@@ -25,12 +29,17 @@ net.nobu0707.busnav
 ├── map
 │   ├── MapScreen.kt
 │   ├── MapController.kt
-│   └── RouteOverlayController.kt
+│   ├── RouteOverlayController.kt
+│   └── RoutePlanOverlayController.kt
 └── ui
     ├── navigation
     │   ├── NavigationScreen.kt
     │   ├── NavigationStateHolder.kt
     │   └── NavigationUiState.kt
+    ├── routeplan
+    │   ├── RoutePlanEditorScreen.kt
+    │   ├── RoutePlanEditorStateHolder.kt / RoutePlanUiState.kt
+    │   └── RoutePlanEditorViewModel.kt
     └── theme
 ```
 
@@ -44,17 +53,21 @@ net.nobu0707.busnav
 
 `ScheduledRoute`、`RouteGeometry`、`RoutePoint` は Android SDK と MapLibre に依存しない純粋 Kotlin model です。geometry は最低 2 点を要求し、日本国内運用を前提とした単純な緯度経度 bounds を計算します。取得元は `ScheduledRouteRepository` で抽象化し、Phase 002 は `InMemoryScheduledRouteRepository` だけを実装しています。詳細は [所定経路 domain](domain/scheduled-route.md) を参照してください。
 
+`RoutePlan` は経路探索入力、`ScheduledRoute` は探索後の走行 geometry です。`RoutePlanOperations` と validation は純粋 Kotlin で、不完全な編集中状態を許容しながら routing 可能性を別判定します。validation 済み plan だけを `RoutingRequest` へ変換します。詳細は [RoutePlan domain](domain/route-plan.md) を参照してください。
+
 ### UI / 状態
 
 `NavigationRoute` は Android の実行時権限と Lifecycle を Compose 状態へ橋渡しします。`NavigationStateHolder` は `StateFlow<NavigationUiState>` を所有し、位置更新の購読、所定経路読込、追従 ON/OFF、再センタ要求、経路全体表示要求、エラーを集約します。経路読込失敗は `routeError` に隔離し、位置情報と地図を停止しません。
 
 `NavigationScreen` 以下は状態を受け取る表示層です。地図領域は Composable ラムダとして差し替え可能なので、UI テストは MapLibre/OpenGL を起動せずレイアウトと操作を検証できます。
 
+RoutePlan は専用 `RoutePlanEditorStateHolder` と `RoutePlanUiState` が所有します。小さな ViewModel は回転時の in-memory 保持だけを担当し、Navigation state へ編集項目を混在させません。Navigation と editor は同時表示せず、走行画面に複雑編集を置きません。
+
 ### map
 
 `MapScreen` は Compose と `MapView` の境界です。Lifecycle の start/resume/pause/stop/destroy を MapView へ転送します。
 
-`MapController` は MapLibre 固有 API を隔離します。スタイル読込、GeoJSON の自車ソース、SymbolLayer、カメラ追従、経路 bounds fit、MapLibre の移動ジェスチャ検知を担当します。`RouteOverlayController` は所定経路を GeoJSON LineString / FeatureCollection へ変換し、casing、main line、START / STOP / DESTINATION の circle layer を管理します。最新 route は controller 側に保持し、style load 完了ごとに同じ ID の source/layer を重複させず復元します。
+`MapController` は MapLibre 固有 API を隔離します。スタイル読込、GeoJSON の自車ソース、SymbolLayer、カメラ追従、経路 bounds fit、MapLibre の移動/長押しジェスチャ検知を担当します。MapLibre `LatLng` はこの境界内で `GeoPoint` へ変換します。`RouteOverlayController` は所定経路、`RoutePlanOverlayController` は直線 preview と 4 種 point layer を別 ID で管理します。最新 route/plan は controller 側に保持し、style load 完了ごとに同じ ID の source/layer を重複させず双方を復元します。
 
 ### location
 
@@ -82,11 +95,21 @@ ScheduledRouteRepository
   -> MapLibre GeoJSON source + style layers
 ```
 
+```text
+RoutePlanEditorScreen long press
+  -> GeoPoint
+  -> RoutePlanEditorStateHolder
+  -> RoutePlan + validation
+  -> RoutingRequest (ready 時のみ)
+  -> [Phase 004 RoutingEngine]
+  -> ScheduledRoute
+```
+
 権限拒否や provider 無効は `NavigationUiState.locationError` へ変換され、地図表示自体を止めません。手動地図操作は MapController から StateHolder へ通知され、追従状態だけを OFF にします。
 
 ## 将来の接続点
 
-- Valhalla: 外部クライアントは将来の `routing` interface 背後へ置き、結果を所定経路と混同しない経路候補 model へ変換します。UI から HTTP クライアントを直接呼びません。
+- Valhalla: `RoutingRequest` を将来の `RoutingEngine` interface へ渡し、結果を `ScheduledRoute` へ変換します。Valhalla 固有 JSON、HTTP client、vehicle profile は domain/UI へ漏らしません。
 - VICS / 規制情報: `traffic` のデータソースを追加し、所定経路との照合結果を状態層へ統合します。MapController には描画用モデルのみ渡します。
 - 所定経路復帰: 現在地と所定経路の偏差判定を domain サービスとし、LocationProvider や MapLibre から分離します。
 - JCT 表示: NavigationUiState に案内モードと接近情報を追加し、レイアウトの中央地図領域へ一時的な専用表示を重ねます。

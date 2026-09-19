@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +37,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -49,10 +53,13 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import net.nobu0707.busnav.location.LocationProvider
 import net.nobu0707.busnav.domain.route.ScheduledRouteRepository
 import net.nobu0707.busnav.map.MapScreen
 import net.nobu0707.busnav.ui.theme.BusNavTheme
+import net.nobu0707.busnav.ui.routeplan.RoutePlanEditorScreen
+import net.nobu0707.busnav.ui.routeplan.RoutePlanEditorViewModel
 
 object NavigationTestTags {
     const val NEXT_GUIDANCE = "next_guidance"
@@ -62,7 +69,10 @@ object NavigationTestTags {
     const val CURRENT_LOCATION = "current_location"
     const val ROUTE_OVERVIEW = "route_overview"
     const val PERMISSION = "permission_prompt"
+    const val ROUTE_EDIT = "route_edit"
 }
+
+private enum class BusNavScreen { NAVIGATION, ROUTE_EDIT }
 
 @Composable
 fun NavigationRoute(
@@ -76,6 +86,9 @@ fun NavigationRoute(
         NavigationStateHolder(locationProvider, routeRepository, scope)
     }
     val uiState by stateHolder.uiState.collectAsState()
+    val routePlanHolder = viewModel<RoutePlanEditorViewModel>().stateHolder
+    val routePlanUiState by routePlanHolder.uiState.collectAsState()
+    var screen by rememberSaveable { mutableStateOf(BusNavScreen.NAVIGATION) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -112,33 +125,69 @@ fun NavigationRoute(
         }
     }
 
-    NavigationScreen(
-        uiState = uiState,
-        onLayoutModeChanged = stateHolder::setLayoutMode,
-        onRequestPermission = {
-            permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                ),
-            )
-        },
-        onCurrentLocation = stateHolder::onCurrentLocationRequested,
-        onRouteOverview = stateHolder::onRouteOverviewRequested,
-        mapContent = { modifier ->
-            MapScreen(
-                location = uiState.location,
-                isFollowingLocation = uiState.isFollowingLocation,
-                recenterRequestId = uiState.recenterRequestId,
-                activeRoute = uiState.activeRoute,
-                routeOverviewRequestId = uiState.routeOverviewRequestId,
-                onMapReady = stateHolder::onMapReady,
-                onMapGesture = stateHolder::onManualMapGesture,
-                onMapError = stateHolder::onMapError,
-                modifier = modifier,
-            )
-        },
-    )
+    BackHandler(enabled = screen == BusNavScreen.ROUTE_EDIT) { screen = BusNavScreen.NAVIGATION }
+
+    when (screen) {
+        BusNavScreen.NAVIGATION -> NavigationScreen(
+            uiState = uiState,
+            hasRoutePlan = routePlanUiState.currentPlan.points.isNotEmpty(),
+            onLayoutModeChanged = stateHolder::setLayoutMode,
+            onRequestPermission = {
+                permissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                    ),
+                )
+            },
+            onCurrentLocation = stateHolder::onCurrentLocationRequested,
+            onRouteOverview = stateHolder::onRouteOverviewRequested,
+            onEditRoute = { screen = BusNavScreen.ROUTE_EDIT },
+            mapContent = { modifier ->
+                MapScreen(
+                    location = uiState.location,
+                    isFollowingLocation = uiState.isFollowingLocation,
+                    recenterRequestId = uiState.recenterRequestId,
+                    activeRoute = uiState.activeRoute,
+                    routeOverviewRequestId = uiState.routeOverviewRequestId,
+                    onMapReady = stateHolder::onMapReady,
+                    onMapGesture = stateHolder::onManualMapGesture,
+                    onMapError = stateHolder::onMapError,
+                    modifier = modifier,
+                )
+            },
+        )
+        BusNavScreen.ROUTE_EDIT -> RoutePlanEditorScreen(
+            uiState = routePlanUiState,
+            onBack = { screen = BusNavScreen.NAVIGATION },
+            onSelectAddMode = routePlanHolder::selectAddMode,
+            onSelectPoint = routePlanHolder::selectPoint,
+            onRemovePoint = routePlanHolder::removePoint,
+            onMovePoint = routePlanHolder::movePoint,
+            onTogglePointType = routePlanHolder::toggleIntermediateType,
+            onPlanOverview = routePlanHolder::requestPlanOverview,
+            onComplete = {
+                routePlanHolder.completeEditing()
+                screen = BusNavScreen.NAVIGATION
+            },
+            mapContent = { modifier ->
+                MapScreen(
+                    location = uiState.location,
+                    isFollowingLocation = false,
+                    recenterRequestId = 0,
+                    activeRoute = uiState.activeRoute,
+                    routeOverviewRequestId = 0,
+                    routePlan = routePlanUiState.currentPlan,
+                    planOverviewRequestId = routePlanUiState.planOverviewRequestId,
+                    onMapLongPress = routePlanHolder::addPoint,
+                    onMapReady = stateHolder::onMapReady,
+                    onMapGesture = {},
+                    onMapError = stateHolder::onMapError,
+                    modifier = modifier,
+                )
+            },
+        )
+    }
 }
 
 @Composable
@@ -149,6 +198,8 @@ fun NavigationScreen(
     onCurrentLocation: () -> Unit,
     onRouteOverview: () -> Unit,
     modifier: Modifier = Modifier,
+    onEditRoute: () -> Unit = {},
+    hasRoutePlan: Boolean = false,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     BoxWithConstraints(
@@ -166,6 +217,8 @@ fun NavigationScreen(
                 onRequestPermission = onRequestPermission,
                 onCurrentLocation = onCurrentLocation,
                 onRouteOverview = onRouteOverview,
+                onEditRoute = onEditRoute,
+                hasRoutePlan = hasRoutePlan,
                 mapContent = mapContent,
             )
             NavigationLayoutMode.LandscapeThreeColumn -> LandscapeNavigationLayout(
@@ -173,6 +226,8 @@ fun NavigationScreen(
                 onRequestPermission = onRequestPermission,
                 onCurrentLocation = onCurrentLocation,
                 onRouteOverview = onRouteOverview,
+                onEditRoute = onEditRoute,
+                hasRoutePlan = hasRoutePlan,
                 mapContent = mapContent,
             )
         }
@@ -185,6 +240,8 @@ private fun PortraitNavigationLayout(
     onRequestPermission: () -> Unit,
     onCurrentLocation: () -> Unit,
     onRouteOverview: () -> Unit,
+    onEditRoute: () -> Unit,
+    hasRoutePlan: Boolean,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     Column(
@@ -206,10 +263,11 @@ private fun PortraitNavigationLayout(
         )
         PlaceholderPanel(
             title = "運行情報",
-            detail = operationsSummary(uiState),
+            detail = operationsSummary(uiState, hasRoutePlan),
             modifier = Modifier.fillMaxWidth().height(70.dp).testTag(NavigationTestTags.OPERATIONS),
         )
         AuxiliaryControls(
+            onEditRoute = onEditRoute,
             modifier = Modifier.fillMaxWidth().height(72.dp).testTag(NavigationTestTags.AUXILIARY),
         )
     }
@@ -221,6 +279,8 @@ private fun LandscapeNavigationLayout(
     onRequestPermission: () -> Unit,
     onCurrentLocation: () -> Unit,
     onRouteOverview: () -> Unit,
+    onEditRoute: () -> Unit,
+    hasRoutePlan: Boolean,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     Row(
@@ -238,7 +298,7 @@ private fun LandscapeNavigationLayout(
             )
             PlaceholderPanel(
                 title = "運行情報",
-                detail = operationsSummary(uiState),
+                detail = operationsSummary(uiState, hasRoutePlan),
                 modifier = Modifier.fillMaxWidth().weight(1f).testTag(NavigationTestTags.OPERATIONS),
             )
         }
@@ -251,6 +311,7 @@ private fun LandscapeNavigationLayout(
             mapContent = mapContent,
         )
         AuxiliaryControls(
+            onEditRoute = onEditRoute,
             vertical = true,
             modifier = Modifier.fillMaxHeight().weight(0.18f).testTag(NavigationTestTags.AUXILIARY),
         )
@@ -350,7 +411,11 @@ private fun PlaceholderPanel(title: String, detail: String, modifier: Modifier =
 }
 
 @Composable
-private fun AuxiliaryControls(modifier: Modifier = Modifier, vertical: Boolean = false) {
+private fun AuxiliaryControls(
+    onEditRoute: () -> Unit,
+    modifier: Modifier = Modifier,
+    vertical: Boolean = false,
+) {
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -360,6 +425,7 @@ private fun AuxiliaryControls(modifier: Modifier = Modifier, vertical: Boolean =
                 modifier = Modifier.fillMaxSize().padding(8.dp),
                 verticalArrangement = Arrangement.SpaceEvenly,
             ) {
+                RouteEditControl(onEditRoute)
                 FutureControl("迂回")
                 FutureControl("規制")
                 FutureControl("音声")
@@ -371,6 +437,7 @@ private fun AuxiliaryControls(modifier: Modifier = Modifier, vertical: Boolean =
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                RouteEditControl(onEditRoute)
                 FutureControl("迂回")
                 FutureControl("規制")
                 FutureControl("音声")
@@ -378,6 +445,17 @@ private fun AuxiliaryControls(modifier: Modifier = Modifier, vertical: Boolean =
             }
         }
     }
+}
+
+@Composable
+private fun RouteEditControl(onEditRoute: () -> Unit) {
+    OutlinedButton(
+        onClick = onEditRoute,
+        modifier = Modifier
+            .width(88.dp)
+            .testTag(NavigationTestTags.ROUTE_EDIT)
+            .semantics { contentDescription = "ルート編集画面を開く" },
+    ) { Text("ルート編集") }
 }
 
 @Composable
@@ -394,7 +472,7 @@ private fun locationSummary(state: NavigationUiState): String = when {
     else -> "位置情報なしでも地図を閲覧できます"
 }
 
-private fun operationsSummary(state: NavigationUiState): String {
+private fun operationsSummary(state: NavigationUiState, hasRoutePlan: Boolean = false): String {
     val route = when {
         state.isRouteLoading -> "所定経路：読み込み中"
         state.routeError != null -> "所定経路：読込失敗"
@@ -402,7 +480,8 @@ private fun operationsSummary(state: NavigationUiState): String {
         else -> "所定経路：未選択"
     }
     val location = state.locationError ?: locationSummary(state)
-    return "$route\n$location"
+    val plan = if (hasRoutePlan) "・編集プランあり" else ""
+    return "$route$plan\n$location"
 }
 
 private fun Context.hasLocationPermission(): Boolean =

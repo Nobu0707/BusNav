@@ -1,6 +1,7 @@
 package net.nobu0707.busnav.ui.navigation
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,19 +28,20 @@ class NavigationStateHolder(
 
     private fun loadActiveRoute() {
         scope.launch {
-            runCatching { routeRepository.getActiveRoute() }
-                .onSuccess { route ->
-                    update { copy(activeRoute = route, isRouteLoading = false, routeError = null) }
+            try {
+                val route = routeRepository.getActiveRoute()
+                update { copy(activeRoute = route, isRouteLoading = false, routeError = null) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                update {
+                    copy(
+                        activeRoute = null,
+                        isRouteLoading = false,
+                        routeError = error.message ?: "所定経路を読み込めませんでした",
+                    )
                 }
-                .onFailure { error ->
-                    update {
-                        copy(
-                            activeRoute = null,
-                            isRouteLoading = false,
-                            routeError = error.message ?: "所定経路を読み込めませんでした",
-                        )
-                    }
-                }
+            }
         }
     }
 
@@ -59,6 +61,7 @@ class NavigationStateHolder(
         locationJob = scope.launch {
             locationProvider.updates()
                 .catch { error ->
+                    if (error is CancellationException) throw error
                     update { copy(locationError = error.message ?: "位置情報を取得できませんでした", isLoading = false) }
                 }
                 .collect { locationUpdate ->

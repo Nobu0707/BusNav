@@ -16,6 +16,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import net.nobu0707.busnav.location.LocationState
 import net.nobu0707.busnav.domain.route.ScheduledRoute
+import net.nobu0707.busnav.domain.routeplan.RoutePlan
+import net.nobu0707.busnav.domain.model.GeoPoint
 import org.maplibre.android.maps.MapView
 
 @Composable
@@ -25,10 +27,13 @@ fun MapScreen(
     recenterRequestId: Int,
     activeRoute: ScheduledRoute?,
     routeOverviewRequestId: Int,
+    modifier: Modifier = Modifier,
+    routePlan: RoutePlan? = null,
+    planOverviewRequestId: Int = 0,
+    onMapLongPress: ((GeoPoint) -> Unit)? = null,
     onMapReady: () -> Unit,
     onMapGesture: () -> Unit,
     onMapError: (String) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -41,6 +46,7 @@ fun MapScreen(
             onReady = onMapReady,
             onGesture = onMapGesture,
             onError = onMapError,
+            onLongPress = onMapLongPress,
             routePaddingPx = routePaddingPx,
         ).also { it.attach(mapView) }
     }
@@ -96,6 +102,7 @@ fun MapScreen(
     SideEffect {
         controller.update(location, isFollowingLocation, recenterRequestId)
         controller.updateRoute(activeRoute, routeOverviewRequestId)
+        controller.updateRoutePlan(routePlan, planOverviewRequestId)
     }
 
     Box(modifier = modifier) {

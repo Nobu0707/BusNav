@@ -1,3 +1,5 @@
+@file:Suppress("LogNotTimber")
+
 package net.nobu0707.busnav.map
 
 import android.graphics.Bitmap
@@ -26,11 +28,14 @@ import org.maplibre.geojson.Feature
 import org.maplibre.geojson.Point
 import net.nobu0707.busnav.location.LocationState
 import net.nobu0707.busnav.domain.route.ScheduledRoute
+import net.nobu0707.busnav.domain.model.GeoPoint
+import net.nobu0707.busnav.domain.routeplan.RoutePlan
 
 class MapController(
     private val onReady: () -> Unit,
     private val onGesture: () -> Unit,
     private val onError: (String) -> Unit,
+    private val onLongPress: ((GeoPoint) -> Unit)?,
     private val routePaddingPx: Int,
 ) {
     private var map: MapLibreMap? = null
@@ -43,7 +48,11 @@ class MapController(
     private var latestRoute: ScheduledRoute? = null
     private var latestRouteOverviewRequestId = 0
     private var lastRouteOverviewRequestId = 0
+    private var latestRoutePlan: RoutePlan? = null
+    private var latestPlanOverviewRequestId = 0
+    private var lastPlanOverviewRequestId = 0
     private val routeOverlay = RouteOverlayController()
+    private val routePlanOverlay = RoutePlanOverlayController()
     private val styleLoadedListener = MapView.OnDidFinishLoadingStyleListener {
         map?.style?.let { loadedStyle ->
             style = loadedStyle
@@ -56,6 +65,13 @@ class MapController(
         override fun onMove(detector: MoveGestureDetector) = Unit
         override fun onMoveEnd(detector: MoveGestureDetector) = Unit
     }
+    private val longClickListener = MapLibreMap.OnMapLongClickListener { latLng ->
+        val callback = onLongPress ?: return@OnMapLongClickListener false
+        runCatching { GeoPoint(latLng.latitude, latLng.longitude) }
+            .onSuccess(callback)
+            .onFailure { error -> Log.w(TAG, "Ignoring invalid long-press coordinate", error) }
+        true
+    }
 
     fun attach(mapView: MapView) {
         this.mapView = mapView
@@ -66,6 +82,7 @@ class MapController(
         mapView.getMapAsync { mapLibreMap ->
             map = mapLibreMap
             mapLibreMap.addOnMoveListener(moveListener)
+            if (onLongPress != null) mapLibreMap.addOnMapLongClickListener(longClickListener)
             mapLibreMap.moveCamera(
                 CameraUpdateFactory.newLatLngZoom(DEFAULT_LOCATION, DEFAULT_ZOOM),
             )
@@ -85,9 +102,12 @@ class MapController(
         runCatching {
             routeOverlay.setRoute(latestRoute)
             routeOverlay.install(loadedStyle)
+            routePlanOverlay.setRoutePlan(latestRoutePlan)
+            routePlanOverlay.install(loadedStyle)
             installVehicleLayer(loadedStyle)
             latestLocation?.let(::renderLocation)
             fitRouteIfRequested()
+            fitRoutePlanIfRequested()
         }.onFailure { error ->
             Log.e(TAG, "Unable to install map overlays", error)
         }
@@ -127,9 +147,24 @@ class MapController(
         fitRouteIfRequested()
     }
 
+    fun updateRoutePlan(routePlan: RoutePlan?, planOverviewRequestId: Int) {
+        val planChanged = routePlan != latestRoutePlan
+        latestRoutePlan = routePlan
+        latestPlanOverviewRequestId = planOverviewRequestId
+        routePlanOverlay.setRoutePlan(routePlan)
+        if (planChanged) {
+            style?.let { loadedStyle ->
+                runCatching { routePlanOverlay.render(loadedStyle) }
+                    .onFailure { error -> Log.e(TAG, "Unable to render route plan preview", error) }
+            }
+        }
+        fitRoutePlanIfRequested()
+    }
+
     fun detach() {
         mapView?.removeOnDidFinishLoadingStyleListener(styleLoadedListener)
         map?.removeOnMoveListener(moveListener)
+        if (onLongPress != null) map?.removeOnMapLongClickListener(longClickListener)
         mapView = null
         map = null
         style = null
@@ -197,6 +232,34 @@ class MapController(
         lastRouteOverviewRequestId = latestRouteOverviewRequestId
     }
 
+    private fun fitRoutePlanIfRequested() {
+        val points = latestRoutePlan?.points.orEmpty()
+        if (
+            map == null || style == null || points.isEmpty() ||
+            latestPlanOverviewRequestId == 0 ||
+            latestPlanOverviewRequestId == lastPlanOverviewRequestId
+        ) {
+            return
+        }
+        if (points.size == 1) {
+            map?.easeCamera(
+                CameraUpdateFactory.newLatLngZoom(points.single().position.toLatLng(), PLAN_POINT_ZOOM),
+                RECENTER_ANIMATION_MILLIS,
+            )
+        } else {
+            runCatching {
+                val bounds = LatLngBounds.Builder().apply {
+                    points.forEach { include(it.position.toLatLng()) }
+                }.build()
+                map?.easeCamera(
+                    CameraUpdateFactory.newLatLngBounds(bounds, routePaddingPx),
+                    RECENTER_ANIMATION_MILLIS,
+                )
+            }.onFailure { error -> Log.w(TAG, "Unable to fit route plan bounds", error) }
+        }
+        lastPlanOverviewRequestId = latestPlanOverviewRequestId
+    }
+
     private fun net.nobu0707.busnav.domain.model.GeoPoint.toLatLng() = LatLng(latitude, longitude)
 
     private fun createVehicleIcon(): Bitmap {
@@ -237,6 +300,7 @@ class MapController(
         const val VEHICLE_ICON_ID = "busnav-vehicle-icon"
         const val DEFAULT_ZOOM = 4.5
         const val FOLLOW_ZOOM = 16.5
+        const val PLAN_POINT_ZOOM = 15.0
         const val FOLLOW_ANIMATION_MILLIS = 450
         const val RECENTER_ANIMATION_MILLIS = 750
         const val TAG = "BusNavMapController"
