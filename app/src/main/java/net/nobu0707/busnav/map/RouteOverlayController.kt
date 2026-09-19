@@ -109,6 +109,8 @@ internal class RouteOverlayController {
     private fun ensurePointLayers(style: Style) {
         addPointLayer(style, START_LAYER_ID, RoutePointType.START, "#35D07F", 8f)
         addPointLayer(style, STOP_LAYER_ID, RoutePointType.STOP, "#FFD166", 7f)
+        addPointLayer(style, VIA_LAYER_ID, RoutePointType.VIA, "#FF9F43", 7f)
+        addPointLayer(style, SHAPING_LAYER_ID, RoutePointType.SHAPING, "#9B6DFF", 5f)
         addPointLayer(style, DESTINATION_LAYER_ID, RoutePointType.DESTINATION, "#FF6B6B", 9f)
     }
 
@@ -139,6 +141,8 @@ internal class RouteOverlayController {
         const val LINE_LAYER_ID = "busnav-scheduled-route-line-layer"
         const val START_LAYER_ID = "busnav-scheduled-route-start-layer"
         const val STOP_LAYER_ID = "busnav-scheduled-route-stop-layer"
+        const val VIA_LAYER_ID = "busnav-scheduled-route-via-layer"
+        const val SHAPING_LAYER_ID = "busnav-scheduled-route-shaping-layer"
         const val DESTINATION_LAYER_ID = "busnav-scheduled-route-destination-layer"
         const val POINT_TYPE_PROPERTY = "routePointType"
         const val POINT_NAME_PROPERTY = "routePointName"

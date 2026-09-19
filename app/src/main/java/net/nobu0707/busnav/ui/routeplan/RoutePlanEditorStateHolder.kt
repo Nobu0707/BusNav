@@ -81,6 +81,7 @@ class RoutePlanEditorStateHolder(
                 validation = updated.validateForRouting(),
                 hasUnsavedChanges = true,
                 errorMessage = null,
+                revision = revision + 1,
             )
         }
     }

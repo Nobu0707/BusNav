@@ -107,4 +107,14 @@ class NavigationStateHolderTest {
         assertTrue(nullRouteHolder.uiState.value.isFollowingLocation)
         assertEquals(0, nullRouteHolder.uiState.value.routeOverviewRequestId)
     }
+
+    @Test
+    fun `calculated route becomes active without changing follow mode`() {
+        holder.onManualMapGesture()
+
+        holder.applyCalculatedRoute(sampleRoute)
+
+        assertEquals(sampleRoute, holder.uiState.value.activeRoute)
+        assertFalse(holder.uiState.value.isFollowingLocation)
+    }
 }

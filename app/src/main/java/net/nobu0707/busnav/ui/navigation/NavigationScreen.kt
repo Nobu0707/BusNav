@@ -56,10 +56,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import net.nobu0707.busnav.location.LocationProvider
 import net.nobu0707.busnav.domain.route.ScheduledRouteRepository
+import net.nobu0707.busnav.domain.routing.RoutingEngine
 import net.nobu0707.busnav.map.MapScreen
 import net.nobu0707.busnav.ui.theme.BusNavTheme
 import net.nobu0707.busnav.ui.routeplan.RoutePlanEditorScreen
 import net.nobu0707.busnav.ui.routeplan.RoutePlanEditorViewModel
+import net.nobu0707.busnav.ui.routing.RouteCalculationStateHolder
 
 object NavigationTestTags {
     const val NEXT_GUIDANCE = "next_guidance"
@@ -78,6 +80,7 @@ private enum class BusNavScreen { NAVIGATION, ROUTE_EDIT }
 fun NavigationRoute(
     locationProvider: LocationProvider,
     routeRepository: ScheduledRouteRepository,
+    routingEngine: RoutingEngine,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -88,6 +91,9 @@ fun NavigationRoute(
     val uiState by stateHolder.uiState.collectAsState()
     val routePlanHolder = viewModel<RoutePlanEditorViewModel>().stateHolder
     val routePlanUiState by routePlanHolder.uiState.collectAsState()
+    val calculationHolder = remember(routingEngine, scope) { RouteCalculationStateHolder(routingEngine, scope) }
+    val calculationState by calculationHolder.state.collectAsState()
+    val candidateRoute = calculationHolder.currentCandidate(routePlanUiState.revision)
     var screen by rememberSaveable { mutableStateOf(BusNavScreen.NAVIGATION) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -110,6 +116,14 @@ fun NavigationRoute(
         )
     }
 
+    LaunchedEffect(routePlanUiState.revision) {
+        calculationHolder.onPlanChanged(routePlanUiState.revision)
+    }
+
+    DisposableEffect(calculationHolder) {
+        onDispose { calculationHolder.cancel() }
+    }
+
     DisposableEffect(lifecycleOwner, stateHolder) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -125,7 +139,10 @@ fun NavigationRoute(
         }
     }
 
-    BackHandler(enabled = screen == BusNavScreen.ROUTE_EDIT) { screen = BusNavScreen.NAVIGATION }
+    BackHandler(enabled = screen == BusNavScreen.ROUTE_EDIT) {
+        calculationHolder.cancel()
+        screen = BusNavScreen.NAVIGATION
+    }
 
     when (screen) {
         BusNavScreen.NAVIGATION -> NavigationScreen(
@@ -159,7 +176,10 @@ fun NavigationRoute(
         )
         BusNavScreen.ROUTE_EDIT -> RoutePlanEditorScreen(
             uiState = routePlanUiState,
-            onBack = { screen = BusNavScreen.NAVIGATION },
+            onBack = {
+                calculationHolder.cancel()
+                screen = BusNavScreen.NAVIGATION
+            },
             onSelectAddMode = routePlanHolder::selectAddMode,
             onSelectPoint = routePlanHolder::selectPoint,
             onRemovePoint = routePlanHolder::removePoint,
@@ -167,17 +187,29 @@ fun NavigationRoute(
             onTogglePointType = routePlanHolder::toggleIntermediateType,
             onPlanOverview = routePlanHolder::requestPlanOverview,
             onComplete = {
+                calculationHolder.cancel()
                 routePlanHolder.completeEditing()
                 screen = BusNavScreen.NAVIGATION
+            },
+            calculationState = calculationState,
+            onCalculate = {
+                calculationHolder.calculate(routePlanUiState.currentPlan, routePlanUiState.revision)
+            },
+            onApplyCalculatedRoute = {
+                calculationHolder.currentCandidate(routePlanUiState.revision)?.let { route ->
+                    stateHolder.applyCalculatedRoute(route)
+                    routePlanHolder.completeEditing()
+                    screen = BusNavScreen.NAVIGATION
+                }
             },
             mapContent = { modifier ->
                 MapScreen(
                     location = uiState.location,
                     isFollowingLocation = false,
                     recenterRequestId = 0,
-                    activeRoute = uiState.activeRoute,
-                    routeOverviewRequestId = 0,
-                    routePlan = routePlanUiState.currentPlan,
+                    activeRoute = candidateRoute ?: uiState.activeRoute,
+                    routeOverviewRequestId = if (candidateRoute == null) 0 else 1,
+                    routePlan = routePlanUiState.currentPlan.takeIf { candidateRoute == null },
                     planOverviewRequestId = routePlanUiState.planOverviewRequestId,
                     onMapLongPress = routePlanHolder::addPoint,
                     onMapReady = stateHolder::onMapReady,

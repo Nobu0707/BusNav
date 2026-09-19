@@ -60,4 +60,15 @@ class RoutePlanEditorStateHolderTest {
         holder.completeEditing()
         assertFalse(holder.uiState.value.hasUnsavedChanges)
     }
+
+    @Test fun `plan edits increment revision but selection does not`() {
+        assertEquals(0, holder.uiState.value.revision)
+        holder.selectAddMode(RoutePlanPointType.START)
+        holder.selectPoint(null)
+        assertEquals(0, holder.uiState.value.revision)
+        holder.addPoint(GeoPoint(35.0, 139.0))
+        assertEquals(1, holder.uiState.value.revision)
+        holder.removePoint(holder.uiState.value.currentPlan.points.single().id)
+        assertEquals(2, holder.uiState.value.revision)
+    }
 }

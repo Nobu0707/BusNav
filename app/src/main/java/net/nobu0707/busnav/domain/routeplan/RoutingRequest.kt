@@ -1,8 +1,10 @@
 package net.nobu0707.busnav.domain.routeplan
 
 import net.nobu0707.busnav.domain.model.GeoPoint
+import net.nobu0707.busnav.domain.routing.VehicleProfile
 
 data class RoutingRequestPoint(
+    val id: String,
     val position: GeoPoint,
     val type: RoutePlanPointType,
     val name: String?,
@@ -10,29 +12,34 @@ data class RoutingRequestPoint(
 
 data class RoutingRequest(
     val routePlanId: String,
-    val origin: GeoPoint,
-    val destination: GeoPoint,
-    val intermediatePoints: List<RoutingRequestPoint>,
-)
+    val routeName: String?,
+    val points: List<RoutingRequestPoint>,
+    val vehicleProfile: VehicleProfile,
+) {
+    val origin: GeoPoint get() = points.first { it.type == RoutePlanPointType.START }.position
+    val destination: GeoPoint get() = points.first { it.type == RoutePlanPointType.DESTINATION }.position
+    val intermediatePoints: List<RoutingRequestPoint>
+        get() = points.filter { it.type == RoutePlanPointType.VIA || it.type == RoutePlanPointType.SHAPING }
+}
 
 sealed interface RoutingRequestResult {
     data class Ready(val request: RoutingRequest) : RoutingRequestResult
     data class Invalid(val validation: RoutePlanValidationResult) : RoutingRequestResult
 }
 
-fun RoutePlan.toRoutingRequest(): RoutingRequestResult {
+fun RoutePlan.toRoutingRequest(
+    vehicleProfile: VehicleProfile = VehicleProfile.DEVELOPMENT_LARGE_BUS,
+): RoutingRequestResult {
     val validation = validateForRouting()
     if (!validation.isRoutingReady) return RoutingRequestResult.Invalid(validation)
-    val start = points.single { it.type == RoutePlanPointType.START }
-    val destination = points.single { it.type == RoutePlanPointType.DESTINATION }
     return RoutingRequestResult.Ready(
         RoutingRequest(
             routePlanId = id,
-            origin = start.position,
-            destination = destination.position,
-            intermediatePoints = points.filter { it.type in INTERMEDIATE_TYPES }.map {
-                RoutingRequestPoint(position = it.position, type = it.type, name = it.name)
+            routeName = name,
+            points = points.map {
+                RoutingRequestPoint(id = it.id, position = it.position, type = it.type, name = it.name)
             },
+            vehicleProfile = vehicleProfile,
         ),
     )
 }

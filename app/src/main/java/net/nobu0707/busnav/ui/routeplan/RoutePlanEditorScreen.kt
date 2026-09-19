@@ -22,6 +22,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -42,6 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import net.nobu0707.busnav.domain.routeplan.RoutePlanPoint
 import net.nobu0707.busnav.domain.routeplan.RoutePlanPointType
+import net.nobu0707.busnav.ui.routing.RouteCalculationState
+import net.nobu0707.busnav.ui.routing.userMessage
 
 object RoutePlanEditorTestTags {
     const val SCREEN = "route_plan_editor"
@@ -51,6 +54,11 @@ object RoutePlanEditorTestTags {
     const val COMPLETE = "route_plan_complete"
     const val OVERVIEW = "route_plan_overview"
     const val BACK = "route_plan_back"
+    const val CALCULATE = "route_plan_calculate"
+    const val CALCULATING = "route_plan_calculating"
+    const val RESULT = "route_plan_result"
+    const val APPLY = "route_plan_apply"
+    const val FAILURE = "route_plan_failure"
     fun point(id: String) = "route_plan_point_$id"
     fun delete(id: String) = "route_plan_delete_$id"
     fun moveUp(id: String) = "route_plan_move_up_$id"
@@ -69,6 +77,9 @@ fun RoutePlanEditorScreen(
     onTogglePointType: (String) -> Unit,
     onPlanOverview: () -> Unit,
     onComplete: () -> Unit,
+    calculationState: RouteCalculationState = RouteCalculationState.Idle,
+    onCalculate: () -> Unit = {},
+    onApplyCalculatedRoute: () -> Unit = {},
     modifier: Modifier = Modifier,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
@@ -97,10 +108,15 @@ fun RoutePlanEditorScreen(
                     onMovePoint = onMovePoint,
                     onTogglePointType = onTogglePointType,
                     onComplete = onComplete,
+                    calculationState = calculationState,
+                    onCalculate = onCalculate,
+                    onApplyCalculatedRoute = onApplyCalculatedRoute,
                     modifier = Modifier.fillMaxHeight().weight(0.38f),
                 )
                 PlanMapPanel(
                     hasPoints = uiState.currentPlan.points.isNotEmpty(),
+                    hasCandidate = calculationState is RouteCalculationState.Success &&
+                        calculationState.planRevision == uiState.revision,
                     onPlanOverview = onPlanOverview,
                     modifier = Modifier.fillMaxHeight().weight(0.62f),
                     mapContent = mapContent,
@@ -114,6 +130,8 @@ fun RoutePlanEditorScreen(
                 EditorHeader(onBack = onBack)
                 PlanMapPanel(
                     hasPoints = uiState.currentPlan.points.isNotEmpty(),
+                    hasCandidate = calculationState is RouteCalculationState.Success &&
+                        calculationState.planRevision == uiState.revision,
                     onPlanOverview = onPlanOverview,
                     modifier = Modifier.fillMaxWidth().weight(0.47f),
                     mapContent = mapContent,
@@ -129,6 +147,9 @@ fun RoutePlanEditorScreen(
                     onMovePoint = onMovePoint,
                     onTogglePointType = onTogglePointType,
                     onComplete = onComplete,
+                    calculationState = calculationState,
+                    onCalculate = onCalculate,
+                    onApplyCalculatedRoute = onApplyCalculatedRoute,
                     showHeader = false,
                     modifier = Modifier.fillMaxWidth().weight(0.53f),
                 )
@@ -164,6 +185,9 @@ private fun EditorPanel(
     onMovePoint: (String, Int) -> Unit,
     onTogglePointType: (String) -> Unit,
     onComplete: () -> Unit,
+    calculationState: RouteCalculationState,
+    onCalculate: () -> Unit,
+    onApplyCalculatedRoute: () -> Unit,
     modifier: Modifier,
     showHeader: Boolean = true,
 ) {
@@ -194,6 +218,22 @@ private fun EditorPanel(
                 "出発地と到着地を設定してください"
             }
             Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "開発用車両条件（実車の業務運行には使用しないでください）",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            val calculating = calculationState is RouteCalculationState.Calculating
+            Button(
+                onClick = onCalculate,
+                enabled = uiState.validation.isRoutingReady && !calculating,
+                modifier = Modifier.fillMaxWidth().testTag(RoutePlanEditorTestTags.CALCULATE),
+            ) { Text(if (calculationState is RouteCalculationState.Failure) "再試行" else "経路探索") }
+            RouteCalculationPanel(
+                state = calculationState,
+                currentRevision = uiState.revision,
+                onApply = onApplyCalculatedRoute,
+            )
             Button(
                 onClick = onComplete,
                 modifier = Modifier.fillMaxWidth().testTag(RoutePlanEditorTestTags.COMPLETE),
@@ -352,6 +392,7 @@ private fun RoutePlanPointRow(
 @Composable
 private fun PlanMapPanel(
     hasPoints: Boolean,
+    hasCandidate: Boolean,
     onPlanOverview: () -> Unit,
     modifier: Modifier,
     mapContent: @Composable (Modifier) -> Unit,
@@ -362,7 +403,11 @@ private fun PlanMapPanel(
             modifier = Modifier.align(Alignment.TopStart).padding(10.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
         ) {
-            Text("仮ルート（経路探索前プレビュー）", modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.labelMedium)
+            Text(
+                if (hasCandidate) "探索結果（道路沿いルート）" else "仮ルート（経路探索前プレビュー）",
+                modifier = Modifier.padding(8.dp),
+                style = MaterialTheme.typography.labelMedium,
+            )
         }
         OutlinedButton(
             onClick = onPlanOverview,
@@ -373,6 +418,56 @@ private fun PlanMapPanel(
                 .semantics { contentDescription = "編集プラン全体を表示" },
         ) { Text("プラン全体") }
     }
+}
+
+@Composable
+private fun RouteCalculationPanel(
+    state: RouteCalculationState,
+    currentRevision: Long,
+    onApply: () -> Unit,
+) {
+    when (state) {
+        RouteCalculationState.Idle -> Unit
+        is RouteCalculationState.Calculating -> Row(
+            modifier = Modifier.fillMaxWidth().testTag(RoutePlanEditorTestTags.CALCULATING),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            CircularProgressIndicator()
+            Text("経路を探索しています", style = MaterialTheme.typography.bodySmall)
+        }
+        is RouteCalculationState.Failure -> Text(
+            state.reason.userMessage(),
+            modifier = Modifier.testTag(RoutePlanEditorTestTags.FAILURE),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        is RouteCalculationState.Success -> {
+            val current = state.planRevision == currentRevision
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag(RoutePlanEditorTestTags.RESULT),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+            ) {
+                Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("探索結果", fontWeight = FontWeight.SemiBold)
+                    Text(formatRouteSummary(state.summary.distanceMeters, state.summary.durationSeconds))
+                    if (!current) Text("プラン変更前の結果です。再探索してください。", color = MaterialTheme.colorScheme.error)
+                    Button(
+                        onClick = onApply,
+                        enabled = current,
+                        modifier = Modifier.fillMaxWidth().testTag(RoutePlanEditorTestTags.APPLY),
+                    ) { Text("このルートを使用") }
+                }
+            }
+        }
+    }
+}
+
+private fun formatRouteSummary(distanceMeters: Double, durationSeconds: Double): String {
+    val distance = "%.1f km".format(distanceMeters / 1_000.0)
+    val totalMinutes = (durationSeconds / 60.0).toInt()
+    val duration = if (totalMinutes >= 60) "${totalMinutes / 60}時間${totalMinutes % 60}分" else "${totalMinutes}分"
+    return "探索距離 $distance・推定所要時間 $duration"
 }
 
 private val RoutePlanPointType.isEndpoint: Boolean

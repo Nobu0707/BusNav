@@ -2,7 +2,7 @@
 
 BusNav は、高速バス・夜行バスの実運用を想定した業務用ナビゲーションアプリです。通常は登録済みの所定経路を案内し、通行止めや運行管理上の指示がある場合だけ安全な迂回と所定経路への復帰を行うことを将来目標としています。
 
-このリポジトリの Phase 003 は、所定経路表示基盤に加えて、将来の経路探索入力となる RoutePlan と専用編集画面を提供します。Valhalla 接続と実経路探索はまだ行いません。
+このリポジトリの Phase 004 は、RoutePlan を Valhalla へ送り、大型車条件で道路沿いの候補経路を計算・確認して active route へ反映します。
 
 ## 現在の実装範囲
 
@@ -23,6 +23,11 @@ BusNav は、高速バス・夜行バスの実運用を想定した業務用ナ�
 - START / DESTINATION / VIA / SHAPING の追加、削除、上・下並べ替え、VIA/SHAPING 切替
 - Navigation と分離した縦横対応 RoutePlan editor、地図長押し、in-memory/回転保持
 - ScheduledRoute と共存する細い半透明の経路探索前 preview と 4 種 marker
+- Android/Valhalla 非依存の RoutingEngine、RoutingResult、RoutingFailure、VehicleProfile
+- OkHttp と kotlinx.serialization による Valhalla `POST /route` adapter、polyline6 decode、複数 leg 結合
+- truck costing と寸法・重量・軸重、舗装路/道路種別の保守的 option
+- 探索中/失敗/成功 summary、candidate route preview、revision stale 防止、「このルートを使用」
+- Gradle property による endpoint 上書き、debug 限定 local cleartext、HTTP coroutine cancellation
 
 ## 開発環境
 
@@ -43,6 +48,7 @@ Windows:
 .\gradlew.bat test
 .\gradlew.bat lint
 .\gradlew.bat assembleDebug
+.\gradlew.bat assembleDebugAndroidTest
 ```
 
 macOS / Linux / WSL:
@@ -73,8 +79,10 @@ macOS / Linux / WSL:
 - 実端末での長時間走行、トンネル、GPS ロスト時の評価は未実施です。
 - 位置情報の権限を「今後表示しない」で拒否した場合の設定画面への直接リンクは未実装です。
 - 高頻度ナビ更新向けの平滑化、センサ融合、進行方向上固定は未実装です。
-- Valhalla 実接続、道路沿いの経路探索、RoutePlan 永続保存、逸脱判定、VICS、音声案内、オフライン地図は対象外です。
+- truck costing は物理寸法を優先するため、bus/psv access と完全には一致せず、本来バスが通れる道路を過剰回避する可能性があります。
+- 開発用車両条件は仮値であり、実車の業務運行に使用できません。
+- RoutePlan/vehicle profile の永続保存、逸脱判定、自動reroute、VICS、音声案内、オフライン地図は対象外です。
 
 ## 次フェーズ候補
 
-Phase 004 では validated `RoutingRequest` を Valhalla または routing backend へ渡し、結果を `ScheduledRoute` へ変換する境界を実装します。その後、VICS、所定経路復帰、JCT 案内、運行管理指示を段階的に追加します。接続点は [アーキテクチャ文書](docs/architecture.md)、[RoutePlan domain](docs/domain/route-plan.md)、[所定経路 domain](docs/domain/scheduled-route.md) を参照してください。
+Phase 005 では Valhalla maneuver を使う案内、route 上の進捗、次の右左折と道路名を追加する予定です。その後、VICS、所定経路復帰、JCT 案内、運行管理指示を段階的に追加します。接続点は [アーキテクチャ文書](docs/architecture.md)、[RoutingEngine](docs/routing/routing-engine.md)、[Valhalla 接続](docs/routing/valhalla.md) を参照してください。

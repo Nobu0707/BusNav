@@ -1,8 +1,8 @@
-# BusNav Phase 003 アーキテクチャ
+# BusNav Phase 004 アーキテクチャ
 
 ## 方針
 
-Phase 003 は単一 `app` モジュールを維持し、編集入力 RoutePlan、計算済み ScheduledRoute、UI、地図 SDK、位置情報 API の境界を明確にします。不要な DI フレームワークや機械的な多層化は導入せず、依存は `MainActivity` と Compose のルートで手動生成できる規模に保っています。
+Phase 004 は単一 `app` モジュールを維持し、編集入力 RoutePlan、routing domain、Valhalla adapter、計算済み ScheduledRoute、UI、地図 SDK、位置情報 API の境界を明確にします。不要な DI フレームワークや機械的な多層化は導入せず、依存は `MainActivity` と Compose のルートで手動生成できる規模に保っています。
 
 ## パッケージ構成
 
@@ -101,15 +101,24 @@ RoutePlanEditorScreen long press
   -> RoutePlanEditorStateHolder
   -> RoutePlan + validation
   -> RoutingRequest (ready 時のみ)
-  -> [Phase 004 RoutingEngine]
-  -> ScheduledRoute
+  -> RoutingEngine
+  -> Valhalla adapter -> POST /route
+  -> candidate ScheduledRoute
+  -> user confirmation
+  -> NavigationUiState.activeRoute
 ```
+
+## routing / Valhalla
+
+`RoutingEngine`、`RoutingResult`、`RoutingFailure`、`RoutingSummary`、`VehicleProfile` は純粋 Kotlin domain である。Valhalla 固有の `truck`、location type、costing option、JSON/HTTP、polyline6 は `data.routing.valhalla` package に隔離する。`MainActivity` が BuildConfig endpoint から adapter を生成して Compose root へ注入する。
+
+`RouteCalculationStateHolder` は editor state holder と分離し、network job、retry、cancellation、revision 整合性だけを担う。Map は current revision の candidate を active route より優先表示する。利用者が適用するまで Navigation 側 active route は変わらない。
 
 権限拒否や provider 無効は `NavigationUiState.locationError` へ変換され、地図表示自体を止めません。手動地図操作は MapController から StateHolder へ通知され、追従状態だけを OFF にします。
 
 ## 将来の接続点
 
-- Valhalla: `RoutingRequest` を将来の `RoutingEngine` interface へ渡し、結果を `ScheduledRoute` へ変換します。Valhalla 固有 JSON、HTTP client、vehicle profile は domain/UI へ漏らしません。
+- Valhalla maneuvers: Phase 005 で必要 field を response model へ追加し、既存 HTTP/JSON 境界を保ったまま案内 domain へ変換します。
 - VICS / 規制情報: `traffic` のデータソースを追加し、所定経路との照合結果を状態層へ統合します。MapController には描画用モデルのみ渡します。
 - 所定経路復帰: 現在地と所定経路の偏差判定を domain サービスとし、LocationProvider や MapLibre から分離します。
 - JCT 表示: NavigationUiState に案内モードと接近情報を追加し、レイアウトの中央地図領域へ一時的な専用表示を重ねます。

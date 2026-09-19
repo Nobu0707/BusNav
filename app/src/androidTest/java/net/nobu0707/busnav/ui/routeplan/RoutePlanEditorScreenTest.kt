@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -15,6 +17,10 @@ import net.nobu0707.busnav.domain.routeplan.RoutePlan
 import net.nobu0707.busnav.domain.routeplan.RoutePlanPoint
 import net.nobu0707.busnav.domain.routeplan.RoutePlanPointType
 import net.nobu0707.busnav.ui.theme.BusNavTheme
+import net.nobu0707.busnav.data.route.createDevelopmentSampleRoute
+import net.nobu0707.busnav.domain.routing.RoutingFailure
+import net.nobu0707.busnav.domain.routing.RoutingSummary
+import net.nobu0707.busnav.ui.routing.RouteCalculationState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -93,10 +99,51 @@ class RoutePlanEditorScreenTest {
         composeRule.runOnIdle { assertTrue(completed) }
     }
 
+    @Test
+    fun invalidPlanDisablesCalculateButton() {
+        setEditor(RoutePlanUiState(), Modifier.requiredSize(400.dp, 900.dp))
+        composeRule.onNodeWithTag(RoutePlanEditorTestTags.CALCULATE).assertIsNotEnabled()
+    }
+
+    @Test
+    fun calculatingStateShowsProgressAndDisablesDuplicateTap() {
+        setEditor(
+            RoutePlanUiState(currentPlan = samplePlan()),
+            Modifier.requiredSize(400.dp, 900.dp),
+            calculationState = RouteCalculationState.Calculating(0),
+        )
+        composeRule.onNodeWithTag(RoutePlanEditorTestTags.CALCULATING).assertIsDisplayed()
+        composeRule.onNodeWithTag(RoutePlanEditorTestTags.CALCULATE).assertIsNotEnabled()
+    }
+
+    @Test
+    fun successStateShowsSummaryAndApplyAction() {
+        val plan = samplePlan()
+        setEditor(
+            RoutePlanUiState(currentPlan = plan, revision = 2),
+            Modifier.requiredSize(400.dp, 1100.dp),
+            calculationState = RouteCalculationState.Success(2, createDevelopmentSampleRoute(), RoutingSummary(12_300.0, 3_900.0)),
+        )
+        composeRule.onNodeWithTag(RoutePlanEditorTestTags.RESULT).assertIsDisplayed()
+        composeRule.onNodeWithTag(RoutePlanEditorTestTags.APPLY).assertIsEnabled()
+    }
+
+    @Test
+    fun failureStateShowsUserFacingMessage() {
+        val plan = samplePlan()
+        setEditor(
+            RoutePlanUiState(currentPlan = plan),
+            Modifier.requiredSize(400.dp, 1000.dp),
+            calculationState = RouteCalculationState.Failure(0, RoutingFailure.NO_ROUTE),
+        )
+        composeRule.onNodeWithTag(RoutePlanEditorTestTags.FAILURE).assertIsDisplayed()
+    }
+
     private fun setEditor(
         state: RoutePlanUiState,
         modifier: Modifier,
         onComplete: () -> Unit = {},
+        calculationState: RouteCalculationState = RouteCalculationState.Idle,
     ) {
         composeRule.setContent {
             BusNavTheme {
@@ -110,6 +157,7 @@ class RoutePlanEditorScreenTest {
                     onTogglePointType = {},
                     onPlanOverview = {},
                     onComplete = onComplete,
+                    calculationState = calculationState,
                     modifier = modifier,
                     mapContent = { Box(it) },
                 )

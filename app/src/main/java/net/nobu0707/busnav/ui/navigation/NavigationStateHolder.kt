@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import net.nobu0707.busnav.domain.route.ScheduledRouteRepository
+import net.nobu0707.busnav.domain.route.ScheduledRoute
 import net.nobu0707.busnav.location.LocationProvider
 import net.nobu0707.busnav.location.LocationUpdate
 
@@ -100,6 +101,17 @@ class NavigationStateHolder(
         update {
             copy(
                 isFollowingLocation = false,
+                routeOverviewRequestId = routeOverviewRequestId + 1,
+            )
+        }
+    }
+
+    fun applyCalculatedRoute(route: ScheduledRoute) {
+        update {
+            copy(
+                activeRoute = route,
+                isRouteLoading = false,
+                routeError = null,
                 routeOverviewRequestId = routeOverviewRequestId + 1,
             )
         }

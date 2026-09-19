@@ -1,7 +1,10 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
+
+val valhallaBaseUrl = providers.gradleProperty("busnavValhallaBaseUrl")
 
 android {
     namespace = "net.nobu0707.busnav"
@@ -18,8 +21,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            val debugUrl = valhallaBaseUrl.orElse("http://10.0.2.2:8002").get()
+            buildConfigField("String", "VALHALLA_BASE_URL", "\"${debugUrl.replace("\"", "\\\"")}\"")
+        }
         release {
             isMinifyEnabled = false
+            val releaseUrl = valhallaBaseUrl.orElse("").get()
+            buildConfigField("String", "VALHALLA_BASE_URL", "\"${releaseUrl.replace("\"", "\\\"")}\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -53,9 +62,13 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.okhttp)
     implementation(libs.maplibre.android)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.test.ext.junit)

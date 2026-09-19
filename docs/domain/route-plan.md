@@ -8,11 +8,11 @@
 RoutePlan
   -> validation
   -> RoutingRequest
-  -> [Phase 004 RoutingEngine / Valhalla]
+  -> RoutingEngine / Valhalla
   -> ScheduledRoute
 ```
 
-Phase 003 は RoutingEngine を実装しません。RoutePlan の点列を直線で結ぶ表示は経路探索前の preview に限り、`ScheduledRoute.geometry` へ変換しません。domain は Android SDK、MapLibre、Valhalla 固有 JSON のいずれにも依存しません。
+RoutePlan の点列を直線で結ぶ表示は経路探索前の preview に限り、`ScheduledRoute.geometry` へ変換しません。Phase 004 は validation 後に RoutingEngine へ渡し、Valhalla response の geometry だけを候補 ScheduledRoute に使います。domain は Android SDK、MapLibre、Valhalla 固有 JSON のいずれにも依存しません。
 
 ## model
 
@@ -50,4 +50,6 @@ START は先頭、DESTINATION は末尾へ正規化され、両端点の move �
 
 ## RoutingRequest 境界
 
-`toRoutingRequest()` は validation 成功時だけ origin、destination、中間点列を持つ MapLibre/Valhalla 非依存の `RoutingRequest` を返します。失敗時は validation result を返します。車両 profile、回避条件、VICS、HTTP client、実 routing interface は Phase 004 以降で追加します。
+`toRoutingRequest()` は validation 成功時だけ plan ID/name、元の順序とID/nameを保つ全地点、domain `VehicleProfile` を持つ MapLibre/Valhalla 非依存の `RoutingRequest` を返します。失敗時は validation result を返し、HTTP を呼びません。Valhalla の type 文字列、costing、JSON、URL は request に含めません。
+
+`RoutePlanUiState.revision` は point の追加、削除、並べ替え、type切替、端点置換、clearで増加し、選択だけでは変化しません。探索結果は開始時 revision と一致するときだけ適用できます。

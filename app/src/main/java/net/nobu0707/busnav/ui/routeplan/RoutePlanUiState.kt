@@ -15,6 +15,7 @@ data class RoutePlanUiState(
     val hasUnsavedChanges: Boolean = false,
     val planOverviewRequestId: Int = 0,
     val errorMessage: String? = null,
+    val revision: Long = 0,
 ) {
     val planBounds: RoutePlanBounds? get() = currentPlan.boundsOrNull()
 }

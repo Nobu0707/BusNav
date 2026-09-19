@@ -2,7 +2,7 @@
 
 ## 画面分離と安全性
 
-走行中の Navigation 画面には「ルート編集」入口と「編集プランあり」の要約だけを置き、複雑な地点操作は専用 `RoutePlanEditorScreen` で行います。Phase 003 に速度連動ロックはありませんが、将来入口を無効化できる責務境界です。Android back と画面内の「戻る」は Navigation へ戻り、「編集完了」は in-memory plan の dirty 状態を確定します。ScheduledRoute の再計算は行いません。
+走行中の Navigation 画面には「ルート編集」入口と「編集プランあり」の要約だけを置き、複雑な地点操作は専用 `RoutePlanEditorScreen` で行います。速度連動ロックはまだありませんが、将来入口を無効化できる責務境界です。Android back と画面内の「戻る」は進行中探索を cancel して Navigation へ戻り、「編集完了」は in-memory plan の dirty 状態を確定します。
 
 `RoutePlanEditorViewModel` が純粋Kotlinの `RoutePlanEditorStateHolder` を保持するため、通常の Activity 再生成を伴う画面回転でもプロセスが生きている間は編集内容を維持します。process death とDB永続化は対象外です。
 
@@ -24,7 +24,7 @@ VIAは「必ず通る地点」、SHAPINGは「ルート形状の誘導点」と�
 
 ## preview overlay
 
-編集画面は確定済みScheduledRouteを残したまま、RoutePlanを別source/layerで重ねます。
+探索前は確定済みScheduledRouteを残したまま、RoutePlanを別source/layerで重ねます。探索成功後は道路沿いcandidate routeを優先し、直線previewを隠します。
 
 - ScheduledRoute: 水色の太い実線とcasing
 - RoutePlan: オレンジの細い半透明線
@@ -33,3 +33,11 @@ VIAは「必ず通る地点」、SHAPINGは「ルート形状の誘導点」と�
 画面には「仮ルート（経路探索前プレビュー）」と明記します。preview は点を直線で結ぶだけで道路geometryではありません。source/layer IDはScheduledRouteと分離し、style reload時は双方を存在確認付きで復元します。
 
 「プラン全体」は1点ならcenter、2点以上ならpadding付きbounds fit、0点なら無効です。点追加ごとの強制camera移動は行いません。
+
+## 経路探索と candidate
+
+validation ready かつ非計算中だけ「経路探索」を有効にします。計算中はindicatorと「経路を探索しています」を表示し、重複tapを無効化します。成功時は距離km、推定時間h/m、道路沿いcandidateと「このルートを使用」を表示します。失敗時はreasonごとの日本語文言と再試行を表示し、server bodyは表示しません。
+
+plan内容変更はrevisionを増やし、進行中HTTPをcancelします。過去revisionの成功結果はstaleとして適用不可で、Mapにも表示しません。「このルートを使用」は現在revisionの成功だけをactive routeへ反映し、現在地追従状態は変更しません。
+
+画面には「開発用車両条件」と明示しています。これは仮の大型バス寸法で、実車の業務運行には使用できません。

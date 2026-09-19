@@ -2,15 +2,17 @@
 
 ## モデル
 
-`ScheduledRoute` は immutable な `id`、`name`、`RouteGeometry`、順序付き `RoutePoint`、最小限の `RouteMetadata` を持ちます。ID と名前は空文字を拒否し、point ID は route 内で一意、START と DESTINATION は各 1 点を要求します。
+`ScheduledRoute` は immutable な `id`、`name`、`RouteGeometry`、順序付き `RoutePoint`、`RouteMetadata` を持ちます。ID と名前は空文字を拒否し、point ID は route 内で一意、START と DESTINATION は各 1 点を要求します。
 
 `RouteGeometry` は `List<GeoPoint>` を防御的にコピーし、最低 2 点を要求します。`first`、`last` と、最小/最大緯度経度からなる `RouteBounds` を純粋 Kotlin で提供します。日付変更線を跨ぐ補正は日本国内向けの Phase 002 では行いません。同一座標の連続は有効です。
 
-`RoutePointType` は `START`、`DESTINATION`、`STOP`、`VIA`、`SHAPING`、`REJOIN` を定義します。Phase 002 の地図では START / DESTINATION / STOP を色分けし、残りは domain に保持できますが表示しません。道路区間制約は地点とは別概念なので含めません。
+`RouteMetadata` は任意の description、distanceMeters、durationSeconds、routingSource を保持します。Phase 004 の Valhalla route は km を meter へ変換し、所要秒数と source を格納します。
+
+`RoutePointType` は `START`、`DESTINATION`、`STOP`、`VIA`、`SHAPING`、`REJOIN` を定義します。地図は START / DESTINATION / STOP に加えて候補 route の VIA / SHAPING も区別して表示します。道路区間制約は地点とは別概念なので含めません。
 
 ## repository と sample
 
-UI/state は Android/MapLibre 非依存の `ScheduledRouteRepository.getActiveRoute()` だけに依存します。Phase 002 の `InMemoryScheduledRouteRepository` は架空の東京都内座標を使う「開発用サンプルルート」を返します。これは実在する営業路線ではありません。
+初期 active route は `ScheduledRouteRepository.getActiveRoute()` から読みます。Phase 004 の候補 route は editor 内に隔離し、「このルートを使用」で `NavigationStateHolder` の active route へ in-memory 反映します。repository への永続保存はまだ行いません。debug の架空 sample route は初回デモ用に残し、候補/適用後 route を優先します。
 
 `MainActivity` は `BuildConfig.DEBUG` のときだけ sample を注入します。release variant は `activeRoute = null` となり、画面は「所定経路：未選択」、経路全体ボタン無効の状態で正常動作します。
 
