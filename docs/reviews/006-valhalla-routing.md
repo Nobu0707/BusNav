@@ -12,7 +12,7 @@ validated RoutePlan を大型車条件付き Valhalla `/route` へ送り、道�
 
 ## 3. 最終HEAD
 
-実装コミットと最終化コミットは本書末尾に記録する。最終化コミット自身のSHAは自己参照できないため、archiveの`meta/review-info.txt`を最終HEADの正とする。
+実装と初回全品質検査を行ったHEADは`9b0b4ce63b194a83f4bb07fcdd147db074a6e6f7`。本書の結果反映を含む最終化コミット自身のSHAは自己参照できないため、最終再検査後の`build/review-checks/review-check-summary.txt`とarchiveの`meta/review-info.txt`を最終HEADの正とする。
 
 ## 4. 変更ファイル
 
@@ -146,7 +146,7 @@ response modelへValhalla maneuversを段階追加し、道路名、次の右左
 
 ## 34. commit SHA
 
-- 実装コミット: 最終`git log`参照
+- `9b0b4ce63b194a83f4bb07fcdd147db074a6e6f7` — `feat: add Valhalla routing engine`
 - Review 006最終化コミット: archive metadata参照
 
 ## 35. review archive名
