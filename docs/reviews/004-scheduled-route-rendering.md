@@ -12,7 +12,7 @@ Phase 002 の全検査と archive はこの SHA を `-BaseRef` に指定する�
 
 ## 3. 最終 HEAD
 
-実装コミットは `82176f8c176cecbd32040010b4582a44f34cfdf9`。Review 004 自体を含む最終 HEAD の厳密な SHA は自己参照を避け、最終 `review-check-summary.txt` と archive の `meta/review-info.txt` に記録する。
+実装コミットは `82176f8c176cecbd32040010b4582a44f34cfdf9`。Review 004 初版を含む検証 HEAD は `0a2c97cdb374652bbc377b389288145d0b3fc3ed`。検証結果を反映する本書の最終化コミットは自己参照になるため、その厳密な最終 SHA は `review-check-summary.txt` と archive の `meta/review-info.txt` に記録する。
 
 ## 4. 変更ファイル
 
@@ -105,7 +105,7 @@ PASS。`assembleDebug` と `assembleDebugAndroidTest` が完了し、`app-debug.
 
 ## 20. connected test
 
-現環境には emulator/physical device がないため SKIP 予定。最終判定と理由は `review-check-summary.txt` / `connected-debug-android-test.txt` に保存する。androidTest の compile/package は PASS。
+SKIP。`adb devices` は exit 0 で PASS したが、emulator/physical device が 0 台だった。理由は `review-check-summary.txt` / `connected-debug-android-test.txt` に保存した。androidTest の compile/package は PASS。
 
 ## 21. manual verification
 
