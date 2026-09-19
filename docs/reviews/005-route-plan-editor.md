@@ -12,7 +12,7 @@
 
 ## 3. 最終 HEAD
 
-最終検証 HEAD は `build/review-checks/review-check-summary.txt` と archive の `meta/review-info.txt` に記録する。本書自身を含む最終化コミットの SHA は自己参照になるため、これらの機械生成 metadata を正とする。
+実装と全品質検査を行った HEAD は `71f62cf8631ac83403feab8574d4ae6efc019adb`。本書の検査結果反映を含む最終化コミット SHA は自己参照になるため、最終再検査後の `build/review-checks/review-check-summary.txt` と archive の `meta/review-info.txt` を最終 HEAD の正とする。
 
 ## 4. 変更ファイル
 
@@ -121,11 +121,11 @@ PASS。`assembleDebug`、`assembleDebugAndroidTest`とも成功し、debug/app t
 
 ## 27. connected test
 
-最終判定は`review-check-summary.txt`に記録する。adb未発見または端末0台はSKIP、adb devices失敗はFAILとするPhase 002の判定を維持した。
+SKIP。adb は `C:\projects\android-sdk\platform-tools\adb.exe` で発見され、`adb devices` は exit 0 / device 0台だった。ADB checkはPASS、connectedDebugAndroidTestは「端末/emulatorなし」でSKIPとなった。adb未発見/0台はSKIP、adb devices失敗はFAILとするPhase 002の判定を維持した。
 
 ## 28. manual verification
 
-接続端末がない場合はSKIPとし、Kotlin compile、Unit test、Compose test compile、source/layer ID、state/validationで代替確認する。実機があればeditor、long press、VIA/SHAPING、reorder、delete、rotation、preview/ScheduledRoute共存を確認する。
+SKIP。接続端末がないため、editor起動、Map長押し、VIA/SHAPING、reorder、delete、rotation、preview/ScheduledRoute共存の実機目視は未実施。Kotlin compile、45 Unit tests、9 Compose testsのAPK compile、source/layer ID、state/validationで代替確認した。
 
 ## 29. 既知の制限
 
@@ -145,7 +145,8 @@ RoutingEngine interfaceをrouting packageへ追加し、validated RoutingRequest
 
 ## 32. commit SHA
 
-Phase 003実装コミットとReview 005最終化コミットは最終`git log`およびarchive metadataに記録する。
+- `71f62cf8631ac83403feab8574d4ae6efc019adb` — `feat: add route plan editor foundation`
+- Review 005最終化コミット — 最終`git log`とarchive metadataに記録
 
 ## 33. review archive 名
 
