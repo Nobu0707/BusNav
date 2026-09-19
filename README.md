@@ -2,7 +2,7 @@
 
 BusNav は、高速バス・夜行バスの実運用を想定した業務用ナビゲーションアプリです。通常は登録済みの所定経路を案内し、通行止めや運行管理上の指示がある場合だけ安全な迂回と所定経路への復帰を行うことを将来目標としています。
 
-このリポジトリの Phase 001 / MVP0 は、経路探索ではなく Android アプリ基盤を提供します。
+このリポジトリの Phase 002 は、経路探索ではなく Android アプリ基盤と所定経路表示基盤を提供します。
 
 ## 現在の実装範囲
 
@@ -15,6 +15,10 @@ BusNav は、高速バス・夜行バスの実運用を想定した業務用ナ�
 - 利用可能幅に応じた縦画面向け地図重視 UI と横画面向け 3 カラム UI
 - 夜行運行向けダークテーマ
 - 純粋ロジックの単体テストと Compose UI テスト
+- Android/MapLibre 非依存の ScheduledRoute / RouteGeometry / RoutePoint domain model
+- debug build の架空 sample route と repository 境界
+- GeoJSON LineString、casing/main line、START / STOP / DESTINATION marker による所定経路表示
+- style reload 時の overlay 復元と、位置追従を解除する「経路全体」bounds fit
 
 ## 開発環境
 
@@ -65,8 +69,8 @@ macOS / Linux / WSL:
 - 実端末での長時間走行、トンネル、GPS ロスト時の評価は未実施です。
 - 位置情報の権限を「今後表示しない」で拒否した場合の設定画面への直接リンクは未実装です。
 - 高頻度ナビ更新向けの平滑化、センサ融合、進行方向上固定は未実装です。
-- 経路探索、所定経路、VICS、音声案内、オフライン地図は対象外です。
+- 経路探索、所定経路編集/保存、逸脱判定、VICS、音声案内、オフライン地図は対象外です。
 
 ## 次フェーズ候補
 
-所定経路モデルと表示、Valhalla 接続境界、VICS などの交通情報入力、JCT 専用案内、運行管理指示、設定画面、昼間テーマを段階的に追加します。接続点は [アーキテクチャ文書](docs/architecture.md) を参照してください。
+所定経路編集、Valhalla 接続境界、VICS などの交通情報入力、所定経路復帰、JCT 専用案内、運行管理指示、設定画面、昼間テーマを段階的に追加します。接続点は [アーキテクチャ文書](docs/architecture.md) と [所定経路 domain](docs/domain/scheduled-route.md) を参照してください。

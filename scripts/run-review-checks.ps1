@@ -70,28 +70,33 @@ if (-not (Test-Path -LiteralPath $gradleWrapper -PathType Leaf)) {
 
 $adbResolution = Find-AndroidAdb -RepositoryRoot $repositoryRoot
 $adbAvailable = $null -ne $adbResolution.Path
+$adbReason = ""
 if ($adbAvailable) {
     Write-Host "Checking connected Android devices..."
     $adbResult = Invoke-CapturedCommand -FilePath $adbResolution.Path -Arguments @("devices") -WorkingDirectory $repositoryRoot
-    if ($adbResult.ExitCode -eq 0) {
-        $adbStatus = "PASS"
-    }
-    else {
-        $adbStatus = "FAIL"
-    }
-    Write-Utf8File -Path (Join-Path $checksDirectory "adb-devices.txt") -Content (Format-CommandResult -Result $adbResult -Status $adbStatus)
-
     $onlineDevices = @($adbResult.StandardOutput -split "`r?`n" | Where-Object { $_ -match '^\S+\s+device(?:\s|$)' })
-    if (($adbResult.ExitCode -eq 0) -and ($onlineDevices.Count -gt 0)) {
+    $adbDisposition = Get-AdbCheckDisposition -AdbAvailable $true -AdbExitCode $adbResult.ExitCode -OnlineDeviceCount $onlineDevices.Count
+    $adbStatus = $adbDisposition.AdbStatus
+    $adbReason = $adbDisposition.Reason
+    Write-Utf8File -Path (Join-Path $checksDirectory "adb-devices.txt") -Content (Format-CommandResult -Result $adbResult -Status $adbStatus)
+    $statuses["ADB devices"] = $adbStatus
+
+    if ($adbDisposition.ConnectedAction -eq "RUN") {
         [void](Invoke-LoggedCheck -Name "connectedDebugAndroidTest" -FilePath $gradleWrapper -Arguments @("connectedDebugAndroidTest", "--console=plain") -LogName "connected-debug-android-test.txt")
     }
+    elseif ($adbDisposition.ConnectedAction -eq "FAIL") {
+        $failedResult = [PSCustomObject]@{
+            Command = "$gradleWrapper connectedDebugAndroidTest --console=plain"
+            StartUtc = [DateTime]::UtcNow
+            EndUtc = [DateTime]::UtcNow
+            ExitCode = $adbResult.ExitCode
+            StandardOutput = ""
+            StandardError = $adbReason
+        }
+        Write-Utf8File -Path (Join-Path $checksDirectory "connected-debug-android-test.txt") -Content (Format-CommandResult -Result $failedResult -Status "FAIL" -Reason $adbReason)
+        $statuses["connectedDebugAndroidTest"] = "FAIL"
+    }
     else {
-        if ($adbResult.ExitCode -ne 0) {
-            $reason = "adb devices failed; no online device could be confirmed"
-        }
-        else {
-            $reason = "no connected Android device or running emulator"
-        }
         $skipResult = [PSCustomObject]@{
             Command = "$gradleWrapper connectedDebugAndroidTest --console=plain"
             StartUtc = [DateTime]::UtcNow
@@ -100,11 +105,13 @@ if ($adbAvailable) {
             StandardOutput = ""
             StandardError = ""
         }
-        Write-Utf8File -Path (Join-Path $checksDirectory "connected-debug-android-test.txt") -Content (Format-CommandResult -Result $skipResult -Status "SKIP" -Reason $reason)
+        Write-Utf8File -Path (Join-Path $checksDirectory "connected-debug-android-test.txt") -Content (Format-CommandResult -Result $skipResult -Status "SKIP" -Reason $adbReason)
         $statuses["connectedDebugAndroidTest"] = "SKIP"
     }
 }
 else {
+    $adbDisposition = Get-AdbCheckDisposition -AdbAvailable $false
+    $adbReason = $adbDisposition.Reason
     $notFoundResult = [PSCustomObject]@{
         Command = "adb devices"
         StartUtc = [DateTime]::UtcNow
@@ -114,6 +121,7 @@ else {
         StandardError = ""
     }
     Write-Utf8File -Path (Join-Path $checksDirectory "adb-devices.txt") -Content (Format-CommandResult -Result $notFoundResult -Status "SKIP" -Reason "adb is unavailable")
+    $statuses["ADB devices"] = $adbDisposition.AdbStatus
     $connectedSkip = [PSCustomObject]@{
         Command = "$gradleWrapper connectedDebugAndroidTest --console=plain"
         StartUtc = [DateTime]::UtcNow
@@ -192,12 +200,13 @@ $summaryStatusNames = @(
     "Gradle lint",
     "assembleDebug",
     "assembleDebugAndroidTest",
+    "ADB devices",
     "connectedDebugAndroidTest",
     "APK inventory"
 )
 $overallPass = $true
 foreach ($statusName in $summaryStatusNames) {
-    if ($statusName -eq "connectedDebugAndroidTest") {
+    if (($statusName -eq "connectedDebugAndroidTest") -or ($statusName -eq "ADB devices")) {
         if (($statuses[$statusName] -ne "PASS") -and ($statuses[$statusName] -ne "SKIP")) {
             $overallPass = $false
         }
@@ -220,12 +229,14 @@ $summaryLines = @(
     "adb availability: $adbAvailable",
     "ADB path: $(if ($adbAvailable) { $adbResolution.Path } else { 'unavailable' })",
     "ADB discovery: $($adbResolution.Discovery)",
+    "ADB check reason: $(if ([string]::IsNullOrWhiteSpace($adbReason)) { 'adb devices completed successfully' } else { $adbReason })",
     "",
     "Git diff check: $($statuses['Git diff check'])",
     "Gradle test: $($statuses['Gradle test'])",
     "Gradle lint: $($statuses['Gradle lint'])",
     "assembleDebug: $($statuses['assembleDebug'])",
     "assembleDebugAndroidTest: $($statuses['assembleDebugAndroidTest'])",
+    "ADB devices: $($statuses['ADB devices'])",
     "connectedDebugAndroidTest: $($statuses['connectedDebugAndroidTest'])",
     "APK inventory: $($statuses['APK inventory'])",
     ""

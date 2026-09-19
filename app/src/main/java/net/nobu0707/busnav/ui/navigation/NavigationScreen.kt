@@ -39,6 +39,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -48,6 +50,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import net.nobu0707.busnav.location.LocationProvider
+import net.nobu0707.busnav.domain.route.ScheduledRouteRepository
 import net.nobu0707.busnav.map.MapScreen
 import net.nobu0707.busnav.ui.theme.BusNavTheme
 
@@ -57,15 +60,21 @@ object NavigationTestTags {
     const val OPERATIONS = "operations"
     const val AUXILIARY = "auxiliary"
     const val CURRENT_LOCATION = "current_location"
+    const val ROUTE_OVERVIEW = "route_overview"
     const val PERMISSION = "permission_prompt"
 }
 
 @Composable
-fun NavigationRoute(locationProvider: LocationProvider) {
+fun NavigationRoute(
+    locationProvider: LocationProvider,
+    routeRepository: ScheduledRouteRepository,
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
-    val stateHolder = remember(locationProvider, scope) { NavigationStateHolder(locationProvider, scope) }
+    val stateHolder = remember(locationProvider, routeRepository, scope) {
+        NavigationStateHolder(locationProvider, routeRepository, scope)
+    }
     val uiState by stateHolder.uiState.collectAsState()
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -115,11 +124,14 @@ fun NavigationRoute(locationProvider: LocationProvider) {
             )
         },
         onCurrentLocation = stateHolder::onCurrentLocationRequested,
+        onRouteOverview = stateHolder::onRouteOverviewRequested,
         mapContent = { modifier ->
             MapScreen(
                 location = uiState.location,
                 isFollowingLocation = uiState.isFollowingLocation,
                 recenterRequestId = uiState.recenterRequestId,
+                activeRoute = uiState.activeRoute,
+                routeOverviewRequestId = uiState.routeOverviewRequestId,
                 onMapReady = stateHolder::onMapReady,
                 onMapGesture = stateHolder::onManualMapGesture,
                 onMapError = stateHolder::onMapError,
@@ -135,6 +147,7 @@ fun NavigationScreen(
     onLayoutModeChanged: (NavigationLayoutMode) -> Unit,
     onRequestPermission: () -> Unit,
     onCurrentLocation: () -> Unit,
+    onRouteOverview: () -> Unit,
     modifier: Modifier = Modifier,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
@@ -152,12 +165,14 @@ fun NavigationScreen(
                 uiState = uiState,
                 onRequestPermission = onRequestPermission,
                 onCurrentLocation = onCurrentLocation,
+                onRouteOverview = onRouteOverview,
                 mapContent = mapContent,
             )
             NavigationLayoutMode.LandscapeThreeColumn -> LandscapeNavigationLayout(
                 uiState = uiState,
                 onRequestPermission = onRequestPermission,
                 onCurrentLocation = onCurrentLocation,
+                onRouteOverview = onRouteOverview,
                 mapContent = mapContent,
             )
         }
@@ -169,6 +184,7 @@ private fun PortraitNavigationLayout(
     uiState: NavigationUiState,
     onRequestPermission: () -> Unit,
     onCurrentLocation: () -> Unit,
+    onRouteOverview: () -> Unit,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     Column(
@@ -184,13 +200,14 @@ private fun PortraitNavigationLayout(
             uiState = uiState,
             onRequestPermission = onRequestPermission,
             onCurrentLocation = onCurrentLocation,
+            onRouteOverview = onRouteOverview,
             modifier = Modifier.fillMaxWidth().weight(1f).testTag(NavigationTestTags.MAP),
             mapContent = mapContent,
         )
         PlaceholderPanel(
             title = "運行情報",
-            detail = uiState.locationError ?: locationSummary(uiState),
-            modifier = Modifier.fillMaxWidth().height(62.dp).testTag(NavigationTestTags.OPERATIONS),
+            detail = operationsSummary(uiState),
+            modifier = Modifier.fillMaxWidth().height(70.dp).testTag(NavigationTestTags.OPERATIONS),
         )
         AuxiliaryControls(
             modifier = Modifier.fillMaxWidth().height(72.dp).testTag(NavigationTestTags.AUXILIARY),
@@ -203,6 +220,7 @@ private fun LandscapeNavigationLayout(
     uiState: NavigationUiState,
     onRequestPermission: () -> Unit,
     onCurrentLocation: () -> Unit,
+    onRouteOverview: () -> Unit,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     Row(
@@ -220,7 +238,7 @@ private fun LandscapeNavigationLayout(
             )
             PlaceholderPanel(
                 title = "運行情報",
-                detail = uiState.locationError ?: locationSummary(uiState),
+                detail = operationsSummary(uiState),
                 modifier = Modifier.fillMaxWidth().weight(1f).testTag(NavigationTestTags.OPERATIONS),
             )
         }
@@ -228,6 +246,7 @@ private fun LandscapeNavigationLayout(
             uiState = uiState,
             onRequestPermission = onRequestPermission,
             onCurrentLocation = onCurrentLocation,
+            onRouteOverview = onRouteOverview,
             modifier = Modifier.fillMaxHeight().weight(0.58f).testTag(NavigationTestTags.MAP),
             mapContent = mapContent,
         )
@@ -243,6 +262,7 @@ private fun MapArea(
     uiState: NavigationUiState,
     onRequestPermission: () -> Unit,
     onCurrentLocation: () -> Unit,
+    onRouteOverview: () -> Unit,
     modifier: Modifier,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
@@ -257,16 +277,33 @@ private fun MapArea(
             )
         }
 
-        Button(
-            onClick = onCurrentLocation,
-            enabled = uiState.location != null,
-            modifier = Modifier.padding(12.dp).testTag(NavigationTestTags.CURRENT_LOCATION),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(if (uiState.isFollowingLocation) "現在地・追従中" else "現在地へ戻る")
+            OutlinedButton(
+                onClick = onRouteOverview,
+                enabled = uiState.activeRoute != null,
+                modifier = Modifier
+                    .testTag(NavigationTestTags.ROUTE_OVERVIEW)
+                    .semantics { contentDescription = "所定経路全体を表示" },
+            ) {
+                Text("経路全体")
+            }
+            Button(
+                onClick = onCurrentLocation,
+                enabled = uiState.location != null,
+                modifier = Modifier
+                    .testTag(NavigationTestTags.CURRENT_LOCATION)
+                    .semantics { contentDescription = "現在地へ戻る" },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+            ) {
+                Text(if (uiState.isFollowingLocation) "現在地・追従中" else "現在地へ戻る")
+            }
         }
     }
 }
@@ -357,6 +394,17 @@ private fun locationSummary(state: NavigationUiState): String = when {
     else -> "位置情報なしでも地図を閲覧できます"
 }
 
+private fun operationsSummary(state: NavigationUiState): String {
+    val route = when {
+        state.isRouteLoading -> "所定経路：読み込み中"
+        state.routeError != null -> "所定経路：読込失敗"
+        state.activeRoute != null -> "所定経路：${state.activeRoute.name}"
+        else -> "所定経路：未選択"
+    }
+    val location = state.locationError ?: locationSummary(state)
+    return "$route\n$location"
+}
+
 private fun Context.hasLocationPermission(): Boolean =
     ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
         ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -369,6 +417,7 @@ private fun PortraitPreview() = BusNavTheme {
         onLayoutModeChanged = {},
         onRequestPermission = {},
         onCurrentLocation = {},
+        onRouteOverview = {},
         mapContent = { modifier -> PreviewMap(modifier) },
     )
 }
@@ -381,6 +430,7 @@ private fun LandscapePreview() = BusNavTheme {
         onLayoutModeChanged = {},
         onRequestPermission = {},
         onCurrentLocation = {},
+        onRouteOverview = {},
         mapContent = { modifier -> PreviewMap(modifier) },
     )
 }

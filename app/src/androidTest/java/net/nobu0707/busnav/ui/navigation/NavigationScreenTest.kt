@@ -6,9 +6,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import net.nobu0707.busnav.domain.model.GeoPoint
+import net.nobu0707.busnav.data.route.createDevelopmentSampleRoute
 import net.nobu0707.busnav.location.LocationState
 import net.nobu0707.busnav.ui.theme.BusNavTheme
 import org.junit.Assert.assertTrue
@@ -28,6 +30,7 @@ class NavigationScreenTest {
                     onLayoutModeChanged = {},
                     onRequestPermission = {},
                     onCurrentLocation = {},
+                    onRouteOverview = {},
                     modifier = Modifier.requiredSize(400.dp, 800.dp),
                     mapContent = { modifier -> Box(modifier) },
                 )
@@ -50,6 +53,7 @@ class NavigationScreenTest {
                     onLayoutModeChanged = {},
                     onRequestPermission = {},
                     onCurrentLocation = {},
+                    onRouteOverview = {},
                     modifier = Modifier.requiredSize(900.dp, 400.dp),
                     mapContent = { modifier -> Box(modifier) },
                 )
@@ -80,6 +84,7 @@ class NavigationScreenTest {
                     onLayoutModeChanged = {},
                     onRequestPermission = {},
                     onCurrentLocation = { clicked = true },
+                    onRouteOverview = {},
                     modifier = Modifier.requiredSize(400.dp, 800.dp),
                     mapContent = { modifier -> Box(modifier) },
                 )
@@ -87,6 +92,33 @@ class NavigationScreenTest {
         }
 
         composeRule.onNodeWithTag(NavigationTestTags.CURRENT_LOCATION).performClick()
+        composeRule.runOnIdle { assertTrue(clicked) }
+    }
+
+    @Test
+    fun routeNameAndOverviewActionAreAvailable() {
+        var clicked = false
+        val route = createDevelopmentSampleRoute()
+        composeRule.setContent {
+            BusNavTheme {
+                NavigationScreen(
+                    uiState = NavigationUiState(
+                        locationPermissionState = LocationPermissionState.Granted,
+                        activeRoute = route,
+                        isRouteLoading = false,
+                    ),
+                    onLayoutModeChanged = {},
+                    onRequestPermission = {},
+                    onCurrentLocation = {},
+                    onRouteOverview = { clicked = true },
+                    modifier = Modifier.requiredSize(400.dp, 800.dp),
+                    mapContent = { modifier -> Box(modifier) },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("所定経路：開発用サンプルルート", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag(NavigationTestTags.ROUTE_OVERVIEW).performClick()
         composeRule.runOnIdle { assertTrue(clicked) }
     }
 }

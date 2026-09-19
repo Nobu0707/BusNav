@@ -5,9 +5,11 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.util.Log
 import androidx.core.graphics.createBitmap
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.gestures.MoveGestureDetector
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
@@ -23,18 +25,31 @@ import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.Point
 import net.nobu0707.busnav.location.LocationState
+import net.nobu0707.busnav.domain.route.ScheduledRoute
 
 class MapController(
     private val onReady: () -> Unit,
     private val onGesture: () -> Unit,
     private val onError: (String) -> Unit,
+    private val routePaddingPx: Int,
 ) {
     private var map: MapLibreMap? = null
+    private var mapView: MapView? = null
     private var style: Style? = null
     private var latestLocation: LocationState? = null
     private var hasCenteredOnFirstLocation = false
     private var lastRecenterRequestId = 0
     private var lastFollowedTimestampMillis: Long? = null
+    private var latestRoute: ScheduledRoute? = null
+    private var latestRouteOverviewRequestId = 0
+    private var lastRouteOverviewRequestId = 0
+    private val routeOverlay = RouteOverlayController()
+    private val styleLoadedListener = MapView.OnDidFinishLoadingStyleListener {
+        map?.style?.let { loadedStyle ->
+            style = loadedStyle
+            installOverlays(loadedStyle)
+        }
+    }
 
     private val moveListener = object : MapLibreMap.OnMoveListener {
         override fun onMoveBegin(detector: MoveGestureDetector) = onGesture()
@@ -43,6 +58,8 @@ class MapController(
     }
 
     fun attach(mapView: MapView) {
+        this.mapView = mapView
+        mapView.addOnDidFinishLoadingStyleListener(styleLoadedListener)
         mapView.addOnDidFailLoadingMapListener { error ->
             onError("地図を読み込めませんでした: $error")
         }
@@ -55,13 +72,24 @@ class MapController(
             runCatching {
                 mapLibreMap.setStyle(STYLE_URL) { loadedStyle ->
                     style = loadedStyle
-                    installVehicleLayer(loadedStyle)
-                    latestLocation?.let(::renderLocation)
+                    installOverlays(loadedStyle)
                     onReady()
                 }
             }.onFailure { error ->
                 onError(error.message ?: "地図スタイルを読み込めませんでした")
             }
+        }
+    }
+
+    private fun installOverlays(loadedStyle: Style) {
+        runCatching {
+            routeOverlay.setRoute(latestRoute)
+            routeOverlay.install(loadedStyle)
+            installVehicleLayer(loadedStyle)
+            latestLocation?.let(::renderLocation)
+            fitRouteIfRequested()
+        }.onFailure { error ->
+            Log.e(TAG, "Unable to install map overlays", error)
         }
     }
 
@@ -85,8 +113,24 @@ class MapController(
         }
     }
 
+    fun updateRoute(route: ScheduledRoute?, routeOverviewRequestId: Int) {
+        val routeChanged = route != latestRoute
+        latestRoute = route
+        latestRouteOverviewRequestId = routeOverviewRequestId
+        routeOverlay.setRoute(route)
+        if (routeChanged) {
+            style?.let { loadedStyle ->
+                runCatching { routeOverlay.render(loadedStyle) }
+                    .onFailure { error -> Log.e(TAG, "Unable to render scheduled route", error) }
+            }
+        }
+        fitRouteIfRequested()
+    }
+
     fun detach() {
+        mapView?.removeOnDidFinishLoadingStyleListener(styleLoadedListener)
         map?.removeOnMoveListener(moveListener)
+        mapView = null
         map = null
         style = null
     }
@@ -128,6 +172,29 @@ class MapController(
             CameraUpdateFactory.newLatLngZoom(location.point.toLatLng(), FOLLOW_ZOOM),
             RECENTER_ANIMATION_MILLIS,
         )
+    }
+
+    private fun fitRoute(route: ScheduledRoute) {
+        val bounds = LatLngBounds.Builder().apply {
+            route.geometry.points.forEach { include(it.toLatLng()) }
+        }.build()
+        map?.easeCamera(
+            CameraUpdateFactory.newLatLngBounds(bounds, routePaddingPx),
+            RECENTER_ANIMATION_MILLIS,
+        )
+    }
+
+    private fun fitRouteIfRequested() {
+        val route = latestRoute ?: return
+        if (
+            map == null || style == null ||
+            latestRouteOverviewRequestId == 0 ||
+            latestRouteOverviewRequestId == lastRouteOverviewRequestId
+        ) {
+            return
+        }
+        fitRoute(route)
+        lastRouteOverviewRequestId = latestRouteOverviewRequestId
     }
 
     private fun net.nobu0707.busnav.domain.model.GeoPoint.toLatLng() = LatLng(latitude, longitude)
@@ -172,6 +239,7 @@ class MapController(
         const val FOLLOW_ZOOM = 16.5
         const val FOLLOW_ANIMATION_MILLIS = 450
         const val RECENTER_ANIMATION_MILLIS = 750
+        const val TAG = "BusNavMapController"
         val DEFAULT_LOCATION = LatLng(36.2048, 138.2529)
     }
 }

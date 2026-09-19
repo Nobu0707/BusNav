@@ -8,11 +8,14 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import net.nobu0707.busnav.location.LocationState
+import net.nobu0707.busnav.domain.route.ScheduledRoute
 import org.maplibre.android.maps.MapView
 
 @Composable
@@ -20,6 +23,8 @@ fun MapScreen(
     location: LocationState?,
     isFollowingLocation: Boolean,
     recenterRequestId: Int,
+    activeRoute: ScheduledRoute?,
+    routeOverviewRequestId: Int,
     onMapReady: () -> Unit,
     onMapGesture: () -> Unit,
     onMapError: (String) -> Unit,
@@ -27,6 +32,7 @@ fun MapScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val routePaddingPx = with(LocalDensity.current) { 64.dp.roundToPx() }
     val mapView = remember(context) {
         MapView(context).also { it.onCreate(null) }
     }
@@ -35,6 +41,7 @@ fun MapScreen(
             onReady = onMapReady,
             onGesture = onMapGesture,
             onError = onMapError,
+            routePaddingPx = routePaddingPx,
         ).also { it.attach(mapView) }
     }
 
@@ -88,6 +95,7 @@ fun MapScreen(
 
     SideEffect {
         controller.update(location, isFollowingLocation, recenterRequestId)
+        controller.updateRoute(activeRoute, routeOverviewRequestId)
     }
 
     Box(modifier = modifier) {

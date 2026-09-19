@@ -1,5 +1,6 @@
 package net.nobu0707.busnav.ui.navigation
 
+import net.nobu0707.busnav.domain.route.ScheduledRoute
 import net.nobu0707.busnav.location.LocationState
 
 enum class LocationPermissionState {
@@ -23,6 +24,10 @@ data class NavigationUiState(
     val layoutMode: NavigationLayoutMode = NavigationLayoutMode.PortraitMap,
     val isLoading: Boolean = true,
     val recenterRequestId: Int = 0,
+    val activeRoute: ScheduledRoute? = null,
+    val isRouteLoading: Boolean = true,
+    val routeError: String? = null,
+    val routeOverviewRequestId: Int = 0,
 )
 
 fun resolveNavigationLayout(widthDp: Float, heightDp: Float): NavigationLayoutMode =

@@ -377,6 +377,41 @@ function Find-AndroidAdb {
     return [PSCustomObject]@{ Path = $null; Discovery = "unavailable" }
 }
 
+function Get-AdbCheckDisposition {
+    param(
+        [Parameter(Mandatory = $true)][bool]$AdbAvailable,
+        [int]$AdbExitCode = -1,
+        [int]$OnlineDeviceCount = 0
+    )
+
+    if (-not $AdbAvailable) {
+        return [PSCustomObject]@{
+            AdbStatus = "SKIP"
+            ConnectedAction = "SKIP"
+            Reason = "adb is unavailable"
+        }
+    }
+    if ($AdbExitCode -ne 0) {
+        return [PSCustomObject]@{
+            AdbStatus = "FAIL"
+            ConnectedAction = "FAIL"
+            Reason = "adb was found, but 'adb devices' failed with exit code $AdbExitCode"
+        }
+    }
+    if ($OnlineDeviceCount -eq 0) {
+        return [PSCustomObject]@{
+            AdbStatus = "PASS"
+            ConnectedAction = "SKIP"
+            Reason = "no connected Android device or running emulator"
+        }
+    }
+    return [PSCustomObject]@{
+        AdbStatus = "PASS"
+        ConnectedAction = "RUN"
+        Reason = ""
+    }
+}
+
 function Get-RepositoryRelativePath {
     param(
         [Parameter(Mandatory = $true)][string]$RepositoryRoot,

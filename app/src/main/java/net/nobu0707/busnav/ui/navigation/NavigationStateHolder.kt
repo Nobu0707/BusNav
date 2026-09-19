@@ -7,17 +7,41 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import net.nobu0707.busnav.domain.route.ScheduledRouteRepository
 import net.nobu0707.busnav.location.LocationProvider
 import net.nobu0707.busnav.location.LocationUpdate
 
 class NavigationStateHolder(
     private val locationProvider: LocationProvider,
+    private val routeRepository: ScheduledRouteRepository,
     private val scope: CoroutineScope,
 ) {
     private val _uiState = MutableStateFlow(NavigationUiState())
     val uiState: StateFlow<NavigationUiState> = _uiState.asStateFlow()
 
     private var locationJob: Job? = null
+
+    init {
+        loadActiveRoute()
+    }
+
+    private fun loadActiveRoute() {
+        scope.launch {
+            runCatching { routeRepository.getActiveRoute() }
+                .onSuccess { route ->
+                    update { copy(activeRoute = route, isRouteLoading = false, routeError = null) }
+                }
+                .onFailure { error ->
+                    update {
+                        copy(
+                            activeRoute = null,
+                            isRouteLoading = false,
+                            routeError = error.message ?: "所定経路を読み込めませんでした",
+                        )
+                    }
+                }
+        }
+    }
 
     fun setLayoutMode(layoutMode: NavigationLayoutMode) = update { copy(layoutMode = layoutMode) }
 
@@ -66,6 +90,16 @@ class NavigationStateHolder(
 
     fun onCurrentLocationRequested() = update {
         copy(isFollowingLocation = true, recenterRequestId = recenterRequestId + 1)
+    }
+
+    fun onRouteOverviewRequested() {
+        if (_uiState.value.activeRoute == null) return
+        update {
+            copy(
+                isFollowingLocation = false,
+                routeOverviewRequestId = routeOverviewRequestId + 1,
+            )
+        }
     }
 
     private inline fun update(transform: NavigationUiState.() -> NavigationUiState) {

@@ -56,7 +56,7 @@ BusNav のレビュー資料は Windows 11 上の PowerShell で生成する。�
 - `adb devices` と、オンライン端末がある場合だけ `.\gradlew.bat connectedDebugAndroidTest --console=plain`
 - debug APK と androidTest APK の存在、サイズ、更新日時の一覧
 
-adb がない場合、またはオンライン端末がない場合、connected test は理由付きの `SKIP` となる。それ以外の必須チェックが失敗した場合はスクリプト全体が失敗する。
+adb がない場合、または `adb devices` が正常終了してオンライン端末がない場合、connected test は理由付きの `SKIP` となる。adb を発見済みなのに `adb devices` が異常終了した場合は、ADB check と connected test を `FAIL` としてスクリプト全体を失敗させる。判定理由は `review-check-summary.txt` に記録する。
 
 ## 通常版
 
