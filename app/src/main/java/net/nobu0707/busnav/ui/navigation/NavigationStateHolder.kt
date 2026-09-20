@@ -31,6 +31,7 @@ class NavigationStateHolder(
     private var guidanceJob: Job? = null
     private var calculator: NavigationProgressCalculator? = null
     private var previousProgress: NavigationProgress? = null
+    private var previousHighway: HighwayGuidanceSnapshot? = null
 
     init {
         loadActiveRoute()
@@ -141,7 +142,7 @@ class NavigationStateHolder(
             else -> null
         }
         if (pending != null) {
-            _uiState.value = state.copy(guidance = pending)
+            _uiState.value = state.copy(guidance = pending, highwayGuidance = null)
             return
         }
         val last = previousProgress
@@ -159,7 +160,10 @@ class NavigationStateHolder(
                     GuidanceUiState(GuidanceStatus.UNCERTAIN, "経路付近の位置を確認中", "位置精度が低下しています")
                 } else guidanceUiState(progress)
                 if (display.status == GuidanceStatus.RELIABLE) previousProgress = progress
-                _uiState.value = _uiState.value.copy(guidance = display)
+                val highway = requireNotNull(prepared).highwayCalculator.calculate(progress.distanceAlongRouteMeters,
+                    if (display.status == GuidanceStatus.UNCERTAIN) ProjectionReliability.UNCERTAIN else progress.reliability, previousHighway)
+                previousHighway = highway
+                _uiState.value = _uiState.value.copy(guidance = display, highwayGuidance = HighwayInstructionFormatter.format(highway))
             }
         }
     }
@@ -172,6 +176,7 @@ class NavigationStateHolder(
             preparationJob?.cancel()
             calculator = null
             previousProgress = null
+            previousHighway = null
             after.activeRoute?.takeIf { !it.guidance?.maneuvers.isNullOrEmpty() }?.let { route ->
                 preparationJob = scope.launch {
                     val prepared = withContext(computationDispatcher) { NavigationProgressCalculator(route) }

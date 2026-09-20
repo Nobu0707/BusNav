@@ -2,7 +2,9 @@ package net.nobu0707.busnav.data.routing.valhalla
 
 import net.nobu0707.busnav.domain.navigation.*
 
-// Valhalla DirectionsLeg.Maneuver.Type; raw integers stay in the data layer.
+// Audited Valhalla 3.9.0-a3a5631c4: 25=kMerge, 37=kMergeRight, 38=kMergeLeft.
+// https://github.com/valhalla/valhalla/blob/a3a5631c4/proto/descriptors/directions.proto
+// Raw integers stay in the data layer; unsupported values remain UNKNOWN.
 internal fun mapManeuverType(type: Int): ManeuverType = when (type) {
     1, 2, 3 -> ManeuverType.START
     4, 5, 6 -> ManeuverType.DESTINATION

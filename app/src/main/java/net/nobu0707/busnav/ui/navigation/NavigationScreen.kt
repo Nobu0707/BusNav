@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -296,7 +297,7 @@ private fun PortraitNavigationLayout(
         modifier = Modifier.fillMaxSize().padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        GuidanceCard(uiState.guidance, Modifier.fillMaxWidth())
+        NavigationGuidanceCard(uiState, Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.35f).dp))
         MapArea(
             uiState = uiState,
             onRequestPermission = onRequestPermission,
@@ -335,7 +336,7 @@ private fun LandscapeNavigationLayout(
             modifier = Modifier.fillMaxHeight().weight(0.24f),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            GuidanceCard(uiState.guidance, Modifier.fillMaxWidth().weight(2f))
+            NavigationGuidanceCard(uiState, Modifier.fillMaxWidth().weight(2f))
             PlaceholderPanel(
                 title = "運行情報",
                 detail = operationsSummary(uiState, hasRoutePlan),

@@ -1,4 +1,4 @@
-# BusNav Phase 005 アーキテクチャ
+# BusNav Phase 006 アーキテクチャ
 
 ## 方針
 
@@ -145,3 +145,7 @@ RoutePlanEditorScreen long press
 ## Phase005 guidance
 
 ScheduledRoute は geometry と RouteGuidance を同じ snapshot に保持します。domain/navigation に RouteDistanceIndex、RouteProjector、NavigationProgressCalculator、NavigationProgressTracker を追加しました。data adapter が leg-local index を merged geometry index に変換し、UI は日本語 formatter を通した GuidanceUiState を表示します。NavigationViewModel は適用 snapshot を Activity 再生成時にも保持します。重い投影とindex準備は Default、状態反映は UI scope です。既存の endpoint provider、Developer Connections、basemap と release safety は維持しています。詳細は [走行案内設計](navigation-guidance.md)。
+
+## Phase006 highway guidance
+
+NavigationProgressCalculator は route と同じ geometry distance index を使い、HighwayDecisionExtractor の結果を cache します。NavigationStateHolder が pure HighwayGuidanceCalculator の previous snapshot を保持し、HighwayInstructionFormatter から UI state に変換します。Compose の HighwayGuidanceCard は JSON や routing engine に依存しません。[仕様](highway-guidance.md)。

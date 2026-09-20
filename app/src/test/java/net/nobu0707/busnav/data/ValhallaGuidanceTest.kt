@@ -45,6 +45,18 @@ class ValhallaGuidanceTest {
         assertTrue(route.guidance.maneuvers.any { it.type == ManeuverType.EXIT_LEFT })
         assertEquals(4, route.guidance.maneuvers.count { it.signs.isNotEmpty() })
     }
+    @Test fun realHighwayFixtureProducesFiniteDecisionsAndRollover() {
+        val route = parse(fixture("highway"))
+        val calculator = NavigationProgressCalculator(route).highwayCalculator
+        assertTrue(calculator.decisions.isNotEmpty())
+        assertTrue(calculator.decisions.any { it.sign.routeRefs.isNotEmpty() || it.sign.toward.isNotEmpty() })
+        assertTrue(calculator.decisions.all { it.distanceAlongRouteMeters.isFinite() })
+        val first = calculator.decisions.first()
+        val before = calculator.calculate((first.distanceAlongRouteMeters - 100).coerceAtLeast(0.0), ProjectionReliability.RELIABLE)
+        assertEquals(first, before.currentDecision)
+        val after = calculator.calculate(first.distanceAlongRouteMeters + 30.001, ProjectionReliability.RELIABLE, before)
+        assertEquals(calculator.decisions.getOrNull(1), after.currentDecision)
+    }
     @Test fun representativeRawTypesMapWithoutLeakingIntegers() {
         val expected = listOf(ManeuverType.SLIGHT_RIGHT, ManeuverType.RIGHT, ManeuverType.SHARP_RIGHT,
             ManeuverType.U_TURN_RIGHT, ManeuverType.U_TURN_LEFT, ManeuverType.SHARP_LEFT, ManeuverType.LEFT,
@@ -57,7 +69,7 @@ class ValhallaGuidanceTest {
         listOf(4,5,6).forEach { assertEquals(ManeuverType.DESTINATION, mapManeuverType(it)) }
         listOf(7,8).forEach { assertEquals(ManeuverType.CONTINUE, mapManeuverType(it)) }
         listOf(37,38).forEach { assertEquals(ManeuverType.MERGE, mapManeuverType(it)) }
-        assertEquals(ManeuverType.UNKNOWN, mapManeuverType(999))
+        listOf(-1, 0, 30, 36, 39, 45, 46, 999).forEach { assertEquals(ManeuverType.UNKNOWN, mapManeuverType(it)) }
     }
     @Test fun unknownTypeDoesNotInvalidateResponse() {
         val input = body(listOf(leg(first, listOf(0 to 2)))).replace(":10", ":999")

@@ -37,6 +37,7 @@ class NavigationProgressCalculator(
     val config: NavigationProgressConfig = NavigationProgressConfig(),
 ) {
     val distanceIndex = RouteDistanceIndex(route.geometry)
+    val highwayCalculator = HighwayGuidanceCalculator(HighwayDecisionExtractor.extract(route.guidance, distanceIndex))
     private val maneuvers = route.guidance?.maneuvers.orEmpty()
     private val begins = maneuvers.map { distanceIndex.distanceAtGeometryIndex(it.beginGeometryIndex) }
 

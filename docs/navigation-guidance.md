@@ -38,4 +38,8 @@ Existing IO/CPU routing dispatchers remain unchanged. Guidance distance-index co
 
 Real 3.9.0-a3a5631c4 local/general-road and highway fixtures, synthetic sign parsing, domain distance/projection/index tests, state-holder/formatter tests, deterministic portrait/landscape Compose tests, Activity recreation and optional live routing/UI smoke cover the boundary. Live tests reuse LocalValhallaAssumptions and skip if the configured endpoint is unavailable. Test position injection exists only in androidTest; manual emulator testing uses emulator mock GPS.
 
-Phase 006 can reuse the typed sign model for IC/JCT emphasis, lane guidance, route shields, large junction diagrams and SA/PA displays. Phase 008 owns map matching and formal deviation confidence. Voice, automatic rerouting, detour/rejoin, traffic restrictions and production backend integration are not implemented here.
+Phase 006 reuses the typed sign model for IC/JCT emphasis, route badges and schematic junction guidance. Lane guidance and SA/PA displays remain future work. Phase 008 owns map matching and formal deviation confidence. Voice, automatic rerouting, detour/rejoin, traffic restrictions and production backend integration are not implemented here.
+
+## Phase006 高速案内
+
+従来の一般道案内に加え、近接 ramp / exit / keep / merge は専用カードに切り替えます。距離軸、projection reliability、accuracy、ViewModel 保持は共通です。pin 済み Valhalla の 25 / 37 / 38 は公式 enum に定義された merge で、未対応値は UNKNOWN を維持します。[高速案内の仕様](highway-guidance.md)。

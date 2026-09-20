@@ -1,6 +1,7 @@
 package net.nobu0707.busnav.test
 
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.first
 import net.nobu0707.busnav.BuildConfig
 import org.junit.Assume.assumeTrue
 import java.net.URI
@@ -8,8 +9,11 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 object LocalBasemapAssumptions {
-    val STYLE_URL = BuildConfig.BASEMAP_STYLE_URL
-    val BASE_URL: String = URI(STYLE_URL).let { "${it.scheme}://${it.rawAuthority}" }
+    val STYLE_URL: String get() = kotlinx.coroutines.runBlocking {
+        net.nobu0707.busnav.developer.createConnectionRepository(
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext).settings.first().basemapBaseUrl + "/styles/busnav/style.json"
+    }
+    val BASE_URL: String get() = URI(STYLE_URL).let { "${it.scheme}://${it.rawAuthority}" }
 
     fun assumeAvailable() {
         val available = runCatching {
