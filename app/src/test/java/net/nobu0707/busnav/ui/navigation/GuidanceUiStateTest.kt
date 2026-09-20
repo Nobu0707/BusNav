@@ -43,15 +43,17 @@ class GuidanceUiStateTest {
             maneuver(ManeuverType.DESTINATION).copy(index=1,beginGeometryIndex=2,endGeometryIndex=2))))
     }
     private class TestProvider : LocationProvider {
+        var now = 0L
         val flow = MutableSharedFlow<LocationUpdate>(extraBufferCapacity = 10)
         override fun updates(): Flow<LocationUpdate> = flow
         override fun isLocationEnabled() = true
         fun position(lon: Double = 0.0005, lat: Double = 0.0, accuracy: Float = 5f) {
-            flow.tryEmit(LocationUpdate.Position(LocationState(GeoPoint(lat,lon),accuracy,null,null,1)))
+            now += 5000
+            flow.tryEmit(LocationUpdate.Position(LocationState(GeoPoint(lat,lon),accuracy,null,null,1,now)))
         }
     }
     private fun holder(route: ScheduledRoute?, provider: TestProvider, scope: CoroutineScope) = NavigationStateHolder(
-        provider, object : ScheduledRouteRepository { override suspend fun getActiveRoute() = route }, scope, Dispatchers.Unconfined)
+        provider, object : ScheduledRouteRepository { override suspend fun getActiveRoute() = route }, scope, Dispatchers.Unconfined, elapsedMillis = { provider.now })
     @Test fun noRouteHasNoGuidance() {
         val scope = CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
         try { assertEquals(GuidanceStatus.NO_ROUTE, holder(null,TestProvider(),scope).uiState.value.guidance.status) } finally { scope.cancel() }

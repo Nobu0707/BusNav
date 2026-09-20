@@ -85,6 +85,7 @@ class AndroidLocationProvider(context: Context) : LocationProvider {
         bearingDegrees = if (hasBearing()) bearing else null,
         speedMetersPerSecond = if (hasSpeed()) speed else null,
         timestampMillis = time,
+        elapsedRealtimeMillis = elapsedRealtimeNanos / 1_000_000,
     )
 
     private companion object {

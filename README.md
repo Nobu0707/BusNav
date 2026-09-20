@@ -109,3 +109,7 @@ Phase 005 では Valhalla maneuver を使う案内、route 上の進捗、次の
 ## 走行案内
 
 [Navigation guidance](docs/navigation-guidance.md) と [Phase005 review](docs/reviews/007-navigation-guidance.md) を参照してください。案内距離は geometry の累積距離に統一し、maneuver.length と混用しません。最近傍投影は Map Matching ではありません。適用済みルートと案内は画面回転で保持します。
+
+## Phase008: 所定経路との照合・逸脱検知
+
+距離・方向・連続性・速度・単調時刻・精度を使うローカルroute matcherと、持続証拠による逸脱/復帰判定を追加しました。不確実・逸脱中は一般/高速案内を抑制し、縦横画面へ確認bannerを表示します。raw GPS自車位置と所定経路lineを維持し、自動再探索は行いません。設計・閾値・15m並行道路などの限界は [map matching / deviation](docs/map-matching-deviation.md)、検証結果は [Review010](docs/reviews/010-map-matching-deviation.md) を参照してください。

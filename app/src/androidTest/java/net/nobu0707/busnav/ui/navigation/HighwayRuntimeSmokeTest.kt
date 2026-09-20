@@ -70,7 +70,7 @@ class HighwayRuntimeSmokeTest {
         rule.waitUntil(5000) { rule.activity.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT }
         rule.runOnUiThread { org.maplibre.android.MapLibre.getInstance(rule.activity) }
         val positions = MutableStateFlow<LocationUpdate>(LocationUpdate.Disabled)
-        val provider = object : LocationProvider { override fun updates() = positions; override fun isLocationEnabled() = true }
+        val provider = object : LocationProvider { override fun updates() = net.nobu0707.busnav.test.repeatingSyntheticLocations(positions); override fun isLocationEnabled() = true }
         val delegate = ValhallaRoutingEngine(RoutingConfig(LocalValhallaAssumptions.BASE_URL))
         val repository = InMemoryScheduledRouteRepository()
         lateinit var route: ScheduledRoute
@@ -85,7 +85,7 @@ class HighwayRuntimeSmokeTest {
         }
         fun holder() = ViewModelProvider(rule.activity)[NavigationViewModel::class.java].stateHolder
         fun position(point: GeoPoint, accuracy: Float = 5f) {
-            positions.value = LocationUpdate.Position(LocationState(point, accuracy, null, null, System.currentTimeMillis()))
+            positions.value = LocationUpdate.Position(LocationState(point, accuracy, null, null, System.currentTimeMillis(), android.os.SystemClock.elapsedRealtime()))
         }
         fun awaitHighway() = rule.waitUntil(15000) {
             rule.onAllNodesWithTag("highway_distance", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()

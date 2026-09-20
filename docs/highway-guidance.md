@@ -43,4 +43,8 @@ Canvas は選択方向の太線と矢印、控えめな非選択方向を描き�
 
 unit tests は数値 enum、実 highway fixture、抽出、施設名、標識、距離軸、各 threshold の前／一致／後、通過、近接分岐、信頼性、UI formatter、状態保持を検証します。Compose tests は縦横の視認・semantics・不確実表示を検証します。live smoke は既存 `LocalValhallaAssumptions` / `LocalBasemapAssumptions` を使い、Developer Connections の保存値で接続します。サーバー停止時は JUnit assumption による SKIP です。
 
-自動 reroute、route 自動変更、dead reckoning、音声、車線案内はありません。projector は従来の full scan です。高架／並行道路の誤対応は Phase008 の Map Matching に残します。Phase007 の地図 style 全面改修は行いません。開発 endpoint / DataStore / release safety / basemap / NoOp diagnostics は維持します。
+自動 reroute、route 自動変更、dead reckoning、音声、車線案内はありません。projector 単体は従来の full scan APIを維持します。productionはPhase008の候補index付きRouteMatcherを使用します。高架／近接並行道路を完全には識別できません。Phase007 の地図 style 全面改修は行いません。開発 endpoint / DataStore / release safety / basemap / NoOp diagnostics は維持します。
+
+## Phase008による信頼性gate
+
+RouteMatcherのAMBIGUOUS/UNRELIABLE、または逸脱状態がON_ROUTE以外ならHighwayGuidanceCalculatorへ非RELIABLEを渡します。sign、距離、方向、模式図の確信表示を抑制し、逸脱/位置確認bannerを優先します。元routeとdecision cacheは維持し、復帰確認後に通常の案内を再開します。route差替え時だけcacheを再構築。lane推定、auto rerouteは追加していません。[matching設計](map-matching-deviation.md)。

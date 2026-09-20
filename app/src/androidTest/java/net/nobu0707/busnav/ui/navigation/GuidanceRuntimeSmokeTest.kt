@@ -35,7 +35,7 @@ class GuidanceRuntimeSmokeTest {
         rule.runOnUiThread { org.maplibre.android.MapLibre.getInstance(rule.activity) }
         val positions = MutableStateFlow<LocationUpdate>(LocationUpdate.Disabled)
         val provider = object : LocationProvider {
-            override fun updates() = positions
+            override fun updates() = net.nobu0707.busnav.test.repeatingSyntheticLocations(positions)
             override fun isLocationEnabled() = true
         }
         val delegate = ValhallaRoutingEngine(RoutingConfig(LocalValhallaAssumptions.BASE_URL))
@@ -44,7 +44,7 @@ class GuidanceRuntimeSmokeTest {
             calls++
             delegate.calculateRoute(request).also { result ->
                 if (result is RoutingResult.Success) positions.value = LocationUpdate.Position(
-                    LocationState(result.route.geometry.first,5f,null,null,System.currentTimeMillis()))
+                    LocationState(result.route.geometry.first,5f,null,null,System.currentTimeMillis(), android.os.SystemClock.elapsedRealtime()))
             }
         }
         rule.setContent { BusNavTheme { NavigationRoute(provider, InMemoryScheduledRouteRepository(), engine) } }
@@ -63,7 +63,7 @@ class GuidanceRuntimeSmokeTest {
             rule.onNodeWithTag("guidance_distance").assertIsDisplayed()
             rule.onNodeWithTag("guidance_next_next").assertIsDisplayed()
             rule.onNodeWithText("経路探索結果を読み取れませんでした").assertDoesNotExist()
-            positions.value = LocationUpdate.Position(LocationState(GeoPoint(36.0,137.0),5f,null,null,System.currentTimeMillis()))
+            positions.value = LocationUpdate.Position(LocationState(GeoPoint(36.0,137.0),5f,null,null,System.currentTimeMillis(), android.os.SystemClock.elapsedRealtime()))
             rule.waitUntil(10_000) { rule.onAllNodesWithText("経路付近の位置を確認中").fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithTag("guidance_distance").assertDoesNotExist()
             rule.runOnIdle { assertEquals(attempt + 1, calls) }

@@ -8,9 +8,11 @@ data class LocationState(
     val bearingDegrees: Float?,
     val speedMetersPerSecond: Float?,
     val timestampMillis: Long,
+    /** Monotonic time since boot; timestampMillis is wall-clock metadata only. */
+    val elapsedRealtimeMillis: Long? = null,
 ) {
     val normalizedBearingDegrees: Float?
-        get() = bearingDegrees?.let { ((it % 360f) + 360f) % 360f }
+        get() = bearingDegrees?.takeIf { it.isFinite() }?.let { ((it % 360f) + 360f) % 360f }
 }
 sealed interface LocationUpdate {
     data class Position(val location: LocationState) : LocationUpdate

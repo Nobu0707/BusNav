@@ -16,6 +16,8 @@ enum class NavigationLayoutMode {
 }
 
 data class NavigationUiState(
+    val deviation: DeviationUiState = DeviationUiState(),
+    val deviationSnapshot: net.nobu0707.busnav.domain.navigation.RouteDeviationSnapshot = net.nobu0707.busnav.domain.navigation.RouteDeviationSnapshot(),
     val highwayGuidance: HighwayGuidanceUiState? = null,
     val guidance: GuidanceUiState = GuidanceUiState(),
     val isMapReady: Boolean = false,

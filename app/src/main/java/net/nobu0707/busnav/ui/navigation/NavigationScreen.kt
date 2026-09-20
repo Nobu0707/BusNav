@@ -297,6 +297,7 @@ private fun PortraitNavigationLayout(
         modifier = Modifier.fillMaxSize().padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        DeviationBanner(uiState.deviation)
         NavigationGuidanceCard(uiState, Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.35f).dp))
         MapArea(
             uiState = uiState,
@@ -336,6 +337,7 @@ private fun LandscapeNavigationLayout(
             modifier = Modifier.fillMaxHeight().weight(0.24f),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            DeviationBanner(uiState.deviation)
             NavigationGuidanceCard(uiState, Modifier.fillMaxWidth().weight(2f))
             PlaceholderPanel(
                 title = "運行情報",

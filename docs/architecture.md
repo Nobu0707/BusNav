@@ -1,4 +1,4 @@
-# BusNav Phase 006 アーキテクチャ
+# BusNav Phase008 アーキテクチャ
 
 ## 方針
 
@@ -153,3 +153,7 @@ NavigationProgressCalculator は route と同じ geometry distance index を使�
 ## Phase 004.5.1 regional basemaps
 
 全国Valhallaのrouting coverageとKanto/Chubuの表示coverageは独立しています。BasemapRegionをDeveloper ConnectionsのDataStoreへ保存し、BasemapConfigが地域別style URLを生成します。MapViewと経路状態を保持したままstyleをreloadします。単一style templateからruntimeで2地域のstyleを生成し、日本語glyphと旧Chubu成果物を維持します。[構築・切替・rollback手順](development/japan-routing-and-regional-basemaps.md)。
+
+## Phase008 matching pipeline
+
+`LocationState -> RouteMatcher(RouteMatchIndex) -> RouteDeviationDetector -> NavigationProgressCalculator -> HighwayGuidanceCalculator -> NavigationUiState`。純粋遷移をDefaultで計算し、UI scopeで世代/route/location identityと鮮度を確認してcommitします。route差替えで全cacheを再構築し、ViewModelが回転時の状態を保持します。RouteDistanceIndexは共通距離軸。旧NavigationProgressTrackerはproduction pipelineでは使わず、jitter保持はmatcherへ集約しました。AndroidLocationProviderの単調時刻と10秒watchdogで古い位置からの強案内を防ぎます。詳細は [matching設計](map-matching-deviation.md)。

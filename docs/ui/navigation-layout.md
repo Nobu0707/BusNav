@@ -88,3 +88,7 @@ Phase 003 の Navigation 画面は走行表示に集中し、RoutePlan の複雑
 ## Phase006 高速カード
 
 5 km 以内の対象分岐は HighwayGuidanceCard を表示します。縦は画面高35%以下、横は左列、中央地図を維持します。方向／距離／施設／方面／badge／その次の順で表示し、overflow は内部スクロールと省略、完全な読み上げ説明で対応します。不確実時は模式図と距離を抑制します。[高速案内](../highway-guidance.md)。
+
+## Phase008 deviation banner
+
+縦はguide card上、横は左guide column先頭にDeviationBannerを表示します。ON_ROUTEでは非表示、SUSPECTEDは位置関係確認中、OFF_ROUTEは所定経路から外れている可能性、RECOVERINGは復帰確認中。UNKNOWN/UNRELIABLEは位置情報確認中です。文字とpolite live regionで状態を伝え、OFF_ROUTEのみ強調色。dismiss/確認buttonはありません。高速cardの方向・sign・模式図は不確実時に抑制し、地図とroute lineは維持します。

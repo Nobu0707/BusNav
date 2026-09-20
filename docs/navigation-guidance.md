@@ -1,4 +1,4 @@
-# Navigation guidance (Phase 005)
+# Navigation guidance (Phase005 / Phase008 integration)
 
 ## Route snapshot and parsing
 
@@ -10,7 +10,7 @@ RouteManeuver stores begin/end geometry indices, optional provider segment dista
 
 Each leg is decoded separately. Its global start offset is the current merged point count, minus one only when the previous last point equals this leg's first point. Local index zero then refers to that shared boundary. A-B-C + C-D-E becomes A-B-C-D-E: local 0/1/2 maps to global 2/3/4, including end indices. Negative, reversed, out-of-range or out-of-order indices fail with MANEUVER_INDEX / INVALID_RESPONSE; they are never clamped. Optional negative/non-finite segment summaries fail at MANEUVERS. Malformed serialized fields fail at JSON_DECODE. Missing maneuver lists remain readable for existing shape-only fixtures and emit navigation.guidance.empty through the existing opt-in diagnostics.
 
-## Distance axis and projection
+## Distance axis and legacy projection API
 
 RouteDistanceIndex caches Haversine segment lengths and cumulative meters once per applied route. Its array accessor returns a defensive copy. Index access rejects invalid indices and reversed intervals. NavigationProgressCalculator caches maneuver begin distances on the same axis.
 
@@ -18,13 +18,13 @@ Live distance is max(0, cumulativeMeters[next.beginGeometryIndex] - progressMete
 
 RouteProjector projects onto each segment in a local equirectangular plane, clamps its fraction to [0,1], compares Haversine cross-track distances and interpolates progress on RouteDistanceIndex. It handles zero-length segments and wrapped longitude. The hint initializes the best candidate and resolves ties within 1 mm; the full scan still checks all segments to preserve nearest-distance correctness. Complexity is O(geometry points + maneuvers) per fix, O(points + maneuvers) cached memory. Geometry distance rebuilding and JSON decoding never occur on location updates.
 
-This is simple geometric projection, **not map matching**. Crossings, opposite carriageways, elevated roads, JCTs and parallel roads can project to the wrong segment even at a small cross-track distance. Heading, road topology and speed are not used.
+This is simple geometric projection, **not map matching**. Crossings, opposite carriageways, elevated roads, JCTs and parallel roads can project to the wrong segment even at a small cross-track distance. This describes the standalone projector API. Production now uses the Phase008 route matcher with heading, speed and continuity; road topology outside the scheduled route is still unavailable.
 
 ## Progress and uncertainty
 
-The next maneuver is the first whose begin distance plus 15 m is not behind the current progress. The following list entry is next-next. A passed maneuver stays visible with zero remaining distance for the 15 m tolerance. A reliable backward change up to 15 m keeps the last progress; larger reverse movement is allowed. Pure calculation and the optional stateful NavigationProgressTracker are separate; UI stores only the last accepted progress and invokes pure calculation on a background dispatcher.
+The next maneuver is the first whose begin distance plus 15 m is not behind the current progress. The following list entry is next-next. A passed maneuver stays visible with zero remaining distance for the 15 m tolerance. A reliable backward change up to 15 m keeps the last progress; larger reverse movement is allowed. Pure calculation and the optional stateful NavigationProgressTracker are separate; The Phase008 production pipeline owns matching state and backward smoothing; it invokes the calculator with a matched projection on a background dispatcher.
 
-NavigationProgressConfig centralizes provisional thresholds: <=30 m RELIABLE, >30 to <=80 m UNCERTAIN, >80 m UNRELIABLE. A supplied GPS accuracy above 30 m or non-finite accuracy also suppresses guidance. These thresholds are heuristics, not a probability of correct road matching. Neither uncertainty nor reverse movement calls Valhalla, modifies the candidate, replaces the applied route, or declares route deviation.
+NavigationProgressConfig centralizes provisional thresholds: <=30 m RELIABLE, >30 to <=80 m UNCERTAIN, >80 m UNRELIABLE. These are legacy calculator-only distance thresholds. In production Phase008 overrides reliability using match quality and deviation state (40 m maximum usable accuracy, 25 m on-route threshold). These thresholds are heuristics, not a probability of correct road matching. Neither uncertainty nor reverse movement calls Valhalla, modifies the candidate, replaces the applied route, or reroutes. Phase008 separately detects sustained route deviation.
 
 NavigationUiState carries a compact GuidanceUiState rather than the full projection. No route: choose a route. No maneuvers: no guidance. Missing/revoked/disabled/error location: wait for location, without pretending to be at the start. Uncertain projection: display 経路付近の位置を確認中 and suppress turn, distance and next-next. A future destination says 目的地へ; near the endpoint it says 目的地です.
 
@@ -38,8 +38,12 @@ Existing IO/CPU routing dispatchers remain unchanged. Guidance distance-index co
 
 Real 3.9.0-a3a5631c4 local/general-road and highway fixtures, synthetic sign parsing, domain distance/projection/index tests, state-holder/formatter tests, deterministic portrait/landscape Compose tests, Activity recreation and optional live routing/UI smoke cover the boundary. Live tests reuse LocalValhallaAssumptions and skip if the configured endpoint is unavailable. Test position injection exists only in androidTest; manual emulator testing uses emulator mock GPS.
 
-Phase 006 reuses the typed sign model for IC/JCT emphasis, route badges and schematic junction guidance. Lane guidance and SA/PA displays remain future work. Phase 008 owns map matching and formal deviation confidence. Voice, automatic rerouting, detour/rejoin, traffic restrictions and production backend integration are not implemented here.
+Phase 006 reuses the typed sign model for IC/JCT emphasis, route badges and schematic junction guidance. Lane guidance and SA/PA displays remain future work. Phase008 implements local route matching and heuristic deviation evidence, not calibrated statistical confidence. Voice, automatic rerouting, detour/rejoin, traffic restrictions and production backend integration are not implemented here.
 
 ## Phase006 高速案内
 
 従来の一般道案内に加え、近接 ramp / exit / keep / merge は専用カードに切り替えます。距離軸、projection reliability、accuracy、ViewModel 保持は共通です。pin 済み Valhalla の 25 / 37 / 38 は公式 enum に定義された merge で、未対応値は UNKNOWN を維持します。[高速案内の仕様](highway-guidance.md)。
+
+## Phase008による位置判定の更新
+
+productionでは最近傍投影を直接案内に使わず、RouteMatcherの候補評価を通したprojectionをcalculatorへ入力します。MATCHEDかつON_ROUTEのみ通常案内。それ以外は距離・方向・その次の指示を抑制し、位置確認と逸脱bannerを表示します。復帰には3 fix/2秒を要求します。raw GPS markerは保持し、自動rerouteしません。旧projector/calculator単体APIは後方互換の幾何計算として残します。[仕様と制限](map-matching-deviation.md)。
