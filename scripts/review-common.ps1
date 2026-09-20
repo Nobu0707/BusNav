@@ -275,6 +275,7 @@ function Assert-ReviewChecks {
         "gradle-test.txt",
         "gradle-lint.txt",
         "gradle-assemble-debug.txt",
+        "gradle-assemble-release.txt",
         "gradle-assemble-android-test.txt",
         "artifact-inventory.txt",
         "review-check-summary.txt"
@@ -448,7 +449,7 @@ function Test-ProhibitedReviewPath {
     if ($name -ieq "local.properties") { return $true }
     if ($name -match '^(?i:\.env)(\..*)?$') { return $true }
     if ($name -match '(?i:credential|secret|password)') { return $true }
-    if ($name -match '(?i:\.(apk|aab|class|dex|log|db|sqlite|sqlite3|zip|tmp|jks|keystore|p12|pfx|pem|key|pbf|mbtiles|pmtiles))$') { return $true }
+    if ($name -match '(?i:\.(apk|aab|class|dex|log|db|sqlite|sqlite3|zip|tmp|jks|keystore|p12|pfx|pem|key|pbf|mbtiles|pmtiles|preferences_pb))$') { return $true }
     if ($name -match '(?i:\.layerstats\.tsv\.gz)$') { return $true }
     if ($name -match '(?i:\.tar\.gz)$') { return $true }
     return $false

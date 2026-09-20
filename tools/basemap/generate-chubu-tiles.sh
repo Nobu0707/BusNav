@@ -3,7 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 data_dir="${BUSNAV_BASEMAP_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/busnav/basemap}"
-image="${BUSNAV_PLANETILER_IMAGE:-openmaptiles/planetiler-openmaptiles:latest}"
+image="${BUSNAV_PLANETILER_IMAGE:-openmaptiles/planetiler-openmaptiles@sha256:cdd536498df473ffe8bebf20ed62a89f05a01ba63d5ee7cb92a3581afcaaaa89}"
 output="$data_dir/chubu.mbtiles"
 
 if [[ -n "${BUSNAV_OSM_PBF:-}" ]]; then

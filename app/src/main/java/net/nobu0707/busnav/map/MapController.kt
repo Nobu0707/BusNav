@@ -187,6 +187,12 @@ class MapController(
         fitRoutePlanIfRequested()
     }
 
+    fun updateBasemap(config: BasemapConfig) {
+        val nextStyle = basemapController.updateConfig(config) ?: return
+        style = null
+        map?.setStyle(nextStyle)
+    }
+
     fun detach() {
         mapView?.removeOnDidFinishLoadingStyleListener(styleLoadedListener)
         mapView?.removeOnDidFailLoadingMapListener(mapLoadFailedListener)

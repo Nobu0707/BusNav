@@ -25,7 +25,7 @@ class AndroidLogMapDiagnostics : MapDiagnostics {
         val message = buildString {
             append(event.eventName)
             resource?.let { append(" resource=").append(sanitizeMapResource(it)) }
-            detail?.takeIf(String::isNotBlank)?.let { append(" detail=").append(it.take(MAX_DETAIL_LENGTH)) }
+            detail?.takeIf(String::isNotBlank)?.let { append(" detail=").append(sanitizeMapDetail(it)) }
         }
         if (event == MapDiagnosticEvent.STYLE_LOAD_FAILED || event == MapDiagnosticEvent.SOURCE_ERROR) {
             Log.w(TAG, message)
@@ -36,7 +36,6 @@ class AndroidLogMapDiagnostics : MapDiagnostics {
 
     private companion object {
         const val TAG = "BusNavMap"
-        const val MAX_DETAIL_LENGTH = 240
     }
 }
 
@@ -53,5 +52,27 @@ fun sanitizeMapResource(resource: String): String {
             null,
         ).toString()
     }
-    return resource.substringBefore('?').substringBefore('#')
+    return if (resource == BasemapConfig.FALLBACK_STYLE_URL) resource else "[invalid-resource]"
+}
+
+
+/** Redact first, then bound the log line. Never log raw parser failures. */
+fun sanitizeMapDetail(detail: String): String {
+    var safe = detail
+    repeat(4) {
+        safe = Regex("(?:%[0-9a-fA-F]{2})+").replace(safe) { match ->
+            runCatching { java.net.URLDecoder.decode(match.value, "UTF-8") }.getOrDefault("[encoded]")
+        }
+    }
+    safe = Regex("(?i)https?[^\\s<>\\\"]*").replace(safe) { match ->
+        val uri = runCatching { URI(match.value) }.getOrNull()
+        if (uri?.host != null) {
+            uri.host + if (uri.port >= 0) ":${uri.port}" else ""
+        } else "[redacted-url]"
+    }
+    safe = Regex("(?i)\\bbearer\\s+[^\\s,;\\\"]+").replace(safe, "Bearer [redacted]")
+    safe = Regex("(?i)([\\\"']?(?:[a-z_]*token|api[-_]?key|authorization|password|passwd|secret|credential)[\\\"']?\\s*[:=]\\s*)(?:\\\"[^\\\"]*\\\"|'[^']*'|[^\\s,;]+)")
+        .replace(safe) { it.groupValues[1] + "[redacted]" }
+    safe = Regex("\\beyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\b").replace(safe, "[redacted]")
+    return safe.replace(Regex("[\\r\\n\\t]"), " ").take(240)
 }

@@ -17,6 +17,7 @@ $knownLogs = @(
     "gradle-test.txt",
     "gradle-lint.txt",
     "gradle-assemble-debug.txt",
+    "gradle-assemble-release.txt",
     "gradle-assemble-android-test.txt",
     "adb-devices.txt",
     "connected-debug-android-test.txt",
@@ -66,6 +67,7 @@ if (-not (Test-Path -LiteralPath $gradleWrapper -PathType Leaf)) {
 [void](Invoke-LoggedCheck -Name "Gradle test" -FilePath $gradleWrapper -Arguments @("test", "--console=plain") -LogName "gradle-test.txt")
 [void](Invoke-LoggedCheck -Name "Gradle lint" -FilePath $gradleWrapper -Arguments @("lint", "--console=plain") -LogName "gradle-lint.txt")
 [void](Invoke-LoggedCheck -Name "assembleDebug" -FilePath $gradleWrapper -Arguments @("assembleDebug", "--console=plain") -LogName "gradle-assemble-debug.txt")
+[void](Invoke-LoggedCheck -Name "assembleRelease" -FilePath $gradleWrapper -Arguments @("assembleRelease", "--console=plain") -LogName "gradle-assemble-release.txt")
 [void](Invoke-LoggedCheck -Name "assembleDebugAndroidTest" -FilePath $gradleWrapper -Arguments @("assembleDebugAndroidTest", "--console=plain") -LogName "gradle-assemble-android-test.txt")
 
 $adbResolution = Find-AndroidAdb -RepositoryRoot $repositoryRoot
@@ -78,6 +80,7 @@ if ($adbAvailable) {
     $adbDisposition = Get-AdbCheckDisposition -AdbAvailable $true -AdbExitCode $adbResult.ExitCode -OnlineDeviceCount $onlineDevices.Count
     $adbStatus = $adbDisposition.AdbStatus
     $adbReason = $adbDisposition.Reason
+    $adbResult.StandardOutput = $adbResult.StandardOutput -replace '(?m)^\S+\s+(device|offline|unauthorized)(?:[ \t].*)?\r?$', '[device-id-redacted] $1'
     Write-Utf8File -Path (Join-Path $checksDirectory "adb-devices.txt") -Content (Format-CommandResult -Result $adbResult -Status $adbStatus)
     $statuses["ADB devices"] = $adbStatus
 

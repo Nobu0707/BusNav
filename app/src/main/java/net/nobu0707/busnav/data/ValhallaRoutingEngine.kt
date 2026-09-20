@@ -55,6 +55,7 @@ class ValhallaRoutingEngine(
     routeIdFactory: () -> String = { UUID.randomUUID().toString() },
     private val diagnostics: RoutingDiagnostics = NoOpRoutingDiagnostics,
     private val dispatchers: RoutingDispatchers = RoutingDispatchers(),
+    private val baseUrlProvider: suspend () -> String = { config.baseUrl },
 ) : RoutingEngine {
     private val httpClient = client ?: OkHttpClient.Builder()
         .connectTimeout(config.connectTimeoutSeconds, TimeUnit.SECONDS)
@@ -193,7 +194,7 @@ class ValhallaRoutingEngine(
         }
     }
 
-    private fun routeEndpoint() = config.baseUrl
+    private suspend fun routeEndpoint() = baseUrlProvider()
         .takeIf(String::isNotBlank)
         ?.trimEnd('/')
         ?.plus("/route")

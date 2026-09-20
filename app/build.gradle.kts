@@ -1,3 +1,5 @@
+import java.net.URI
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -27,6 +29,9 @@ android {
             val debugBasemapUrl = basemapStyleUrl
                 .orElse("http://10.0.2.2:8080/styles/busnav/style.json")
                 .get()
+            require(debugBasemapUrl.isEmpty() || debugBasemapUrl.endsWith("/styles/busnav/style.json")) {
+                "Debug basemap URL must end in /styles/busnav/style.json; edit the server base URL in Developer Connections"
+            }
             buildConfigField(
                 "String",
                 "BASEMAP_STYLE_URL",
@@ -37,7 +42,14 @@ android {
         release {
             isMinifyEnabled = false
             buildConfigField("String", "BASEMAP_STYLE_URL", "\"\"")
-            val releaseUrl = valhallaBaseUrl.orElse("").get()
+            val releaseUrl = providers.gradleProperty("busnavReleaseValhallaBaseUrl").orElse("").get()
+            require(releaseUrl.isEmpty() || (releaseUrl.startsWith("https://") &&
+                URI(releaseUrl).host?.let { it != "localhost" && it.contains('.') &&
+                    !it.all { c -> c.isDigit() || c == '.' } } == true &&
+                URI(releaseUrl).rawUserInfo == null &&
+                URI(releaseUrl).rawQuery == null && URI(releaseUrl).rawFragment == null)) {
+                "Release routing requires a public HTTPS hostname without credentials/query/fragment"
+            }
             buildConfigField("String", "VALHALLA_BASE_URL", "\"${releaseUrl.replace("\"", "\\\"")}\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -74,9 +86,11 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
+    implementation(libs.androidx.datastore.preferences)
     implementation(libs.maplibre.android)
 
     testImplementation(libs.junit)
+    testImplementation("androidx.datastore:datastore-core-okio:1.2.1")
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
 

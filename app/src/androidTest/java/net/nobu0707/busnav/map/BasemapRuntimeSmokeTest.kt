@@ -4,7 +4,9 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import net.nobu0707.busnav.MainActivity
+import androidx.activity.ComponentActivity
+import net.nobu0707.busnav.map.basemap.BasemapConfig
+import net.nobu0707.busnav.ui.theme.BusNavTheme
 import net.nobu0707.busnav.test.LocalBasemapAssumptions
 import okhttp3.Request
 import org.junit.Assert.assertTrue
@@ -15,11 +17,20 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class BasemapRuntimeSmokeTest {
     @get:Rule
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun localStyleVectorTileAndJapaneseGlyphLoadWhenServerIsAvailable() {
-        if (!LocalBasemapAssumptions.assumeAvailable()) return
+        LocalBasemapAssumptions.assumeAvailable()
+        composeRule.runOnUiThread { org.maplibre.android.MapLibre.getInstance(composeRule.activity.applicationContext) }
+        composeRule.setContent {
+            BusNavTheme {
+                MapScreen(location = null, isFollowingLocation = false, recenterRequestId = 0,
+                    activeRoute = null, routeOverviewRequestId = 0,
+                    basemapConfig = BasemapConfig.fromBuildValue(LocalBasemapAssumptions.STYLE_URL, true),
+                    onMapReady = {}, onMapGesture = {}, onMapError = {})
+            }
+        }
         val client = LocalBasemapAssumptions.client()
 
         assertResource(client, "/styles/busnav/style.json", minimumBytes = 1_000)

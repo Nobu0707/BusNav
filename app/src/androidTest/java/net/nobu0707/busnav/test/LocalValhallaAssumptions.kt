@@ -6,7 +6,7 @@ import okhttp3.Request
 import org.junit.Assume.assumeTrue
 
 object LocalValhallaAssumptions {
-    const val BASE_URL = "http://10.0.2.2:8002"
+    val BASE_URL = net.nobu0707.busnav.BuildConfig.VALHALLA_BASE_URL
 
     fun assumeAvailable() {
         val client = OkHttpClient.Builder()

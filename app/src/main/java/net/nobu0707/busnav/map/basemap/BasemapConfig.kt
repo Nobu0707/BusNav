@@ -27,13 +27,16 @@ data class BasemapConfig(
                 ?: return BasemapConfig(null, BasemapMode.FALLBACK)
             val uri = runCatching { URI(normalized) }.getOrNull()
                 ?: return BasemapConfig(null, BasemapMode.FALLBACK)
+            if (uri.host.isNullOrBlank() || uri.rawUserInfo != null || uri.rawQuery != null || uri.rawFragment != null) {
+                return BasemapConfig(null, BasemapMode.FALLBACK)
+            }
             val scheme = uri.scheme?.lowercase()
             val localDevelopmentHost = uri.host in LOCAL_DEVELOPMENT_HOSTS
 
             if (localDevelopmentHost && !isDebug) {
                 return BasemapConfig(null, BasemapMode.FALLBACK)
             }
-            if (scheme == "http" && (!isDebug || !localDevelopmentHost)) {
+            if (scheme == "http" && !isDebug) {
                 return BasemapConfig(null, BasemapMode.FALLBACK)
             }
             if (scheme != "http" && scheme != "https") {

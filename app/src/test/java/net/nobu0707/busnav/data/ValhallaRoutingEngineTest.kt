@@ -7,6 +7,7 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.double
@@ -44,6 +45,34 @@ class ValhallaRoutingEngineTest {
     @After
     fun tearDown() {
         server.shutdown()
+    }
+
+    @Test
+    fun `next request reads saved endpoint without recreating engine`() = runBlocking {
+        MockWebServer().use { second ->
+            second.start()
+            val defaults = net.nobu0707.busnav.developer.DeveloperConnectionSettings(server.url("/").toString(), server.url("/").toString())
+            val file = java.io.File.createTempFile("connections", ".preferences_pb").also { it.delete() }
+            val job = kotlinx.coroutines.SupervisorJob()
+            val store = net.nobu0707.busnav.developer.testPreferenceStore(file,
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO + job))
+            val repository = net.nobu0707.busnav.developer.DataStoreDeveloperConnectionRepository(store, defaults)
+            val engine = ValhallaRoutingEngine(RoutingConfig(defaults.valhallaBaseUrl),
+                baseUrlProvider = { repository.settings.first().valhallaBaseUrl })
+            try {
+                server.enqueue(MockResponse().setBody(successBody()))
+                assertTrue(engine.calculateRoute(request()) is RoutingResult.Success)
+                assertEquals("/route", server.takeRequest().path)
+                repository.update(defaults.copy(valhallaBaseUrl = second.url("/").toString()))
+                second.enqueue(MockResponse().setBody(successBody()))
+                assertTrue(engine.calculateRoute(request()) is RoutingResult.Success)
+                assertEquals("/route", second.takeRequest().path)
+                repository.reset()
+                server.enqueue(MockResponse().setBody(successBody()))
+                assertTrue(engine.calculateRoute(request()) is RoutingResult.Success)
+                assertEquals("/route", server.takeRequest().path)
+            } finally { job.cancel(); job.join(); file.delete() }
+        }
     }
 
     @Test

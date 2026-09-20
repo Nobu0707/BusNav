@@ -51,6 +51,19 @@ class BasemapControllerTest {
         assertEquals(MapDiagnosticEvent.SOURCE_ERROR, diagnostics.events.last())
     }
 
+    @Test fun changingHostRecoversFromFallbackAndDoesNotReloadIdenticalConfig() {
+        val controller = BasemapController(config, NoOpMapDiagnostics) {}
+        controller.initialStyle()
+        controller.onMapLoadFailed("offline")
+        controller.onStyleLoaded()
+        val lan = BasemapConfig.fromBuildValue("http://192.168.1.100:8080/styles/busnav/style.json", true)
+        assertEquals(lan.styleUrl, controller.updateConfig(lan))
+        assertEquals(BasemapState.LOADING, controller.state)
+        controller.onStyleLoaded()
+        assertEquals(BasemapState.AVAILABLE, controller.state)
+        assertNull(controller.updateConfig(lan))
+    }
+
     private class RecordingMapDiagnostics : MapDiagnostics {
         val events = mutableListOf<MapDiagnosticEvent>()
 

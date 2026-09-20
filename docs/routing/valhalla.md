@@ -4,13 +4,13 @@ BusNav Phase 004 は Valhalla の `POST /route` を JSON で呼び出す。公�
 
 ## endpoint
 
-debug の既定値は `http://10.0.2.2:8002` である。Android Emulator の `10.0.2.2` はホスト側 localhost を指す。実機から同一 LAN のサーバーへ接続する場合はビルド時に上書きする。
+debug の既定値は `http://10.0.2.2:8002` である。Android Emulator の `10.0.2.2` はホスト側 localhost を指す。実機から同一 LAN のサーバーへ接続する場合はDebugアプリの「開発接続設定」でPCのLAN IPを保存する。[実機開発手順](../development/device-testing.md) を参照。ビルド時の既定値も以下で上書き可能。
 
 ```powershell
 .\gradlew.bat assembleDebug -PbusnavValhallaBaseUrl=http://192.168.1.20:8002
 ```
 
-release の既定値は空であり、未設定なら `CONFIGURATION` を返す。本番 endpoint は HTTPS を使う。cleartext 許可は debug manifest にだけ置き、main/release では許可しない。
+release の既定値は空であり、未設定なら `CONFIGURATION` を返す。本番 endpoint は別property `busnavReleaseValhallaBaseUrl` のHTTPSを使う。Debug用propertyやDataStoreは取り込まない。cleartext 許可は debug manifest にだけ置き、main/release では許可しない。
 
 ## request
 

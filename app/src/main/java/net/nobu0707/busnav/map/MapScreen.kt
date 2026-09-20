@@ -61,7 +61,7 @@ fun MapScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val routePaddingPx = with(LocalDensity.current) { 64.dp.roundToPx() }
-    var basemapState by remember(basemapConfig) {
+    var basemapState by remember {
         mutableStateOf(
             if (basemapConfig.mode == BasemapMode.FALLBACK) {
                 BasemapState.UNAVAILABLE
@@ -76,7 +76,7 @@ fun MapScreen(
     val mapView = remember(context) {
         MapView(context).also { it.onCreate(null) }
     }
-    val controller = remember(mapView, basemapConfig, routePaddingPx) {
+    val controller = remember(mapView, routePaddingPx) {
         MapController(
             onReady = onMapReady,
             onGesture = onMapGesture,
@@ -138,6 +138,7 @@ fun MapScreen(
     }
 
     SideEffect {
+        controller.updateBasemap(basemapConfig)
         controller.update(location, isFollowingLocation, recenterRequestId)
         controller.updateRoute(activeRoute, routeOverviewRequestId)
         controller.updateRoutePlan(routePlan, planOverviewRequestId)

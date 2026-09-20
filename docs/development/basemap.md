@@ -41,7 +41,7 @@ curl --fail http://localhost:8080/styles/busnav/style.json
 
 TileServer は `maptiler/tileserver-gl:v5.6.0`、host port は 8080 です。Emulator は host loopback を `10.0.2.2` で参照するため、アプリの debug default は `http://10.0.2.2:8080/styles/busnav/style.json` です。Valhalla の 8002 と混同しないでください。
 
-別 style endpoint を試す場合だけ Windows 側の `gradle.properties` などで `busnavBasemapStyleUrl=https://...` を指定します。release はこの property を取り込まず fallback 固定です。
+接続先はDebugアプリの「開発接続設定」で変更できます。ビルド既定値は `busnavBasemapStyleUrl` の標準 `/styles/busnav/style.json` endpointから取得します。Releaseはこのpropertyを取り込まずfallback固定です。実機向けのLAN IP・bind・Firewall確認は [device-testing.md](device-testing.md) を参照してください。
 
 ## Style / labels
 
@@ -67,3 +67,21 @@ TileServer が無い場合、MapLibre は埋め込み dark background に fallba
 ## Production / offline
 
 Development は MBTiles + TileServer GL + HTTP です。Production は HTTPS tile server/CDN を別途設計し、localhost を使いません。Offline は PMTiles または route-corridor cache を将来候補としますが、Phase 004.5 では実装しません。
+
+## 再現性の固定値
+
+| Component | 固定値 |
+| --- | --- |
+| Planetiler | 0.10.2 / git `0e5588c4a6e8c29a270a33afe8df62027d889604` |
+| Planetiler image | `openmaptiles/planetiler-openmaptiles@sha256:cdd536498df473ffe8bebf20ed62a89f05a01ba63d5ee7cb92a3581afcaaaa89` |
+| TileServer GL | `v5.6.0@sha256:3a9ccdb24820b6814c8119bcc8a4376c39867cb0ffe69d62919ef898b90c2427` |
+| OpenMapTiles schema | 3.16.0（生成済みMBTiles metadataのversionで確認） |
+| Font/glyph source | [openmaptiles/fonts commit 025ff2b2f84cc0fdf11f7b1d74b3a784595fe7a4](https://github.com/openmaptiles/fonts/tree/025ff2b2f84cc0fdf11f7b1d74b3a784595fe7a4) |
+| Font archive SHA-256 | `c8106d0af721bbb6adf55005fc4a9ab4ac2d5ade7b9fd8a26ab21530951b7b2f` |
+
+Planetilerの既存レビューで確認済みdigestを使い、存在を未確認のversion tagは付加しません。
+fontsは固定commitのtar.gzを取得し、SHA-256検証後だけ展開します。保存済みglyphもmanifestのchecksumを確認します。
+Noto Sans CJK glyphのlicense/attributionは固定revisionのupstreamに従います。
+
+入力PBFやPlanetilerが初回取得する補助データも同じファイルを保持してください。
+今回のpinは実行ツールとglyphを固定し、OSM更新・補助データ更新を含むbyte-for-byte同一生成まで保証するものではありません。

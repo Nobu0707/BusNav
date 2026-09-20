@@ -14,9 +14,11 @@ build/review-checks/
 busnav-logcat*.txt
 
 # Local basemap inputs, generated tiles, fonts, and caches
+*.preferences_pb
 *.osm.pbf
 *.mbtiles
 *.pmtiles
 tools/basemap/runtime/
 tools/basemap/.planetiler-work/
 tools/basemap/.generated-style/
+/.kotlin/

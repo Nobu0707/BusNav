@@ -13,9 +13,9 @@ export BUSNAV_OSM_PBF="$HOME/busnav/valhalla/custom_files/chubu-latest.osm.pbf"
 ./tools/basemap/start-tileserver.sh
 ```
 
-The generator uses `openmaptiles/planetiler-openmaptiles:latest`, reuses the mounted PBF read-only, and writes `chubu.mbtiles` outside Git. Planetiler downloads only its separate Natural Earth, water polygon, lake centerline, and tile-weight support data. It does not download another Chubu PBF.
+The generator uses the Planetiler 0.10.2 image pinned by its verified SHA-256 digest (see [reproducibility table](../../docs/development/basemap.md)), reuses the mounted PBF read-only, and writes `chubu.mbtiles` outside Git. Planetiler downloads only its separate Natural Earth, water polygon, lake centerline, and tile-weight support data. It does not download another Chubu PBF.
 
-`prepare-fonts.sh` copies the OFL/Apache-licensed OpenMapTiles Noto Sans glyph set into the runtime directory. `start-tileserver.sh` requires the Japanese glyph range before starting `maptiler/tileserver-gl:v5.6.0`.
+`prepare-fonts.sh` verifies a commit-pinned archive with SHA-256, then copies the OFL/Apache-licensed OpenMapTiles Noto Sans glyph set into the runtime directory. `start-tileserver.sh` requires the Japanese glyph range before starting `maptiler/tileserver-gl:v5.6.0`.
 
 Endpoints:
 

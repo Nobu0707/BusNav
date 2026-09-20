@@ -1,24 +1,23 @@
 package net.nobu0707.busnav.test
 
 import java.util.concurrent.TimeUnit
-import android.util.Log
+import net.nobu0707.busnav.BuildConfig
+import org.junit.Assume.assumeTrue
+import java.net.URI
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
 object LocalBasemapAssumptions {
-    const val BASE_URL = "http://10.0.2.2:8080"
-    const val STYLE_URL = "$BASE_URL/styles/busnav/style.json"
+    val STYLE_URL = BuildConfig.BASEMAP_STYLE_URL
+    val BASE_URL: String = URI(STYLE_URL).let { "${it.scheme}://${it.rawAuthority}" }
 
-    fun assumeAvailable(): Boolean {
+    fun assumeAvailable() {
         val available = runCatching {
             client().newCall(Request.Builder().url(STYLE_URL).build())
                 .execute()
                 .use { it.isSuccessful }
         }.getOrDefault(false)
-        if (!available) {
-            Log.i(TAG, "SKIP live basemap smoke: TileServer GL is unavailable at $STYLE_URL")
-        }
-        return available
+        assumeTrue("Local TileServer is unavailable", available)
     }
 
     fun client(): OkHttpClient = OkHttpClient.Builder()
@@ -28,5 +27,4 @@ object LocalBasemapAssumptions {
         .build()
 
     private const val PROBE_TIMEOUT_SECONDS = 3L
-    private const val TAG = "BusNavBasemapTest"
 }

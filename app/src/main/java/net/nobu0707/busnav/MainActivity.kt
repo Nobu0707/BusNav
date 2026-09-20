@@ -1,6 +1,10 @@
 package net.nobu0707.busnav
 
 import android.os.Bundle
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import kotlinx.coroutines.flow.first
+import net.nobu0707.busnav.developer.createConnectionRepository
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -33,16 +37,22 @@ class MainActivity : ComponentActivity() {
         } else {
             NoOpRoutingDiagnostics
         }
+        val connections = createConnectionRepository(applicationContext)
         val routingEngine = ValhallaRoutingEngine(
             config = RoutingConfig(BuildConfig.VALHALLA_BASE_URL),
             diagnostics = diagnostics,
+            baseUrlProvider = { connections.settings.first().valhallaBaseUrl },
         )
         setContent {
+            val settings by connections.settings.collectAsState(initial = null)
             BusNavTheme {
+                val effective = settings ?: return@BusNavTheme
                 NavigationRoute(
                     locationProvider = locationProvider,
                     routeRepository = routeRepository,
                     routingEngine = routingEngine,
+                    connectionRepository = connections,
+                    basemapConfig = effective.basemapConfig(BuildConfig.DEBUG),
                 )
             }
         }

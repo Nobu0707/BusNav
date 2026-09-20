@@ -5,7 +5,7 @@ package net.nobu0707.busnav.map.basemap
  * failure path stays deterministic and unit-testable.
  */
 class BasemapController(
-    private val config: BasemapConfig,
+    private var config: BasemapConfig,
     private val diagnostics: MapDiagnostics,
     private val onStateChanged: (BasemapState) -> Unit,
 ) {
@@ -21,6 +21,14 @@ class BasemapController(
 
     val isFallbackActive: Boolean
         get() = fallbackActive
+
+    fun updateConfig(newConfig: BasemapConfig): String? {
+        if (config == newConfig) return null
+        config = newConfig
+        fallbackActive = config.mode == BasemapMode.FALLBACK
+        detailedStyleLoaded = false
+        return initialStyle()
+    }
 
     fun initialStyle(): String {
         val resource = config.styleUrl ?: config.fallbackStyleUrl

@@ -77,10 +77,11 @@ fun RoutePlanEditorScreen(
     onTogglePointType: (String) -> Unit,
     onPlanOverview: () -> Unit,
     onComplete: () -> Unit,
+    modifier: Modifier = Modifier,
+    onOpenConnections: (() -> Unit)? = null,
     calculationState: RouteCalculationState = RouteCalculationState.Idle,
     onCalculate: () -> Unit = {},
     onApplyCalculatedRoute: () -> Unit = {},
-    modifier: Modifier = Modifier,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     var endpointPendingDeletion by remember { mutableStateOf<RoutePlanPoint?>(null) }
@@ -100,6 +101,7 @@ fun RoutePlanEditorScreen(
                 EditorPanel(
                     uiState = uiState,
                     onBack = onBack,
+                    onOpenConnections = onOpenConnections,
                     onSelectAddMode = onSelectAddMode,
                     onSelectPoint = onSelectPoint,
                     onDeleteRequest = { point ->
@@ -127,7 +129,7 @@ fun RoutePlanEditorScreen(
                 modifier = Modifier.fillMaxSize().padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                EditorHeader(onBack = onBack)
+                EditorHeader(onBack = onBack, onOpenConnections = onOpenConnections)
                 PlanMapPanel(
                     hasPoints = uiState.currentPlan.points.isNotEmpty(),
                     hasCandidate = calculationState is RouteCalculationState.Success &&
@@ -139,6 +141,7 @@ fun RoutePlanEditorScreen(
                 EditorPanel(
                     uiState = uiState,
                     onBack = onBack,
+                    onOpenConnections = onOpenConnections,
                     onSelectAddMode = onSelectAddMode,
                     onSelectPoint = onSelectPoint,
                     onDeleteRequest = { point ->
@@ -177,6 +180,7 @@ fun RoutePlanEditorScreen(
 
 @Composable
 private fun EditorPanel(
+    onOpenConnections: (() -> Unit)? = null,
     uiState: RoutePlanUiState,
     onBack: () -> Unit,
     onSelectAddMode: (RoutePlanPointType) -> Unit,
@@ -243,7 +247,7 @@ private fun EditorPanel(
 }
 
 @Composable
-private fun EditorHeader(onBack: () -> Unit) {
+private fun EditorHeader(onBack: () -> Unit, onOpenConnections: (() -> Unit)? = null) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(
             onClick = onBack,
@@ -251,7 +255,10 @@ private fun EditorHeader(onBack: () -> Unit) {
                 .testTag(RoutePlanEditorTestTags.BACK)
                 .semantics { contentDescription = "ナビ画面へ戻る" },
         ) { Text("戻る") }
-        Text("ルート編集", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Text("ルート編集", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        if (net.nobu0707.busnav.BuildConfig.DEBUG && onOpenConnections != null) {
+            TextButton(onClick = onOpenConnections, modifier = Modifier.testTag("connections_open")) { Text("開発接続設定") }
+        }
     }
 }
 

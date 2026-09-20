@@ -1,6 +1,12 @@
 package net.nobu0707.busnav.ui.navigation
 
 import android.Manifest
+import net.nobu0707.busnav.BuildConfig
+import net.nobu0707.busnav.developer.DeveloperConnectionRepository
+import net.nobu0707.busnav.map.basemap.BasemapConfig
+import net.nobu0707.busnav.ui.settings.developer.DeveloperConnectionScreen
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -81,6 +87,8 @@ fun NavigationRoute(
     locationProvider: LocationProvider,
     routeRepository: ScheduledRouteRepository,
     routingEngine: RoutingEngine,
+    connectionRepository: DeveloperConnectionRepository? = null,
+    basemapConfig: BasemapConfig = BasemapConfig.fromBuildValue(BuildConfig.BASEMAP_STYLE_URL, BuildConfig.DEBUG),
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -94,6 +102,7 @@ fun NavigationRoute(
     val calculationHolder = remember(routingEngine, scope) { RouteCalculationStateHolder(routingEngine, scope) }
     val calculationState by calculationHolder.state.collectAsState()
     val candidateRoute = calculationHolder.currentCandidate(routePlanUiState.revision)
+    var showConnections by rememberSaveable { mutableStateOf(false) }
     var screen by rememberSaveable { mutableStateOf(BusNavScreen.NAVIGATION) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -162,6 +171,7 @@ fun NavigationRoute(
             onEditRoute = { screen = BusNavScreen.ROUTE_EDIT },
             mapContent = { modifier ->
                 MapScreen(
+                    basemapConfig = basemapConfig,
                     location = uiState.location,
                     isFollowingLocation = uiState.isFollowingLocation,
                     recenterRequestId = uiState.recenterRequestId,
@@ -176,6 +186,7 @@ fun NavigationRoute(
         )
         BusNavScreen.ROUTE_EDIT -> RoutePlanEditorScreen(
             uiState = routePlanUiState,
+            onOpenConnections = if (BuildConfig.DEBUG && connectionRepository != null) ({ showConnections = true }) else null,
             onBack = {
                 calculationHolder.cancel()
                 screen = BusNavScreen.NAVIGATION
@@ -204,6 +215,7 @@ fun NavigationRoute(
             },
             mapContent = { modifier ->
                 MapScreen(
+                    basemapConfig = basemapConfig,
                     location = uiState.location,
                     isFollowingLocation = false,
                     recenterRequestId = 0,
@@ -219,6 +231,12 @@ fun NavigationRoute(
                 )
             },
         )
+    }
+    if (BuildConfig.DEBUG && showConnections && connectionRepository != null) {
+        Dialog(onDismissRequest = { showConnections = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            DeveloperConnectionScreen(connectionRepository, onBack = { showConnections = false })
+        }
     }
 }
 

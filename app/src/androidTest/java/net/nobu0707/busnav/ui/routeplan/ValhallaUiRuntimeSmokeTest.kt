@@ -13,7 +13,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import net.nobu0707.busnav.MainActivity
+import androidx.activity.ComponentActivity
+import net.nobu0707.busnav.ui.theme.BusNavTheme
+import net.nobu0707.busnav.ui.navigation.NavigationRoute
+import net.nobu0707.busnav.location.AndroidLocationProvider
+import net.nobu0707.busnav.data.route.InMemoryScheduledRouteRepository
+import net.nobu0707.busnav.data.routing.valhalla.RoutingConfig
+import net.nobu0707.busnav.data.routing.valhalla.ValhallaRoutingEngine
 import net.nobu0707.busnav.domain.model.GeoPoint
 import net.nobu0707.busnav.domain.routeplan.RoutePlanPointType
 import net.nobu0707.busnav.test.LocalValhallaAssumptions
@@ -26,13 +32,20 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ValhallaUiRuntimeSmokeTest {
     @get:Rule
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     private lateinit var planHolder: RoutePlanEditorStateHolder
 
     @Before
     fun openRouteEditor() {
         LocalValhallaAssumptions.assumeAvailable()
+        composeRule.runOnUiThread { org.maplibre.android.MapLibre.getInstance(composeRule.activity) }
+        val provider = AndroidLocationProvider(composeRule.activity.applicationContext)
+        val repository = InMemoryScheduledRouteRepository()
+        val engine = ValhallaRoutingEngine(RoutingConfig(LocalValhallaAssumptions.BASE_URL))
+        composeRule.setContent {
+            BusNavTheme { NavigationRoute(provider, repository, engine) }
+        }
         composeRule.runOnUiThread {
             planHolder = ViewModelProvider(composeRule.activity)[RoutePlanEditorViewModel::class.java]
                 .stateHolder
