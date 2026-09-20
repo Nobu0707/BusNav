@@ -208,7 +208,7 @@ Android実ストレージの再生成・resetはconnected testで別途PASS。
 UI tests: portrait/landscapeで既定値・invalidエラー・LAN保存・reset・接続結果の成功/失敗表示をPASS。
 ネイティブ地図reloadテストではfallback→詳細style、経路source、4種類のmarker layer、overlay layers、カメラ維持を検証。
 描画前のnative source queryでMapLibre rendererが落ちるため、テストではstyleのsource/layer再登録を確認し、
-実データの道路上表示は手動ケースで確認した。
+実データの道路上表示は手動ケースで確認した。 再実行中にAVDプロセス終了が発生したため、reloadテストも実画面のMapScreenを使用し、MapViewの生成・破棄を本番と同じライフサイクルに統一した。AVD再起動後の全21件はPASS。
 
 BasemapRuntimeSmokeTestはreturnを廃止し `Assume.assumeTrue` を使用する。
 Basemap/Valhallaのprobeとlive testはBuildConfigの明示endpointを使い、ユーザーDataStoreへ依存しない。
