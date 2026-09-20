@@ -1,6 +1,8 @@
 package net.nobu0707.busnav.ui.settings.developer
 
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
+import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -23,7 +25,10 @@ class DeveloperConnectionScreenTest {
     @Test fun landscapeValidationSaveResetAndConnectionResults() { exercise(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) }
 
     private fun exercise(orientation: Int) {
-        rule.activity.requestedOrientation = orientation
+        rule.runOnUiThread { rule.activity.requestedOrientation = orientation }
+        val expected = if (orientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
+            Configuration.ORIENTATION_LANDSCAPE else Configuration.ORIENTATION_PORTRAIT
+        rule.waitUntil(5_000) { rule.activity.resources.configuration.orientation == expected }
         rule.waitForIdle()
         rule.setContent {
             BusNavTheme {
@@ -35,12 +40,17 @@ class DeveloperConnectionScreenTest {
         }
         rule.waitUntil(5_000) { rule.onAllNodes(hasText(defaults.valhallaBaseUrl)).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("valhalla_url").performScrollTo().performTextReplacement("host:8002")
+        rule.onNodeWithTag("valhalla_url").assertTextContains("host:8002")
+        closeSoftKeyboard()
+        rule.waitForIdle()
         rule.onNodeWithTag("connections_save").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(defaults, repository.settings.value) }
         rule.onNodeWithTag("valhalla_url").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("http(s)://ホスト:ポートを入力してください（認証情報・query・fragment・path は不可）").assertExists()
         rule.onNodeWithTag("valhalla_url").performTextReplacement(" http://192.168.1.100:8002/ ")
         rule.onNodeWithTag("basemap_url").performScrollTo().performTextReplacement("http://192.168.1.100:8080")
+        closeSoftKeyboard()
+        rule.waitForIdle()
         rule.onNodeWithTag("connections_save").performScrollTo().performClick()
         rule.waitUntil(5_000) { repository.settings.value.valhallaBaseUrl == "http://192.168.1.100:8002" }
         rule.waitUntil(10_000) { rule.onAllNodes(hasTestTag("connections_save") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
