@@ -1,4 +1,3 @@
-
 # Review007 — Phase005 Navigation Guidance
 
 ## 1. 概要・版
@@ -50,10 +49,11 @@ NavigationStateHolderにはRoutingEngine依存がなく、位置更新から再�
 
 | Check | 実行結果 |
 | --- | --- |
-| Unit tests | 141件、failure/error 0（新規37件） |
+| Unit tests | 141件、failure/error 0（新規36件） |
 | lint | PASS |
 | assembleDebug | PASS |
 | assembleDebugAndroidTest | PASS |
+| assembleRelease | PASS |
 | connectedDebugAndroidTest | 27件、failure/error/skip 0 |
 | Valhalla runtime | 既存長距離3回 + maneuver先頭/到着/global index確認 PASS |
 | Valhalla UI runtime | 既存short/long計7回 PASS |
