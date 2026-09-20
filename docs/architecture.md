@@ -157,3 +157,12 @@ NavigationProgressCalculator は route と同じ geometry distance index を使�
 ## Phase008 matching pipeline
 
 `LocationState -> RouteMatcher(RouteMatchIndex) -> RouteDeviationDetector -> NavigationProgressCalculator -> HighwayGuidanceCalculator -> NavigationUiState`。純粋遷移をDefaultで計算し、UI scopeで世代/route/location identityと鮮度を確認してcommitします。route差替えで全cacheを再構築し、ViewModelが回転時の状態を保持します。RouteDistanceIndexは共通距離軸。旧NavigationProgressTrackerはproduction pipelineでは使わず、jitter保持はmatcherへ集約しました。AndroidLocationProviderの単調時刻と10秒watchdogで古い位置からの強案内を防ぎます。詳細は [matching設計](map-matching-deviation.md)。
+
+## Phase008.5A presentation
+
+NavigationRoute は案内付き採用経路を表示中だけ navigationActive とし、編集・設定画面は inactive。
+SolarDayCache（現在地・日付・ZoneId）と TransportationTunnelProvider（loaded transportation/brunnel）を
+ThemeModeResolver に渡す。Compose の配色と地域別 Light/Dark style を同時に runtime 更新し、
+MapView、ViewModel、route snapshot を保持する。Theme は LocalContentColor を提供する。
+太陽計算は NOAA の pure Kotlin、java.time は minSdk23 向け core library desugaring を使用する。
+詳細・限界・検証は [テーマ・地図表示](theme-map-presentation.md)。

@@ -15,7 +15,7 @@ Phase 004.5.1 の [全国routing・関東/中部basemap環境](docs/development/
 - GeoJSON ソースと SymbolLayer による自車位置表示
 - 初回現在地への移動、位置更新追従、手動地図操作による追従解除、現在地ボタンによる復帰
 - 利用可能幅に応じた縦画面向け地図重視 UI と横画面向け 3 カラム UI
-- 夜行運行向けダークテーマ
+- 基本ライト、案内中の夜間・明示的トンネルのみ自動ダーク（[テーマ・地図表示](docs/theme-map-presentation.md)）
 - 純粋ロジックの単体テストと Compose UI テスト
 - Android/MapLibre 非依存の ScheduledRoute / RouteGeometry / RoutePoint domain model
 - debug build の架空 sample route と repository 境界
@@ -31,7 +31,7 @@ Phase 004.5.1 の [全国routing・関東/中部basemap環境](docs/development/
 - 探索中/失敗/成功 summary、candidate route preview、revision stale 防止、「このルートを使用」
 - Gradle property による endpoint 上書き、debug 限定 local cleartext、HTTP coroutine cancellation
 - OpenMapTiles 互換 MBTiles と TileServer GL による debug 用詳細 vector basemap
-- 高速道路から service road までの道路階層、道路名・地名・IC/JCT・水域・鉄道の dark style
+- 高速道路から service road までの道路階層、道路名・地名・IC/JCT・水域・鉄道の light/dark style
 - 詳細地図の LOADING / AVAILABLE / UNAVAILABLE、埋め込み fallback、OSM/OpenMapTiles attribution
 
 ## 開発環境

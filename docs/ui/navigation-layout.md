@@ -92,3 +92,13 @@ Phase 003 の Navigation 画面は走行表示に集中し、RoutePlan の複雑
 ## Phase008 deviation banner
 
 縦はguide card上、横は左guide column先頭にDeviationBannerを表示します。ON_ROUTEでは非表示、SUSPECTEDは位置関係確認中、OFF_ROUTEは所定経路から外れている可能性、RECOVERINGは復帰確認中。UNKNOWN/UNRELIABLEは位置情報確認中です。文字とpolite live regionで状態を伝え、OFF_ROUTEのみ強調色。dismiss/確認buttonはありません。高速cardの方向・sign・模式図は不確実時に抑制し、地図とroute lineは維持します。
+
+## Phase008.5A 配色と補助ボタン
+
+基本ライト。案内付き採用経路の表示中だけ、日の出前/日の入り以降または検知済みトンネルでダーク。
+編集・設定は夜間もライト。[テーマ・地図表示](../theme-map-presentation.md) を参照。
+
+下部は「ルート / 迂回 / 規制 / 音声 / 表示」。ルートの accessibility 説明は
+「ルート編集画面を開く」を維持する。固定幅88/72dpを廃止し、portraitではweight配分、
+landscapeでは列幅に合わせる。TextはmaxLines=1、softWrap=false、中央配置、最小ボタン高48dp。
+320dp画面相当の304dpバー（画面左右8dp）と狭い横画面列をComposeテストで確認する。
