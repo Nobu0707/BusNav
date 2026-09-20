@@ -2,7 +2,7 @@
 
 BusNav は、高速バス・夜行バスの実運用を想定した業務用ナビゲーションアプリです。通常は登録済みの所定経路を案内し、通行止めや運行管理上の指示がある場合だけ安全な迂回と所定経路への復帰を行うことを将来目標としています。
 
-このリポジトリの Phase 004 は、RoutePlan を Valhalla へ送り、大型車条件で道路沿いの候補経路を計算・確認して active route へ反映します。
+このリポジトリの Phase 004.5 は、RoutePlan を Valhalla へ送る Phase 004.1 に加え、同じ Chubu OSM PBF から作るローカル vector basemap を表示します。
 
 ## 現在の実装範囲
 
@@ -28,6 +28,9 @@ BusNav は、高速バス・夜行バスの実運用を想定した業務用ナ�
 - truck costing と寸法・重量・軸重、舗装路/道路種別の保守的 option
 - 探索中/失敗/成功 summary、candidate route preview、revision stale 防止、「このルートを使用」
 - Gradle property による endpoint 上書き、debug 限定 local cleartext、HTTP coroutine cancellation
+- OpenMapTiles 互換 MBTiles と TileServer GL による debug 用詳細 vector basemap
+- 高速道路から service road までの道路階層、道路名・地名・IC/JCT・水域・鉄道の dark style
+- 詳細地図の LOADING / AVAILABLE / UNAVAILABLE、埋め込み fallback、OSM/OpenMapTiles attribution
 
 ## 開発環境
 
@@ -67,15 +70,28 @@ macOS / Linux / WSL:
 
 デバッグ APK は `app/build/outputs/apk/debug/app-debug.apk` に生成されます。
 
+## ローカル詳細地図
+
+WSL2 上で既存 Chubu PBF を再利用し、MBTiles を生成して TileServer GL を起動します。PBF、MBTiles、glyph、Planetiler cache は Git 管理外です。
+
+```bash
+cd /mnt/c/projects/BusNav
+tools/basemap/generate-chubu-tiles.sh
+tools/basemap/start-tileserver.sh
+```
+
+Host の style URL は `http://localhost:8080/styles/busnav/style.json`、Android Emulator からは `http://10.0.2.2:8080/styles/busnav/style.json` です。詳細手順とトラブルシュートは [basemap 開発手順](docs/development/basemap.md) を参照してください。
+
 ## MapLibre と位置情報
 
-地図 SDK は `org.maplibre.gl:android-sdk:13.6.1` を使用し、Compose の `AndroidView` から `MapView` をホストします。開発用スタイルは MapLibre の公開デモスタイル `https://demotiles.maplibre.org/style.json` です。API キーは不要で、MapLibre ロゴと attribution は標準表示のままです。大量取得やオフライン保存は実装していません。
+地図 SDK は `org.maplibre.gl:android-sdk:13.6.1` を使用し、Compose の `AndroidView` から `MapView` をホストします。debug build はローカル TileServer GL、release build は localhost を含まない埋め込み dark fallback を使います。API キーは不要です。画面上に `© OpenMapTiles © OpenStreetMap contributors` を常時表示します。
 
 位置情報は Google Play services に依存せず、Android 標準 `LocationManager` を `LocationProvider` の背後に隔離しています。フォアグラウンドで GPS / Network provider を購読し、画面停止時に解除します。バックグラウンド位置情報権限は要求しません。
 
 ## 既知の制限
 
-- 公開デモスタイルにはネットワーク接続が必要です。
+- debug の詳細地図には WSL/Docker の TileServer GL が必要です。未起動時も fallback と route editor は利用できます。
+- 本番 tile server/CDN、PMTiles offline、route-corridor cache は未実装です。
 - 実端末での長時間走行、トンネル、GPS ロスト時の評価は未実施です。
 - 位置情報の権限を「今後表示しない」で拒否した場合の設定画面への直接リンクは未実装です。
 - 高頻度ナビ更新向けの平滑化、センサ融合、進行方向上固定は未実装です。

@@ -1,4 +1,4 @@
-# BusNav Phase 004 アーキテクチャ
+# BusNav Phase 004.5 アーキテクチャ
 
 ## 方針
 
@@ -30,7 +30,11 @@ net.nobu0707.busnav
 │   ├── MapScreen.kt
 │   ├── MapController.kt
 │   ├── RouteOverlayController.kt
-│   └── RoutePlanOverlayController.kt
+│   ├── RoutePlanOverlayController.kt
+│   └── basemap
+│       ├── BasemapConfig.kt / BasemapState.kt / BasemapController.kt
+│       ├── MapDiagnostics.kt / BasemapAttribution.kt
+│       └── OverlayLayerOrder.kt
 └── ui
     ├── navigation
     │   ├── NavigationScreen.kt
@@ -70,6 +74,12 @@ RoutePlan は専用 `RoutePlanEditorStateHolder` と `RoutePlanUiState` が所�
 `MapController` は MapLibre 固有 API を隔離します。スタイル読込、GeoJSON の自車ソース、SymbolLayer、カメラ追従、経路 bounds fit、MapLibre の移動/長押しジェスチャ検知を担当します。MapLibre `LatLng` はこの境界内で `GeoPoint` へ変換します。`RouteOverlayController` は所定経路、`RoutePlanOverlayController` は直線 preview と 4 種 point layer を別 ID で管理します。最新 route/plan は controller 側に保持し、style load 完了ごとに同じ ID の source/layer を重複させず双方を復元します。
 
 ### location
+
+### basemap
+
+`map.basemap` は表示地図だけを扱い、Valhalla routing と依存しません。`BasemapConfig` は debug local / HTTPS remote / fallback を選び、release で localhost や cleartext を採用しません。`BasemapController` は detailed style の LOADING / AVAILABLE / UNAVAILABLE と一度だけの fallback 切替を管理します。style reload 後は active route、candidate、START/DEST/VIA/SHAPING、自車を basemap の後に再追加します。
+
+表示データは `OSM PBF -> Planetiler OpenMapTiles profile -> MBTiles -> TileServer GL -> MapLibre`、経路計算は `OSM PBF -> Valhalla graph -> POST /route` です。両者は PBF を共有しますが、HTTP endpoint と障害状態は独立しています。query/credential を除去した `MapDiagnostics` と visible attribution は routing diagnostics から分離しています。
 
 `LocationProvider` が UI/状態層から見える抽象です。`AndroidLocationProvider` は Android 標準 `LocationManager` を使い、GPS と Network provider の更新を `Flow<LocationUpdate>` へ変換します。購読終了時には callback を解除します。
 
@@ -123,6 +133,7 @@ RoutePlanEditorScreen long press
 - 所定経路復帰: 現在地と所定経路の偏差判定を domain サービスとし、LocationProvider や MapLibre から分離します。
 - JCT 表示: NavigationUiState に案内モードと接近情報を追加し、レイアウトの中央地図領域へ一時的な専用表示を重ねます。
 - DI: 実装数と環境別構成が増えるまでは手動注入を維持します。Hilt は複数スコープや多数の実装切替が実際に必要になった時点で再評価します。
+- Basemap: development は MBTiles + TileServer GL、production は tile server/CDN、offline は PMTiles または route-corridor cache を候補にします。Valhalla を tile server として流用しません。
 
 ## 意図的な非採用
 

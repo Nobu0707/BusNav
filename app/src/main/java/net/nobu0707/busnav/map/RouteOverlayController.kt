@@ -1,5 +1,6 @@
 package net.nobu0707.busnav.map
 
+import net.nobu0707.busnav.map.basemap.OverlayLayerOrder
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression.eq
 import org.maplibre.android.style.expressions.Expression.get
@@ -137,13 +138,13 @@ internal class RouteOverlayController {
     companion object {
         const val GEOMETRY_SOURCE_ID = "busnav-scheduled-route-source"
         const val POINT_SOURCE_ID = "busnav-scheduled-route-points-source"
-        const val CASING_LAYER_ID = "busnav-scheduled-route-casing-layer"
-        const val LINE_LAYER_ID = "busnav-scheduled-route-line-layer"
-        const val START_LAYER_ID = "busnav-scheduled-route-start-layer"
-        const val STOP_LAYER_ID = "busnav-scheduled-route-stop-layer"
-        const val VIA_LAYER_ID = "busnav-scheduled-route-via-layer"
-        const val SHAPING_LAYER_ID = "busnav-scheduled-route-shaping-layer"
-        const val DESTINATION_LAYER_ID = "busnav-scheduled-route-destination-layer"
+        const val CASING_LAYER_ID = OverlayLayerOrder.ACTIVE_ROUTE_CASING
+        const val LINE_LAYER_ID = OverlayLayerOrder.ACTIVE_ROUTE
+        const val START_LAYER_ID = OverlayLayerOrder.ACTIVE_START
+        const val STOP_LAYER_ID = OverlayLayerOrder.ACTIVE_STOP
+        const val VIA_LAYER_ID = OverlayLayerOrder.ACTIVE_VIA
+        const val SHAPING_LAYER_ID = OverlayLayerOrder.ACTIVE_SHAPING
+        const val DESTINATION_LAYER_ID = OverlayLayerOrder.ACTIVE_DESTINATION
         const val POINT_TYPE_PROPERTY = "routePointType"
         const val POINT_NAME_PROPERTY = "routePointName"
     }

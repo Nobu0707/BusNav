@@ -22,6 +22,7 @@ Phase 003 の Navigation 画面は走行表示に集中し、RoutePlan の複雑
 │   + 権限案内          │
 │   + 経路全体ボタン    │
 │   + 現在地ボタン      │
+│   + 地図状態/attribution│
 │                      │
 ├──────────────────────┤
 │ 運行情報              │ 70dp
@@ -68,6 +69,8 @@ Phase 003 の Navigation 画面は走行表示に集中し、RoutePlan の複雑
 - `経路全体`: active route がある場合だけ有効で、位置追従を OFF にして geometry bounds を 64dp 相当の余白付きで fit します。
 
 両操作は独立したテストタグと content description を持ちます。MapView 自体が各レイアウトの地図領域内に収まるため、bounds fit は案内・運行情報・補助操作の外側 UI に隠れません。
+
+詳細地図が利用できない場合は地図上端に「詳細地図サーバー未接続」を小さく重ねます。MapView は埋め込み dark fallback のまま残り、長押し、地点編集、route/candidate overlay、bounds fit は停止しません。OSM/OpenMapTiles attribution は地図左下に常時表示します。
 
 ## JCT 接近専用表示
 

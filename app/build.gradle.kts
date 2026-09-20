@@ -5,6 +5,7 @@ plugins {
 }
 
 val valhallaBaseUrl = providers.gradleProperty("busnavValhallaBaseUrl")
+val basemapStyleUrl = providers.gradleProperty("busnavBasemapStyleUrl")
 
 android {
     namespace = "net.nobu0707.busnav"
@@ -23,10 +24,19 @@ android {
     buildTypes {
         debug {
             val debugUrl = valhallaBaseUrl.orElse("http://10.0.2.2:8002").get()
+            val debugBasemapUrl = basemapStyleUrl
+                .orElse("http://10.0.2.2:8080/styles/busnav/style.json")
+                .get()
+            buildConfigField(
+                "String",
+                "BASEMAP_STYLE_URL",
+                "\"" + debugBasemapUrl.replace("\"", "\\\"") + "\"",
+            )
             buildConfigField("String", "VALHALLA_BASE_URL", "\"${debugUrl.replace("\"", "\\\"")}\"")
         }
         release {
             isMinifyEnabled = false
+            buildConfigField("String", "BASEMAP_STYLE_URL", "\"\"")
             val releaseUrl = valhallaBaseUrl.orElse("").get()
             buildConfigField("String", "VALHALLA_BASE_URL", "\"${releaseUrl.replace("\"", "\\\"")}\"")
             proguardFiles(

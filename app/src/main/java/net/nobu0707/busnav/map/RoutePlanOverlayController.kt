@@ -1,5 +1,6 @@
 package net.nobu0707.busnav.map
 
+import net.nobu0707.busnav.map.basemap.OverlayLayerOrder
 import net.nobu0707.busnav.domain.routeplan.RoutePlan
 import net.nobu0707.busnav.domain.routeplan.RoutePlanPointType
 import org.maplibre.android.maps.Style
@@ -113,12 +114,12 @@ internal class RoutePlanOverlayController {
 
     companion object {
         const val PREVIEW_SOURCE_ID = "busnav-route-plan-preview-source"
-        const val PREVIEW_LINE_LAYER_ID = "busnav-route-plan-preview-line-layer"
+        const val PREVIEW_LINE_LAYER_ID = OverlayLayerOrder.PLAN_PREVIEW
         const val POINT_SOURCE_ID = "busnav-route-plan-point-source"
-        const val START_LAYER_ID = "busnav-route-plan-start-layer"
-        const val VIA_LAYER_ID = "busnav-route-plan-via-layer"
-        const val SHAPING_LAYER_ID = "busnav-route-plan-shaping-layer"
-        const val DESTINATION_LAYER_ID = "busnav-route-plan-destination-layer"
+        const val START_LAYER_ID = OverlayLayerOrder.START
+        const val VIA_LAYER_ID = OverlayLayerOrder.VIA
+        const val SHAPING_LAYER_ID = OverlayLayerOrder.SHAPING
+        const val DESTINATION_LAYER_ID = OverlayLayerOrder.DESTINATION
         const val POINT_TYPE_PROPERTY = "routePlanPointType"
         const val POINT_ID_PROPERTY = "routePlanPointId"
     }

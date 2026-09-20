@@ -1,0 +1,26 @@
+{
+  "options": {
+    "paths": {
+      "root": "/data",
+      "fonts": "runtime/fonts",
+      "styles": "styles",
+      "mbtiles": "runtime"
+    },
+    "serveAllFonts": true,
+    "serveAllStyles": false,
+    "serveStaticMaps": false,
+    "allowedHosts": "localhost,127.0.0.1,10.0.2.2"
+  },
+  "styles": {
+    "busnav": {
+      "style": "busnav.json",
+      "serve_rendered": false,
+      "serve_data": true
+    }
+  },
+  "data": {
+    "chubu": {
+      "mbtiles": "chubu.mbtiles"
+    }
+  }
+}

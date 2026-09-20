@@ -30,6 +30,11 @@ import net.nobu0707.busnav.location.LocationState
 import net.nobu0707.busnav.domain.route.ScheduledRoute
 import net.nobu0707.busnav.domain.model.GeoPoint
 import net.nobu0707.busnav.domain.routeplan.RoutePlan
+import net.nobu0707.busnav.map.basemap.BasemapConfig
+import net.nobu0707.busnav.map.basemap.BasemapController
+import net.nobu0707.busnav.map.basemap.BasemapState
+import net.nobu0707.busnav.map.basemap.MapDiagnostics
+import net.nobu0707.busnav.map.basemap.OverlayLayerOrder
 
 class MapController(
     private val onReady: () -> Unit,
@@ -37,6 +42,9 @@ class MapController(
     private val onError: (String) -> Unit,
     private val onLongPress: ((GeoPoint) -> Unit)?,
     private val routePaddingPx: Int,
+    basemapConfig: BasemapConfig,
+    mapDiagnostics: MapDiagnostics,
+    onBasemapStateChanged: (BasemapState) -> Unit,
 ) {
     private var map: MapLibreMap? = null
     private var mapView: MapView? = null
@@ -53,10 +61,29 @@ class MapController(
     private var lastPlanOverviewRequestId = 0
     private val routeOverlay = RouteOverlayController()
     private val routePlanOverlay = RoutePlanOverlayController()
+    private val basemapController = BasemapController(
+        config = basemapConfig,
+        diagnostics = mapDiagnostics,
+        onStateChanged = onBasemapStateChanged,
+    )
+    private var readyDelivered = false
     private val styleLoadedListener = MapView.OnDidFinishLoadingStyleListener {
         map?.style?.let { loadedStyle ->
             style = loadedStyle
+            basemapController.onStyleLoaded()
             installOverlays(loadedStyle)
+            if (!readyDelivered) {
+                readyDelivered = true
+                onReady()
+            }
+        }
+    }
+    private val mapLoadFailedListener = MapView.OnDidFailLoadingMapListener { error ->
+        val fallbackStyle = basemapController.onMapLoadFailed(error)
+        if (fallbackStyle != null) {
+            map?.setStyle(fallbackStyle)
+        } else if (basemapController.isFallbackActive) {
+            onError("Embedded fallback map style failed to load")
         }
     }
 
@@ -76,9 +103,7 @@ class MapController(
     fun attach(mapView: MapView) {
         this.mapView = mapView
         mapView.addOnDidFinishLoadingStyleListener(styleLoadedListener)
-        mapView.addOnDidFailLoadingMapListener { error ->
-            onError("地図を読み込めませんでした: $error")
-        }
+        mapView.addOnDidFailLoadingMapListener(mapLoadFailedListener)
         mapView.getMapAsync { mapLibreMap ->
             map = mapLibreMap
             mapLibreMap.addOnMoveListener(moveListener)
@@ -87,13 +112,14 @@ class MapController(
                 CameraUpdateFactory.newLatLngZoom(DEFAULT_LOCATION, DEFAULT_ZOOM),
             )
             runCatching {
-                mapLibreMap.setStyle(STYLE_URL) { loadedStyle ->
-                    style = loadedStyle
-                    installOverlays(loadedStyle)
-                    onReady()
-                }
+                mapLibreMap.setStyle(basemapController.initialStyle())
             }.onFailure { error ->
-                onError(error.message ?: "地図スタイルを読み込めませんでした")
+                val fallbackStyle = basemapController.onMapLoadFailed(error.message.orEmpty())
+                if (fallbackStyle != null) {
+                    mapLibreMap.setStyle(fallbackStyle)
+                } else {
+                    onError(error.message ?: "Map style could not be loaded")
+                }
             }
         }
     }
@@ -163,6 +189,7 @@ class MapController(
 
     fun detach() {
         mapView?.removeOnDidFinishLoadingStyleListener(styleLoadedListener)
+        mapView?.removeOnDidFailLoadingMapListener(mapLoadFailedListener)
         map?.removeOnMoveListener(moveListener)
         if (onLongPress != null) map?.removeOnMapLongClickListener(longClickListener)
         mapView = null
@@ -294,9 +321,8 @@ class MapController(
     }
 
     private companion object {
-        const val STYLE_URL = "https://demotiles.maplibre.org/style.json"
         const val VEHICLE_SOURCE_ID = "busnav-vehicle-source"
-        const val VEHICLE_LAYER_ID = "busnav-vehicle-layer"
+        const val VEHICLE_LAYER_ID = OverlayLayerOrder.VEHICLE
         const val VEHICLE_ICON_ID = "busnav-vehicle-icon"
         const val DEFAULT_ZOOM = 4.5
         const val FOLLOW_ZOOM = 16.5

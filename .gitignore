@@ -12,3 +12,11 @@ busnav-review-*.zip
 busnav-full-review-*.zip
 build/review-checks/
 busnav-logcat*.txt
+
+# Local basemap inputs, generated tiles, fonts, and caches
+*.osm.pbf
+*.mbtiles
+*.pmtiles
+tools/basemap/runtime/
+tools/basemap/.planetiler-work/
+tools/basemap/.generated-style/
