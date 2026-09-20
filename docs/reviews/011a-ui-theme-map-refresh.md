@@ -7,7 +7,7 @@
 - 開始時tracked差分なし。既存untracked .vscode/、gradle/gradle-daemon-jvm.propertiesは保持・未commit。
 - Phase008はCOMPLETEを維持。Phase009 Detour / Rejoin、auto rerouteは未実装。
 - 実装commit: fa2e273 (runtime theme / map / controls / tests)。
-- 本文書を含むdocs commitが最終HEAD。完全なHEAD/commit一覧はarchive metadataを正とする。
+- docs commit: 19a4103。追加の検証修正commitを含む完全なHEAD/commit一覧はarchive metadataを正とする。
 
 ## Theme / solar / tunnel
 
@@ -39,7 +39,7 @@ accuracy<=30m、位置鮮度<=10秒を要求。連続進入2秒、退出4秒、U
   ThemeがonSurfaceを提供し、Card/Surface/buttonのsemantic content colorを維持した。
   guidance/highway/deviation/editor/settings/bottom barを確認した。
 - 自車はSymbolLayer iconSize=2f。bitmap形状、center anchor、heading/map alignment、
-  座標sourceは維持。instrumentationでサイズ、heading、実GeoJSON座標を検証。
+  座標sourceは維持。instrumentationでサイズ、heading、source/layerを検証し、実画面で位置を確認。
 - 道路幅はzoom4〜22で単調増加。motorway > trunk > primary > secondary > tertiary >
   minor(residential) > service。trunkを独立し、route line/casingもzoomに応じてscale。
 - 下部は「ルート / 迂回 / 規制 / 音声 / 表示」。maxLines=1、softWrap=false、
@@ -65,6 +65,10 @@ accuracy<=30m、位置鮮度<=10秒を要求。連続進入2秒、退出4秒、U
 ラベルテストの文字幅overflowをText.fillMaxWidthによる明示的領域確保で修正し、
 実機/Emulatorの両方で再検証した。
 検証ログのsun.misc.Unsafe警告は既存ライブラリ/JDK由来で、テスト失敗ではない。
+追加検証でquerySourceFeaturesの件数を元GeoJSON件数と同一視した待機条件がtimeoutしたため撤去した。
+同APIは現在load済みのタイルを照会し、元データ全件の取得APIではない。
+overlayはsource/layer、size/heading、同一MapView/camera、およびruntimeの実画面で検証する。
+この検証修正後の最終HEADで全チェックを再実行する。
 
 ## Emulator / Physical smoke and visual QA
 
