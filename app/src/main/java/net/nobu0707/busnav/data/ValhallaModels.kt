@@ -12,7 +12,7 @@ internal data class ValhallaRouteRequest(
     @SerialName("costing_options") val costingOptions: ValhallaCostingOptions,
     val units: String = "kilometers",
     @SerialName("shape_format") val shapeFormat: String = "polyline6",
-    @SerialName("directions_type") val directionsType: String = "none",
+    @SerialName("directions_type") val directionsType: String = "maneuvers",
 )
 
 @Serializable
@@ -52,7 +52,32 @@ internal data class ValhallaTrip(
 internal data class ValhallaSummary(val length: Double? = null, val time: Double? = null)
 
 @Serializable
-internal data class ValhallaLeg(val shape: String? = null)
+internal data class ValhallaLeg(val shape: String? = null, val maneuvers: List<ValhallaManeuver> = emptyList())
+
+@Serializable
+internal data class ValhallaManeuver(
+    val type: Int = 0,
+    val instruction: String = "",
+    @SerialName("verbal_pre_transition_instruction") val verbalPre: String? = null,
+    @SerialName("verbal_post_transition_instruction") val verbalPost: String? = null,
+    @SerialName("street_names") val streetNames: List<String> = emptyList(),
+    @SerialName("begin_shape_index") val begin: Int,
+    @SerialName("end_shape_index") val end: Int,
+    val length: Double? = null,
+    val time: Double? = null,
+    val sign: ValhallaSign? = null,
+)
+
+@Serializable
+internal data class ValhallaSign(
+    @SerialName("exit_number_elements") val numbers: List<ValhallaSignElement> = emptyList(),
+    @SerialName("exit_branch_elements") val branches: List<ValhallaSignElement> = emptyList(),
+    @SerialName("exit_toward_elements") val towards: List<ValhallaSignElement> = emptyList(),
+    @SerialName("exit_name_elements") val names: List<ValhallaSignElement> = emptyList(),
+)
+
+@Serializable
+internal data class ValhallaSignElement(val text: String, @SerialName("consecutive_count") val consecutiveCount: Int? = null)
 
 @Serializable
 internal data class ValhallaErrorResponse(

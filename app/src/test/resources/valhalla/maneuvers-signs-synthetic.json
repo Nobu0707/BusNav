@@ -1,0 +1,55 @@
+{
+  "trip": {
+    "summary": {
+      "length": 1,
+      "time": 10
+    },
+    "legs": [
+      {
+        "shape": "???o}@?o}@",
+        "maneuvers": [
+          {
+            "type": 21,
+            "instruction": "Exit left",
+            "begin_shape_index": 1,
+            "end_shape_index": 2,
+            "length": 0.05,
+            "time": 5,
+            "street_names": [
+              "road"
+            ],
+            "verbal_pre_transition_instruction": "before",
+            "verbal_post_transition_instruction": "after",
+            "unknown_future_field": true,
+            "sign": {
+              "exit_number_elements": [
+                {
+                  "text": "12",
+                  "consecutive_count": 2
+                },
+                {
+                  "text": "12"
+                }
+              ],
+              "exit_branch_elements": [
+                {
+                  "text": "E1"
+                }
+              ],
+              "exit_toward_elements": [
+                {
+                  "text": "東京方面"
+                }
+              ],
+              "exit_name_elements": [
+                {
+                  "text": "富士IC"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -51,6 +51,12 @@ class ValhallaRuntimeSmokeTest {
             assertTrue(success.summary.distanceMeters in 50_000.0..150_000.0)
             assertTrue(success.summary.durationSeconds > 0.0)
             assertTrue(success.route.geometry.points.size > 1)
+            val maneuvers = requireNotNull(success.route.guidance).maneuvers
+            assertTrue(maneuvers.isNotEmpty())
+            assertTrue(maneuvers.first().type == net.nobu0707.busnav.domain.navigation.ManeuverType.START)
+            assertTrue(maneuvers.last().type == net.nobu0707.busnav.domain.navigation.ManeuverType.DESTINATION)
+            assertTrue(maneuvers.all { it.beginGeometryIndex in success.route.geometry.points.indices &&
+                it.endGeometryIndex in it.beginGeometryIndex..success.route.geometry.points.lastIndex })
         }
     }
 }

@@ -2,7 +2,7 @@
 
 BusNav は、高速バス・夜行バスの実運用を想定した業務用ナビゲーションアプリです。通常は登録済みの所定経路を案内し、通行止めや運行管理上の指示がある場合だけ安全な迂回と所定経路への復帰を行うことを将来目標としています。
 
-このリポジトリの Phase 004.5 は、RoutePlan を Valhalla へ送る Phase 004.1 に加え、同じ Chubu OSM PBF から作るローカル vector basemap を表示します。
+Phase 005 は、詳細 vector basemap 上で Valhalla maneuver による走行案内を表示します。現在位置から次の操作・距離・道路/方面・その次の案内を算出し、位置が不確実な場合は案内を抑制します。自動リルートは行いません。
 
 ## 現在の実装範囲
 
@@ -102,3 +102,8 @@ Host の style URL は `http://localhost:8080/styles/busnav/style.json`、Androi
 ## 次フェーズ候補
 
 Phase 005 では Valhalla maneuver を使う案内、route 上の進捗、次の右左折と道路名を追加する予定です。その後、VICS、所定経路復帰、JCT 案内、運行管理指示を段階的に追加します。接続点は [アーキテクチャ文書](docs/architecture.md)、[RoutingEngine](docs/routing/routing-engine.md)、[Valhalla 接続](docs/routing/valhalla.md) を参照してください。
+
+
+## 走行案内
+
+[Navigation guidance](docs/navigation-guidance.md) と [Phase005 review](docs/reviews/007-navigation-guidance.md) を参照してください。案内距離は geometry の累積距離に統一し、maneuver.length と混用しません。最近傍投影は Map Matching ではありません。適用済みルートと案内は画面回転で保持します。

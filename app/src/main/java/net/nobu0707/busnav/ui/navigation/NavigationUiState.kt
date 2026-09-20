@@ -16,6 +16,7 @@ enum class NavigationLayoutMode {
 }
 
 data class NavigationUiState(
+    val guidance: GuidanceUiState = GuidanceUiState(),
     val isMapReady: Boolean = false,
     val locationPermissionState: LocationPermissionState = LocationPermissionState.Unknown,
     val location: LocationState? = null,

@@ -89,7 +89,7 @@ class ValhallaRoutingEngineTest {
         assertEquals("truck", root.getValue("costing").jsonPrimitive.content)
         assertEquals("kilometers", root.getValue("units").jsonPrimitive.content)
         assertEquals("polyline6", root.getValue("shape_format").jsonPrimitive.content)
-        assertEquals("none", root.getValue("directions_type").jsonPrimitive.content)
+        assertEquals("maneuvers", root.getValue("directions_type").jsonPrimitive.content)
         assertEquals(
             listOf("break", "via", "through", "break"),
             root.getValue("locations").jsonArray.map { it.jsonObject.getValue("type").jsonPrimitive.content },

@@ -1,4 +1,4 @@
-# BusNav Phase 004.5 アーキテクチャ
+# BusNav Phase 005 アーキテクチャ
 
 ## 方針
 
@@ -140,3 +140,8 @@ RoutePlanEditorScreen long press
 - Google Play services Fused Location: MVP0 では Play services 非搭載端末も含めた依存の小ささを優先しました。
 - MapLibre LocationComponent: 位置取得と描画を同一コンポーネントへ閉じ込めず、将来のナビ向け更新・Fake 注入・自車表現を独立させるため使用していません。
 - Hilt / repository/use-case の全面導入: 現段階では抽象の数に対して複雑さが過大になるため見送りました。
+
+
+## Phase005 guidance
+
+ScheduledRoute は geometry と RouteGuidance を同じ snapshot に保持します。domain/navigation に RouteDistanceIndex、RouteProjector、NavigationProgressCalculator、NavigationProgressTracker を追加しました。data adapter が leg-local index を merged geometry index に変換し、UI は日本語 formatter を通した GuidanceUiState を表示します。NavigationViewModel は適用 snapshot を Activity 再生成時にも保持します。重い投影とindex準備は Default、状態反映は UI scope です。既存の endpoint provider、Developer Connections、basemap と release safety は維持しています。詳細は [走行案内設計](navigation-guidance.md)。

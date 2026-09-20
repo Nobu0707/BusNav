@@ -93,9 +93,7 @@ fun NavigationRoute(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
-    val stateHolder = remember(locationProvider, routeRepository, scope) {
-        NavigationStateHolder(locationProvider, routeRepository, scope)
-    }
+    val stateHolder = viewModel { NavigationViewModel(locationProvider, routeRepository) }.stateHolder
     val uiState by stateHolder.uiState.collectAsState()
     val routePlanHolder = viewModel<RoutePlanEditorViewModel>().stateHolder
     val routePlanUiState by routePlanHolder.uiState.collectAsState()
@@ -298,11 +296,7 @@ private fun PortraitNavigationLayout(
         modifier = Modifier.fillMaxSize().padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        PlaceholderPanel(
-            title = "次の案内",
-            detail = "所定経路の案内は次フェーズで追加",
-            modifier = Modifier.fillMaxWidth().height(72.dp).testTag(NavigationTestTags.NEXT_GUIDANCE),
-        )
+        GuidanceCard(uiState.guidance, Modifier.fillMaxWidth())
         MapArea(
             uiState = uiState,
             onRequestPermission = onRequestPermission,
@@ -341,11 +335,7 @@ private fun LandscapeNavigationLayout(
             modifier = Modifier.fillMaxHeight().weight(0.24f),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            PlaceholderPanel(
-                title = "次の案内",
-                detail = "案内待機中",
-                modifier = Modifier.fillMaxWidth().weight(1f).testTag(NavigationTestTags.NEXT_GUIDANCE),
-            )
+            GuidanceCard(uiState.guidance, Modifier.fillMaxWidth().weight(2f))
             PlaceholderPanel(
                 title = "運行情報",
                 detail = operationsSummary(uiState, hasRoutePlan),

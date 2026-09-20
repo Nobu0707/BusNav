@@ -168,7 +168,7 @@ sanitizeの後に240文字へtruncateし、途中のsecret断片を残さない�
 
 Planetiler 0.10.2 / git `0e5588c4a6e8c29a270a33afe8df62027d889604` を既存確認済みdigest
 `sha256:cdd536498df473ffe8bebf20ed62a89f05a01ba63d5ee7cb92a3581afcaaaa89`で固定。
-TileServer GLは `v5.6.0@sha256:3a9ccdb24820b6814c8119bcc8a4376c39867cb0ffe69d629ef898b90c2427`。
+TileServer GLは `v5.6.0@sha256:3a9ccdb24820b6814c8119bcc8a4376c39867cb0ffe69d62919ef898b90c2427`。
 OpenMapTiles schemaは生成済みMBTiles metadataで3.16.0を確認した。
 
 fonts revisionは `025ff2b2f84cc0fdf11f7b1d74b3a784595fe7a4`、tar.gz SHA-256は

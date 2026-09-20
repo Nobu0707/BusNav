@@ -1,15 +1,26 @@
 package net.nobu0707.busnav.domain.route
 
+import net.nobu0707.busnav.domain.navigation.RouteGuidance
+
 class ScheduledRoute(
     val id: String,
     val name: String,
     val geometry: RouteGeometry,
     points: List<RoutePoint>,
     val metadata: RouteMetadata = RouteMetadata(),
+    val guidance: RouteGuidance? = null,
 ) {
     val points: List<RoutePoint> = points.toList()
 
     init {
+        guidance?.maneuvers?.forEachIndexed { index, maneuver ->
+            require(maneuver.index == index) { "Maneuver indices must be sequential" }
+            require(maneuver.beginGeometryIndex in geometry.points.indices &&
+                maneuver.endGeometryIndex in maneuver.beginGeometryIndex..geometry.points.lastIndex) {
+                "Maneuver geometry indices are invalid"
+            }
+            if (index > 0) require(maneuver.beginGeometryIndex >= guidance.maneuvers[index - 1].beginGeometryIndex)
+        }
         require(id.isNotBlank()) { "Route id must not be blank" }
         require(name.isNotBlank()) { "Route name must not be blank" }
         require(this.points.map(RoutePoint::id).distinct().size == this.points.size) {
@@ -32,9 +43,9 @@ class ScheduledRoute(
             name == other.name &&
             geometry == other.geometry &&
             points == other.points &&
-            metadata == other.metadata
+            metadata == other.metadata && guidance == other.guidance
 
-    override fun hashCode(): Int = arrayOf(id, name, geometry, points, metadata).contentHashCode()
+    override fun hashCode(): Int = arrayOf(id, name, geometry, points, metadata, guidance).contentHashCode()
 
     override fun toString(): String =
         "ScheduledRoute(id=$id, name=$name, geometry=$geometry, points=$points, metadata=$metadata)"

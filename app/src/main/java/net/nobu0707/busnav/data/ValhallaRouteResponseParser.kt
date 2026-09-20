@@ -1,5 +1,6 @@
 package net.nobu0707.busnav.data.routing.valhalla
 
+import net.nobu0707.busnav.domain.navigation.*
 import java.util.UUID
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -23,6 +24,8 @@ internal enum class ValhallaResponseStage {
     SHAPE,
     POLYLINE,
     GEOMETRY,
+    MANEUVER_INDEX,
+    MANEUVERS,
     ROUTE_CONSTRUCTION,
 }
 
@@ -69,6 +72,7 @@ internal class ValhallaRouteResponseParser(
         diagnostics.debug("parse.legs") { "count=${trip.legs.size}" }
 
         val geometryPoints = mutableListOf<GeoPoint>()
+        val maneuvers = mutableListOf<RouteManeuver>()
         trip.legs.forEachIndexed { index, leg ->
             val shape = leg.shape?.takeIf(String::isNotEmpty)
                 ?: fail(ValhallaResponseStage.SHAPE, "Leg $index does not contain shape")
@@ -79,7 +83,24 @@ internal class ValhallaRouteResponseParser(
                 fail(ValhallaResponseStage.POLYLINE, "Unable to decode shape for leg $index", error)
             }
             diagnostics.debug("parse.polyline") { "leg=$index decodedPointCount=${decoded.size}" }
-            if (geometryPoints.lastOrNull() == decoded.firstOrNull()) {
+            val dropsFirst = geometryPoints.isNotEmpty() && geometryPoints.lastOrNull() == decoded.firstOrNull()
+            val globalStartOffset = geometryPoints.size - if (dropsFirst) 1 else 0
+            leg.maneuvers.forEach { maneuver ->
+                if (maneuver.begin !in decoded.indices || maneuver.end !in maneuver.begin..decoded.lastIndex) {
+                    fail(ValhallaResponseStage.MANEUVER_INDEX, "Maneuver index out of range in leg $index")
+                }
+                val begin = globalStartOffset + maneuver.begin
+                if (maneuvers.lastOrNull()?.beginGeometryIndex?.let { it > begin } == true) {
+                    fail(ValhallaResponseStage.MANEUVER_INDEX, "Maneuvers are not in geometry order")
+                }
+                if (listOfNotNull(maneuver.length, maneuver.time).any { !it.isFinite() || it < 0.0 }) {
+                    fail(ValhallaResponseStage.MANEUVERS, "Maneuver summary is invalid")
+                }
+                maneuvers += RouteManeuver(maneuvers.size, mapManeuverType(maneuver.type), maneuver.instruction,
+                    begin, globalStartOffset + maneuver.end, maneuver.verbalPre, maneuver.verbalPost,
+                    maneuver.streetNames, maneuver.length?.times(1000.0), maneuver.time, maneuver.sign.toDomain())
+            }
+            if (dropsFirst) {
                 geometryPoints += decoded.drop(1)
             } else {
                 geometryPoints += decoded
@@ -93,6 +114,8 @@ internal class ValhallaRouteResponseParser(
         }
         diagnostics.debug("parse.geometry") { "pointCount=${geometry.points.size}" }
 
+        if (maneuvers.isEmpty()) diagnostics.debug("navigation.guidance.empty") { "count=0" }
+
         val summary = try {
             RoutingSummary(distanceKm * 1_000.0, durationSeconds)
         } catch (error: IllegalArgumentException) {
@@ -104,6 +127,7 @@ internal class ValhallaRouteResponseParser(
                 id = "${request.routePlanId}-${routeIdFactory()}",
                 name = request.routeName?.takeIf(String::isNotBlank) ?: "計算ルート",
                 geometry = geometry,
+                guidance = RouteGuidance(maneuvers.toList()),
                 points = request.points.map { point ->
                     RoutePoint(
                         id = point.id,

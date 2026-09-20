@@ -1,0 +1,172 @@
+{
+  "trip": {
+    "locations": [
+      {
+        "type": "break",
+        "lat": 35.161,
+        "lon": 136.882,
+        "side_of_street": "left",
+        "original_index": 0
+      },
+      {
+        "type": "break",
+        "lat": 35.17,
+        "lon": 136.91,
+        "original_index": 1
+      }
+    ],
+    "legs": [
+      {
+        "maneuvers": [
+          {
+            "type": 3,
+            "instruction": "",
+            "bearing_after": 251,
+            "time": 14.679,
+            "length": 0.069,
+            "cost": 28.435,
+            "begin_shape_index": 0,
+            "end_shape_index": 3,
+            "travel_mode": "drive",
+            "travel_type": "truck"
+          },
+          {
+            "type": 12,
+            "instruction": "",
+            "bearing_before": 251,
+            "bearing_after": 62,
+            "time": 32.313,
+            "length": 0.141,
+            "cost": 89.077,
+            "begin_shape_index": 3,
+            "end_shape_index": 11,
+            "travel_mode": "drive",
+            "travel_type": "truck"
+          },
+          {
+            "type": 15,
+            "instruction": "",
+            "bearing_before": 71,
+            "bearing_after": 340,
+            "time": 74.483,
+            "length": 0.462,
+            "cost": 104.333,
+            "begin_shape_index": 11,
+            "end_shape_index": 36,
+            "travel_mode": "drive",
+            "travel_type": "truck"
+          },
+          {
+            "type": 15,
+            "instruction": "",
+            "street_names": [
+              "名駅通"
+            ],
+            "bearing_before": 79,
+            "bearing_after": 351,
+            "time": 70.672,
+            "length": 0.439,
+            "cost": 124.116,
+            "begin_shape_index": 36,
+            "end_shape_index": 48,
+            "travel_mode": "drive",
+            "travel_type": "truck"
+          },
+          {
+            "type": 10,
+            "instruction": "",
+            "street_names": [
+              "広小路通",
+              "60"
+            ],
+            "bearing_before": 352,
+            "bearing_after": 81,
+            "time": 364.438,
+            "length": 2.328,
+            "cost": 572.653,
+            "begin_shape_index": 48,
+            "end_shape_index": 121,
+            "travel_mode": "drive",
+            "travel_type": "truck"
+          },
+          {
+            "type": 15,
+            "instruction": "",
+            "street_names": [
+              "武平通",
+              "武平通"
+            ],
+            "bearing_before": 85,
+            "bearing_after": 356,
+            "time": 24.581,
+            "length": 0.097,
+            "cost": 30.162,
+            "begin_shape_index": 121,
+            "end_shape_index": 124,
+            "travel_mode": "drive",
+            "travel_type": "truck"
+          },
+          {
+            "type": 15,
+            "instruction": "",
+            "street_names": [
+              "錦通"
+            ],
+            "bearing_before": 356,
+            "bearing_after": 266,
+            "time": 11.886,
+            "length": 0.049,
+            "cost": 28.51,
+            "begin_shape_index": 124,
+            "end_shape_index": 126,
+            "travel_mode": "drive",
+            "travel_type": "truck"
+          },
+          {
+            "type": 4,
+            "instruction": "",
+            "bearing_before": 266,
+            "time": 0,
+            "length": 0,
+            "cost": 0,
+            "begin_shape_index": 126,
+            "end_shape_index": 126,
+            "travel_mode": "drive",
+            "travel_type": "truck"
+          }
+        ],
+        "summary": {
+          "has_time_restrictions": false,
+          "has_toll": false,
+          "has_highway": false,
+          "has_ferry": false,
+          "min_lat": 35.160886,
+          "min_lon": 136.881105,
+          "max_lat": 35.170059,
+          "max_lon": 136.91062,
+          "time": 593.055,
+          "length": 3.587,
+          "cost": 977.29
+        },
+        "shape": "c_aabAuqradGnBnKtCbOpClOY`DkAnAsA^cDq@_CgHoAeHsGq\\gFcX}Bv@aH|BqCp@qEAaBGiGoB_FwEoEsF{GmIiDyDsBcBeDiB_JiEqIiFmFuDwEiEwEoEsDmFiBoEgCuRu@cI_AcKy@mHqMuiAYgDeMxAkMxAkPhA}SdAsRlAyLv@cR`Aqd@jDmk@tDcUn@uL`AeGl@u@gKmAsRaFel@sFwp@g@iGe@_G_CsY]kEg@aGeBqTwAiTbAai@BiIN{JfAoUzA}[Fm@zCcb@bBqSh@_HX}GBaALmR?y@DcIOcG_Cmz@M{Ei@cSqB{u@QuGQgGoCmhAMiEMwEcBgj@YwIQ}F[}KMsDY{JyAmg@QeGOqF{Bev@UcIUcH{Bwv@Q}FQaG{Biw@UmHS}G_Ckx@Q_GM{EaCqx@Q}FSqHaCsx@OoFiB_q@o@uQQwGw@kXmA{b@g@}PUwHoAic@QuGk@kT_Cm`AOgFiDLcj@|BuDNT~Ih@~U"
+      }
+    ],
+    "summary": {
+      "has_time_restrictions": false,
+      "has_toll": false,
+      "has_highway": false,
+      "has_ferry": false,
+      "min_lat": 35.160886,
+      "min_lon": 136.881105,
+      "max_lat": 35.170059,
+      "max_lon": 136.91062,
+      "time": 593.055,
+      "length": 3.587,
+      "cost": 977.29
+    },
+    "status_message": "Found route between points",
+    "status": 0,
+    "units": "kilometers",
+    "language": "en-US"
+  }
+}
