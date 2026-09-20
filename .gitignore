@@ -23,3 +23,9 @@ tools/basemap/.planetiler-work/
 tools/basemap/.generated-style/
 /.kotlin/
 tools/basemap/.env
+
+# Routing runtime must remain outside Git
+tools/routing/runtime/
+tools/routing/.env
+valhalla_tiles/
+valhalla_tiles.tar

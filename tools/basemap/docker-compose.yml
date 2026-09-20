@@ -8,5 +8,5 @@ services:
     volumes:
       - "${BUSNAV_BASEMAP_DATA_DIR:?set BUSNAV_BASEMAP_DATA_DIR}:/data/runtime:ro"
       - "./config:/data/config:ro"
-      - "./style:/data/styles:ro"
+      - "${BUSNAV_BASEMAP_DATA_DIR}/styles:/data/styles:ro"
     restart: unless-stopped

@@ -440,16 +440,17 @@ function Test-ProhibitedReviewPath {
 
     $segments = @($normalized -split '/')
     foreach ($segment in $segments) {
-        if ($segment -match '^(?i:\.git|\.gradle|build|\.idea|secrets?|private)$') {
+        if ($segment -match '^(?i:\.git|\.gradle|build|\.idea|secrets?|private|valhalla_tiles|[.]planetiler-work)$') {
             return $true
         }
     }
 
     $name = [System.IO.Path]::GetFileName($normalized)
+    if ($name -ieq "valhalla_tiles.tar") { return $true }
     if ($name -ieq "local.properties") { return $true }
     if ($name -match '^(?i:\.env)(\..*)?$') { return $true }
     if ($name -match '(?i:credential|secret|password)') { return $true }
-    if ($name -match '(?i:\.(apk|aab|class|dex|log|db|sqlite|sqlite3|zip|tmp|jks|keystore|p12|pfx|pem|key|pbf|mbtiles|pmtiles|preferences_pb))$') { return $true }
+    if ($name -match '(?i:\.(apk|aab|class|dex|log|db|sqlite|sqlite3|zip|tmp|jks|keystore|p12|pfx|pem|key|pbf|mbtiles|pmtiles|gph|preferences_pb))$') { return $true }
     if ($name -match '(?i:\.layerstats\.tsv\.gz)$') { return $true }
     if ($name -match '(?i:\.tar\.gz)$') { return $true }
     return $false

@@ -16,11 +16,24 @@
       "style": "busnav.json",
       "serve_rendered": false,
       "serve_data": true
+    },
+    "busnav-kanto": {
+      "style": "busnav-kanto.json",
+      "serve_rendered": false,
+      "serve_data": true
+    },
+    "busnav-chubu": {
+      "style": "busnav-chubu.json",
+      "serve_rendered": false,
+      "serve_data": true
     }
   },
   "data": {
     "chubu": {
       "mbtiles": "chubu.mbtiles"
+    },
+    "kanto": {
+      "mbtiles": "kanto.mbtiles"
     }
   }
 }
