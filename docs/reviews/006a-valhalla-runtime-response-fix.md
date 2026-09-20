@@ -8,7 +8,8 @@ Phase 004 の Android Emulator 実行で、短い経路が一度成功した後�
 
 `c91e9c4db54fcf1f753f94e092a6255f7ae68dc7`
 
-全 review check と archive はこの SHA を `-BaseRef` に指定する。
+これは初回Phase 004.1 reviewのbaseである。follow-up finalizationのbaseは
+`087b7c8f5f88c313a038f3239a1511dd85d5bba9` とし、最終review checkとarchiveは後者を `-BaseRef` に指定する。
 
 ## 3. 実 Valhalla 環境
 
@@ -201,3 +202,153 @@ archive:
 - lightweight alias: `busnav-review-latest.zip`
 - full alias: `busnav-full-review-latest.zip`
 - immutable名、final HEAD、BASE_SHA、self-checkは各archiveの `meta/review-info.txt` と `meta/archive-self-check.txt` を正とする
+
+## 26. ChatGPT follow-up review findings
+
+follow-up reviewでは、初回hardeningで未完了だった次の3点を確認した。
+
+- `NoOpRoutingDiagnostics` でも呼び出し前にSHA-256、UTF-8 byte配列、詳細文字列、point ID/type集約が生成されていた
+- `await()` 後のbody read、fingerprint、JSON/polyline decode、domain mappingが呼び出し元dispatcherへ戻り、Main threadで実行される余地があった
+- request生成/HTTP前の例外にも `response.unexpected` が使われ、event名だけでは失敗stageを判別できなかった
+
+加えて、元操作に近い短距離/長距離切替のActivity UI連続探索が未確認だったため、実Emulator上の回帰を追加した。
+
+## 27. Original-trigger status
+
+- reproduced: **no**
+- exact root cause of the original transient `INVALID_RESPONSE`: **still unknown**
+
+観測性改善後、短距離/長距離を切り替える実Activity UI経路で7回連続成功し、元の「経路探索結果を読み取れませんでした」は0回だった。したがって、今回の結果からpolyline、OkHttp、state raceなどを元triggerとして断定しない。
+
+## 28. Confirmed defect
+
+確認済みの欠陥は、unexpected parser/domain exceptionが詳細なしで `RoutingFailure.INVALID_RESPONSE` に潰され、当時の末端原因を追跡不能にしていたこと、およびRelease NoOpでも高コストdebug detailsがeager評価され得たこと、重いresponse処理のdispatcher境界が明示されていなかったことである。
+
+初回hardeningでparser分離とstage diagnosticsを導入し、follow-up commit `cdb9ccf` でdiagnostics負荷とdispatcher/event境界を完成させた。
+
+## 29. Release diagnostics optimization
+
+`RoutingDiagnostics` に `isDebugEnabled` / `isErrorEnabled` とlazy details lambdaを導入した。
+
+- `NoOpRoutingDiagnostics` はsupplierを評価しない
+- Android loggerは対象levelが有効な場合だけsupplierを評価する
+- SHA-256、UTF-8 byte化、request pointの`map`/`joinToString`、debug details生成はlambda内に移した
+- raw JSON、full encoded shape、全geometry coordinateは引き続き記録しない
+
+JVM testでNoOp時のsupplier非評価とRecording時の評価・保存を固定した。
+
+## 30. Dispatcher/threading fix
+
+inject可能な `RoutingDispatchers` を追加した。
+
+- request JSON encode: computation dispatcher
+- `ResponseBody.string()`: IO dispatcher
+- response fingerprint、HTTP error JSON decode、Valhalla JSON decode、polyline decode、GeoPoint生成、RouteGeometry/ScheduledRoute構築: computation dispatcher
+- `CancellationException`: rethrow
+- OkHttp call cancellation: 従来どおり `invokeOnCancellation { cancel() }`
+
+dispatcher testでは、長い実fixtureの全 `parse.*` eventが注入した `routing-computation-test` threadで実行された。実Emulator Logcatでも `request.start` はmain thread、`response.received` 以降はworker threadであった。
+
+## 31. Diagnostics event naming cleanup
+
+engine eventをstageに合わせて整理した。
+
+- `request.start`
+- `request.encode.failed`
+- `http.request.cancelled`
+- `http.request.failed`
+- `response.received`
+- `response.read.failed`
+- `response.parse.failed`
+- `route.construction.failed`
+- `route.success`
+- `unexpected`（detailsにstageを付与）
+
+malformed JSON/polyline/empty bodyは `response.parse.failed` とparser stage、route invariantは `route.construction.failed` と `ROUTE_CONSTRUCTION` を記録するtestを追加した。
+
+## 32. UI state regression tests
+
+既存の次の回帰testを維持し、全件PASSした。
+
+- Success -> same plan calculate again -> Success
+- short Success -> long Success -> same long Success
+- Failure -> Retry -> Success
+- plan revision変更後のstale candidate拒否
+- 新requestによるprevious job cancellation
+
+engine側の12回long連続、short/long交互6回、実fixture、12,208文字polylineも維持し、全件PASSした。
+
+## 33. Compose test assertion review
+
+commit `087b7c8` の `assertIsDisplayed()` から `fetchSemanticsNode()` への変更4箇所を再査読した。対象はsynthetic `requiredSize` が実端末viewportを超えると画面外になるadaptive branch/containerであり、存在検査が目的である。画面内のmap、screen、complete、preview等は引き続き `assertIsDisplayed()` を使う。
+
+したがって今回これらを不安定な可視性assertへ戻していない。新しいActivity UI smokeではcalculate button、result card、summary、candidate labelに `assertIsDisplayed()` を使用し、実viewport上の検証強度を追加した。
+
+## 34. Emulator Activity UI smoke
+
+- Emulator: `Pixel_8` AVD / Android 16 / API 36 / `emulator-5554`
+- APK: debug
+- endpoint: `http://10.0.2.2:8002`
+- Valhalla: `3.9.0-a3a5631c4`
+- 実行時刻: 2026-09-20 14:00 JST
+- sequence: short -> short -> long -> long -> long -> short -> long
+- success: 7/7
+- failure: 0/7
+- original `INVALID_RESPONSE`: 0
+
+short:
+
+- START `35.24010, 138.61081`
+- DESTINATION `35.25416, 138.83650`
+- UI summary `29.6 km / 35分`
+
+long:
+
+- START `35.52755965924169, 138.79653353327427`
+- DESTINATION `35.609542457517534, 138.29084069799353`
+- UI summary `88.9 km / 1時間59分`
+
+`ValhallaUiRuntimeSmokeTest` は実 `MainActivity` と同じ `RoutePlanEditorViewModel` に正確な座標を設定し、画面上のcalculate buttonを7回操作した。各回、result card、summary、candidate map label「探索結果（道路沿いルート）」の実表示をassertした。Map pixel long-pressの座標丸めを避けるため、地点座標の投入だけはViewModel経由である。探索、再探索、state遷移、candidate routeのMap連携、summary表示はproduction Activity UI経路を通る。
+
+Windows computer-use runtimeは環境ACLエラーで起動不能だったため、ADBで実端末画面のroute editor起動とUI hierarchyも確認した。これはroot triggerに関する証拠を誇張せず、再現可能なinstrumentation UI smokeを正とする。
+
+## 35. Logcat result
+
+7回smoke直前にLogcatをclearし、`BusNavValhalla` DEBUGを有効化した。結果:
+
+- `request.start`: 7
+- `response.received`: 7
+- `parse.json success=true`: 7
+- `parse.polyline`: 7
+- `route.success`: 7
+- error/unexpected event: 0
+- long response: 4回すべて body 12,972、shape 12,208、geometry 3,075
+- short response: 3回すべて body 3,683、shape 2,924、geometry 694
+
+full connected suiteではruntime engine smoke 3回も含め、request 10、route success 10、BusNavValhalla error event 0だった。ログファイルはrepoへ保存・commitしていない。
+
+## 36. Final verification and remaining limitations
+
+- `gradlew test --console=plain`: PASS、85 tests、failure 0
+- `gradlew lint --console=plain`: PASS
+- `gradlew assembleDebug --console=plain`: PASS
+- `gradlew assembleDebugAndroidTest --console=plain`: PASS
+- `gradlew connectedDebugAndroidTest --console=plain`: PASS、15 tests、failure 0
+- long Valhalla 3.9 fixture / 12k+ polyline / repeated / alternating: PASS
+- lazy diagnostics disabled/enabled: PASS
+- injected computation dispatcher: PASS
+
+remaining limitations:
+
+- 原事象発生時の末端例外は旧catch-allで失われており、exact original triggerは不明のまま
+- UI smokeの正確な座標投入はMap pixel long-pressではなくActivityのViewModel経由
+- route lineはproduction MapControllerへ渡る実経路を通したが、pixel image comparisonは行っていない
+- package path整理はPhase 004.1のscope外
+- Phase 005 maneuver/navigation guidanceは未実装
+- 未追跡の自動生成 `gradle/gradle-daemon-jvm.properties` は本修正に不要なため、削除もcommitもしていない
+
+## 37. Final conclusion
+
+**Phase 004.1 COMPLETE**。
+
+original transient triggerを断定できたからではなく、confirmed defectを修正し、Release NoOp負荷とMain-thread依存を除去し、stage diagnosticsを整えたうえで、実Emulatorのproduction Activity UI経路を短長切替を含め7回連続で通し、元エラー0回、全quality gate PASSを確認したことを完了根拠とする。
