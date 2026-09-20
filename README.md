@@ -23,7 +23,7 @@ Phase 004.5.1 の [全国routing・関東/中部basemap環境](docs/development/
 - style reload 時の overlay 復元と、位置追従を解除する「経路全体」bounds fit
 - Android/MapLibre/Valhalla 非依存の RoutePlan、validation、pure editing operations、RoutingRequest 境界
 - START / DESTINATION / VIA / SHAPING の追加、削除、上・下並べ替え、VIA/SHAPING 切替
-- Navigation と分離した縦横対応 RoutePlan editor、地図長押し、in-memory/回転保持
+- Navigation と分離した RoutePlan editor、中央カーソル登録、3段階ドラッグシート、in-memory/回転保持
 - ScheduledRoute と共存する細い半透明の経路探索前 preview と 4 種 marker
 - Android/Valhalla 非依存の RoutingEngine、RoutingResult、RoutingFailure、VehicleProfile
 - OkHttp と kotlinx.serialization による Valhalla `POST /route` adapter、polyline6 decode、複数 leg 結合
@@ -113,3 +113,8 @@ Phase 005 では Valhalla maneuver を使う案内、route 上の進捗、次の
 ## Phase008: 所定経路との照合・逸脱検知
 
 距離・方向・連続性・速度・単調時刻・精度を使うローカルroute matcherと、持続証拠による逸脱/復帰判定を追加しました。不確実・逸脱中は一般/高速案内を抑制し、縦横画面へ確認bannerを表示します。raw GPS自車位置と所定経路lineを維持し、自動再探索は行いません。設計・閾値・15m並行道路などの限界は [map matching / deviation](docs/map-matching-deviation.md)、検証結果は [Review010](docs/reviews/010-map-matching-deviation.md) を参照してください。
+
+## Phase008.5B: Route Editor UX Refresh
+
+編集開始時のroute fitとcamera保持、中央カーソル登録、経由地／通過指定の表示、共通スクロールと固定footerを実装。
+[UI仕様](docs/ui/route-plan-editor.md)・[レビュー](docs/reviews/011b-route-editor-ux.md)。Phase009は未着手。

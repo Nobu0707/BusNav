@@ -166,3 +166,12 @@ ThemeModeResolver に渡す。Compose の配色と地域別 Light/Dark style を
 MapView、ViewModel、route snapshot を保持する。Theme は LocalContentColor を提供する。
 太陽計算は NOAA の pure Kotlin、java.time は minSdk23 向け core library desugaring を使用する。
 詳細・限界・検証は [テーマ・地図表示](theme-map-presentation.md)。
+
+## Phase008.5B editor UX
+
+RoutePlanEditorStateHolder は編集開始／探索成功／明示的な全体表示のcamera requestを発行し、
+MapControllerがstyle・layout・sheet寸法を待って一度だけ実行する。native中心pixelを登録時にprojectionで読む。
+Camera snapshotはMapViewを含まない純粋な値として保持し、fit paddingは表示中心を保って解除する。
+シートは3状態のdraggable領域と単一LazyColumn、scroll外footerで構成する。
+RouteCalculationViewModelは探索・candidateをActivity再生成をまたいで保持する。
+詳細は[editor UI](ui/route-plan-editor.md)と[review011b](reviews/011b-route-editor-ux.md)を参照。

@@ -2,6 +2,10 @@
 
 package net.nobu0707.busnav.map
 
+import android.graphics.PointF
+import net.nobu0707.busnav.ui.routeplan.EditorCamera
+import net.nobu0707.busnav.ui.routeplan.EditorCameraRequest
+import org.maplibre.android.camera.CameraPosition
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -45,6 +49,8 @@ class MapController(
     basemapConfig: BasemapConfig,
     mapDiagnostics: MapDiagnostics,
     onBasemapStateChanged: (BasemapState) -> Unit,
+    private val initialCamera: EditorCamera? = null,
+    private val onCameraChanged: (EditorCamera) -> Unit = {},
 ) {
     private var map: MapLibreMap? = null
     private var mapView: MapView? = null
@@ -78,6 +84,65 @@ class MapController(
             tunnelProvider.observe(location.point)
         } else TunnelObservation.UNKNOWN
         return tunnelHysteresis.update(observation, now)
+    }
+
+    private var editorRequest: EditorCameraRequest? = null
+    private var editorBottomPadding: Int? = null
+    private var onEditorCameraApplied: (Long) -> Unit = {}
+    private var lastEditorRequestId: Long? = null
+    private val cameraListener = MapLibreMap.OnCameraMoveListener { saveCamera() }
+    private val layoutListener = android.view.View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fitEditorIfRequested() }
+
+    private fun saveCamera() {
+        val camera = map?.cameraPosition ?: return
+        val target = camera.target ?: return
+        onCameraChanged(EditorCamera(GeoPoint(target.latitude, target.longitude), camera.zoom, camera.bearing, camera.tilt))
+    }
+
+    fun cursorPosition(): GeoPoint? {
+        val view = mapView ?: return null
+        if (view.width == 0 || view.height == 0) return null
+        val point = map?.projection?.fromScreenLocation(PointF(view.width / 2f, view.height / 2f)) ?: return null
+        return GeoPoint(point.latitude, point.longitude)
+    }
+
+    fun updateEditorCamera(request: EditorCameraRequest?, bottomPadding: Int?, onApplied: (Long) -> Unit) {
+        editorRequest = request
+        editorBottomPadding = bottomPadding
+        onEditorCameraApplied = onApplied
+        fitEditorIfRequested()
+    }
+
+    private fun fitEditorIfRequested() {
+        val request = editorRequest ?: return
+        val requestedBottom = editorBottomPadding ?: return
+        val native = map ?: return
+        val view = mapView ?: return
+        if (style == null || view.width == 0 || view.height == 0 || request.id == lastEditorRequestId) return
+        val bottom = requestedBottom.coerceIn(0, view.height - 1)
+        val points = request.points.distinct()
+        if (points.isEmpty()) return
+        val visibleHeight = (view.height - bottom).coerceAtLeast(1)
+        val margin = routePaddingPx.coerceAtMost(visibleHeight / 4).coerceAtMost(view.width / 4)
+        val update = if (points.size == 1) {
+            CameraUpdateFactory.newLatLngZoom(points.single().toLatLng(), PLAN_POINT_ZOOM)
+        } else {
+            val bounds = LatLngBounds.Builder().apply { points.forEach { include(it.toLatLng()) } }.build()
+            CameraUpdateFactory.newLatLngBounds(bounds, margin, margin, margin, bottom + margin)
+        }
+        native.moveCamera(update)
+        // MapLibre keeps bounds padding on the camera. Remove it while preserving the
+        // physical viewport center: the crosshair and subsequent pan/zoom use that center,
+        // and a restored camera must not depend on the previous sheet dimensions.
+        val fitted = native.cameraPosition
+        val viewportCenter = cursorPosition()
+        if (viewportCenter != null && fitted.padding?.any { it != 0.0 } == true) {
+            native.moveCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.Builder(fitted)
+                .target(viewportCenter.toLatLng()).padding(0.0, 0.0, 0.0, 0.0).build()))
+        }
+        lastEditorRequestId = request.id
+        saveCamera()
+        onEditorCameraApplied(request.id)
     }
 
     private var readyDelivered = false
@@ -116,14 +181,19 @@ class MapController(
 
     fun attach(mapView: MapView) {
         this.mapView = mapView
+        mapView.addOnLayoutChangeListener(layoutListener)
         mapView.addOnDidFinishLoadingStyleListener(styleLoadedListener)
         mapView.addOnDidFailLoadingMapListener(mapLoadFailedListener)
         mapView.getMapAsync { mapLibreMap ->
             map = mapLibreMap
             mapLibreMap.addOnMoveListener(moveListener)
+            mapLibreMap.addOnCameraMoveListener(cameraListener)
             if (onLongPress != null) mapLibreMap.addOnMapLongClickListener(longClickListener)
             mapLibreMap.moveCamera(
-                CameraUpdateFactory.newLatLngZoom(DEFAULT_LOCATION, DEFAULT_ZOOM),
+                initialCamera?.let { camera ->
+                    CameraUpdateFactory.newCameraPosition(CameraPosition.Builder().target(camera.center.toLatLng())
+                        .zoom(camera.zoom).bearing(camera.bearing).tilt(camera.tilt).build())
+                } ?: CameraUpdateFactory.newLatLngZoom(DEFAULT_LOCATION, DEFAULT_ZOOM),
             )
             runCatching {
                 mapLibreMap.setStyle(basemapController.initialStyle())
@@ -148,6 +218,7 @@ class MapController(
             latestLocation?.let(::renderLocation)
             fitRouteIfRequested()
             fitRoutePlanIfRequested()
+            fitEditorIfRequested()
         }.onFailure { error ->
             Log.e(TAG, "Unable to install map overlays", error)
         }
@@ -208,6 +279,9 @@ class MapController(
     }
 
     fun detach() {
+        saveCamera()
+        mapView?.removeOnLayoutChangeListener(layoutListener)
+        map?.removeOnCameraMoveListener(cameraListener)
         mapView?.removeOnDidFinishLoadingStyleListener(styleLoadedListener)
         mapView?.removeOnDidFailLoadingMapListener(mapLoadFailedListener)
         map?.removeOnMoveListener(moveListener)

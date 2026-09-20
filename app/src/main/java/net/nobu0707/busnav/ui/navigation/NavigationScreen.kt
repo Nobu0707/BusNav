@@ -44,7 +44,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -65,11 +64,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import net.nobu0707.busnav.location.LocationProvider
 import net.nobu0707.busnav.domain.route.ScheduledRouteRepository
 import net.nobu0707.busnav.domain.routing.RoutingEngine
+import net.nobu0707.busnav.domain.model.GeoPoint
+import net.nobu0707.busnav.ui.routeplan.EditorSheetState
+import net.nobu0707.busnav.ui.routing.RouteCalculationViewModel
 import net.nobu0707.busnav.map.MapScreen
 import net.nobu0707.busnav.ui.theme.BusNavTheme
 import net.nobu0707.busnav.ui.routeplan.RoutePlanEditorScreen
 import net.nobu0707.busnav.ui.routeplan.RoutePlanEditorViewModel
-import net.nobu0707.busnav.ui.routing.RouteCalculationStateHolder
 
 object NavigationTestTags {
     const val NEXT_GUIDANCE = "next_guidance"
@@ -95,14 +96,18 @@ fun NavigationRoute(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val scope = rememberCoroutineScope()
     val stateHolder = viewModel { NavigationViewModel(locationProvider, routeRepository) }.stateHolder
     val uiState by stateHolder.uiState.collectAsState()
     val routePlanHolder = viewModel<RoutePlanEditorViewModel>().stateHolder
     val routePlanUiState by routePlanHolder.uiState.collectAsState()
-    val calculationHolder = remember(routingEngine, scope) { RouteCalculationStateHolder(routingEngine, scope) }
+    val calculationHolder = viewModel { RouteCalculationViewModel(routingEngine) }.stateHolder
     val calculationState by calculationHolder.state.collectAsState()
     val candidateRoute = calculationHolder.currentCandidate(routePlanUiState.revision)
+    var editorViewport by remember { mutableStateOf<Pair<EditorSheetState, Int>?>(null) }
+    var cursorReader by remember { mutableStateOf<(() -> GeoPoint?)?>(null) }
+    LaunchedEffect(calculationState) {
+        routePlanHolder.onCandidateCalculated(candidateRoute)
+    }
     var showConnections by rememberSaveable { mutableStateOf(false) }
     var screen by rememberSaveable { mutableStateOf(BusNavScreen.NAVIGATION) }
 
@@ -130,9 +135,6 @@ fun NavigationRoute(
         calculationHolder.onPlanChanged(routePlanUiState.revision)
     }
 
-    DisposableEffect(calculationHolder) {
-        onDispose { calculationHolder.cancel() }
-    }
 
     DisposableEffect(lifecycleOwner, stateHolder) {
         val observer = LifecycleEventObserver { _, event ->
@@ -187,9 +189,15 @@ fun NavigationRoute(
                 },
                 onCurrentLocation = stateHolder::onCurrentLocationRequested,
                 onRouteOverview = stateHolder::onRouteOverviewRequested,
-                onEditRoute = { screen = BusNavScreen.ROUTE_EDIT },
+                onEditRoute = {
+                    routePlanHolder.enterEditor(uiState.activeRoute, candidateRoute)
+                    editorViewport = null
+                    screen = BusNavScreen.ROUTE_EDIT
+                },
                 mapContent = { modifier ->
                     MapScreen(
+                        initialCamera = routePlanHolder.camera,
+                        onCameraChanged = routePlanHolder::saveCamera,
                         basemapConfig = basemapConfig.withTheme(dark),
                         location = uiState.location,
                         monitorTunnel = navigationActive,
@@ -212,6 +220,9 @@ fun NavigationRoute(
                     calculationHolder.cancel()
                     screen = BusNavScreen.NAVIGATION
                 },
+                onRegisterCursor = { cursorReader?.invoke()?.let(routePlanHolder::registerCursor) },
+                onSheetStateChanged = routePlanHolder::setSheetState,
+                onSheetHeightChanged = { state, height -> editorViewport = state to height },
                 onSelectAddMode = routePlanHolder::selectAddMode,
                 onSelectPoint = routePlanHolder::selectPoint,
                 onRemovePoint = routePlanHolder::removePoint,
@@ -236,14 +247,20 @@ fun NavigationRoute(
                 },
                 mapContent = { modifier ->
                     MapScreen(
+                        initialCamera = routePlanHolder.camera,
+                        onCameraChanged = routePlanHolder::saveCamera,
                         basemapConfig = basemapConfig.withTheme(dark),
                         location = uiState.location,
                         isFollowingLocation = false,
                         recenterRequestId = 0,
                         activeRoute = candidateRoute ?: uiState.activeRoute,
-                        routeOverviewRequestId = if (candidateRoute == null) 0 else 1,
+                        routeOverviewRequestId = 0,
+                        editorCameraRequest = routePlanUiState.cameraRequest.takeIf { editorViewport?.first == routePlanUiState.sheetState },
+                        editorBottomPadding = editorViewport?.second?.plus(with(androidx.compose.ui.platform.LocalDensity.current) { 60.dp.roundToPx() }),
+                        onEditorCameraApplied = routePlanHolder::cameraApplied,
+                        onCursorReader = { cursorReader = it },
                         routePlan = routePlanUiState.currentPlan.takeIf { candidateRoute == null },
-                        planOverviewRequestId = routePlanUiState.planOverviewRequestId,
+                        planOverviewRequestId = 0,
                         onMapLongPress = routePlanHolder::addPoint,
                         onMapReady = stateHolder::onMapReady,
                         onMapGesture = {},

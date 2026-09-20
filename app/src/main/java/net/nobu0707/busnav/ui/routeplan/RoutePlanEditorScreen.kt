@@ -1,5 +1,20 @@
 package net.nobu0707.busnav.ui.routeplan
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,12 +23,10 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -47,6 +60,11 @@ import net.nobu0707.busnav.ui.routing.RouteCalculationState
 import net.nobu0707.busnav.ui.routing.userMessage
 
 object RoutePlanEditorTestTags {
+    const val HANDLE = "editor_sheet_handle"
+    const val SHEET = "editor_sheet"
+    const val REGISTER = "editor_register"
+    const val CURSOR = "editor_cursor"
+    const val FOOTER = "editor_footer"
     const val SCREEN = "route_plan_editor"
     const val MAP = "route_plan_map"
     const val POINT_LIST = "route_plan_point_list"
@@ -82,80 +100,148 @@ fun RoutePlanEditorScreen(
     calculationState: RouteCalculationState = RouteCalculationState.Idle,
     onCalculate: () -> Unit = {},
     onApplyCalculatedRoute: () -> Unit = {},
+    onRegisterCursor: () -> Unit = {},
+    onSheetStateChanged: (EditorSheetState) -> Unit = {},
+    onSheetHeightChanged: (EditorSheetState, Int) -> Unit = { _, _ -> },
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     var endpointPendingDeletion by remember { mutableStateOf<RoutePlanPoint?>(null) }
     BoxWithConstraints(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .testTag(RoutePlanEditorTestTags.SCREEN),
+        modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+            .windowInsetsPadding(WindowInsets.safeDrawing).testTag(RoutePlanEditorTestTags.SCREEN),
     ) {
-        val isLandscape = maxWidth.value >= 600f && maxWidth > maxHeight
-        if (isLandscape) {
-            Row(
-                modifier = Modifier.fillMaxSize().padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                EditorPanel(
-                    uiState = uiState,
-                    onBack = onBack,
-                    onOpenConnections = onOpenConnections,
-                    onSelectAddMode = onSelectAddMode,
-                    onSelectPoint = onSelectPoint,
-                    onDeleteRequest = { point ->
-                        if (point.type.isEndpoint) endpointPendingDeletion = point else onRemovePoint(point.id)
-                    },
-                    onMovePoint = onMovePoint,
-                    onTogglePointType = onTogglePointType,
-                    onComplete = onComplete,
-                    calculationState = calculationState,
-                    onCalculate = onCalculate,
-                    onApplyCalculatedRoute = onApplyCalculatedRoute,
-                    modifier = Modifier.fillMaxHeight().weight(0.38f),
-                )
-                PlanMapPanel(
-                    hasPoints = uiState.currentPlan.points.isNotEmpty(),
-                    hasCandidate = calculationState is RouteCalculationState.Success &&
-                        calculationState.planRevision == uiState.revision,
-                    onPlanOverview = onPlanOverview,
-                    modifier = Modifier.fillMaxHeight().weight(0.62f),
-                    mapContent = mapContent,
-                )
+        val density = LocalDensity.current
+        val headerHeight = 56.dp
+        val mapHeight = (maxHeight - headerHeight).coerceAtLeast(120.dp)
+        val peek = 104.dp
+        val landscape = maxWidth > maxHeight
+        val expanded = (mapHeight - if (landscape) 64.dp else 128.dp).coerceAtLeast(peek)
+        val partial = (mapHeight * 0.40f).coerceAtLeast(if (landscape) 160.dp else 240.dp).coerceIn(peek, expanded)
+        val listState = rememberLazyListState()
+        LaunchedEffect(calculationState) {
+            if (calculationState !is RouteCalculationState.Idle) listState.scrollToItem(1)
+        }
+        var level by remember(uiState.sheetState) { mutableStateOf(uiState.sheetState) }
+        var drag by remember { mutableStateOf(0f) }
+        fun heightFor(value: EditorSheetState) = when (value) {
+            EditorSheetState.PEEK -> peek
+            EditorSheetState.PARTIAL -> partial
+            EditorSheetState.EXPANDED -> expanded
+        }
+        val height = (heightFor(level) + with(density) { drag.toDp() }).coerceIn(peek, expanded)
+        fun settle() {
+            val destination = if (drag > with(density) { 24.dp.toPx() }) {
+                if (level == EditorSheetState.PEEK) EditorSheetState.PARTIAL else EditorSheetState.EXPANDED
+            } else if (drag < -with(density) { 24.dp.toPx() }) {
+                if (level == EditorSheetState.EXPANDED) EditorSheetState.PARTIAL else EditorSheetState.PEEK
+            } else level
+            drag = 0f
+            level = destination
+            onSheetStateChanged(destination)
+        }
+        val nestedScroll = object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (source != NestedScrollSource.UserInput) return Offset.Zero
+                val before = drag
+                val base = with(density) { heightFor(level).toPx() }
+                drag = (drag - available.y).coerceIn(with(density) { peek.toPx() } - base, with(density) { expanded.toPx() } - base)
+                return Offset(0f, before - drag)
             }
-        } else {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                EditorHeader(onBack = onBack, onOpenConnections = onOpenConnections)
-                PlanMapPanel(
-                    hasPoints = uiState.currentPlan.points.isNotEmpty(),
-                    hasCandidate = calculationState is RouteCalculationState.Success &&
-                        calculationState.planRevision == uiState.revision,
-                    onPlanOverview = onPlanOverview,
-                    modifier = Modifier.fillMaxWidth().weight(0.47f),
-                    mapContent = mapContent,
-                )
-                EditorPanel(
-                    uiState = uiState,
-                    onBack = onBack,
-                    onOpenConnections = onOpenConnections,
-                    onSelectAddMode = onSelectAddMode,
-                    onSelectPoint = onSelectPoint,
-                    onDeleteRequest = { point ->
-                        if (point.type.isEndpoint) endpointPendingDeletion = point else onRemovePoint(point.id)
-                    },
-                    onMovePoint = onMovePoint,
-                    onTogglePointType = onTogglePointType,
-                    onComplete = onComplete,
-                    calculationState = calculationState,
-                    onCalculate = onCalculate,
-                    onApplyCalculatedRoute = onApplyCalculatedRoute,
-                    showHeader = false,
-                    modifier = Modifier.fillMaxWidth().weight(0.53f),
-                )
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                settle()
+                return Velocity.Zero
+            }
+        }
+        LaunchedEffect(height, level, density) { onSheetHeightChanged(level, with(density) { height.roundToPx() }) }
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxWidth().height(headerHeight).padding(horizontal = 8.dp)) {
+                EditorHeader(onBack, onOpenConnections)
+            }
+            Box(Modifier.fillMaxWidth().weight(1f).testTag(RoutePlanEditorTestTags.MAP)) {
+                mapContent(Modifier.fillMaxSize())
+                val cursorColor = MaterialTheme.colorScheme.primary
+                Canvas(Modifier.fillMaxSize().testTag(RoutePlanEditorTestTags.CURSOR)
+                    .semantics { contentDescription = "登録位置・地図中央" }) {
+                    val c = center
+                    drawCircle(androidx.compose.ui.graphics.Color.White, 8.dp.toPx(), c)
+                    drawLine(cursorColor, Offset(c.x, c.y - 16.dp.toPx()), Offset(c.x, c.y + 16.dp.toPx()), 2.dp.toPx())
+                    drawLine(cursorColor, Offset(c.x - 16.dp.toPx(), c.y), Offset(c.x + 16.dp.toPx(), c.y), 2.dp.toPx())
+                }
+                Card(Modifier.align(Alignment.TopStart).padding(8.dp)) {
+                    Text(if (calculationState is RouteCalculationState.Success && calculationState.planRevision == uiState.revision)
+                        "探索結果（道路沿いルート）" else "仮ルート（経路探索前プレビュー）",
+                        Modifier.padding(6.dp), style = MaterialTheme.typography.labelSmall)
+                }
+                Row(Modifier.align(Alignment.BottomEnd).padding(bottom = height + 4.dp, end = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onPlanOverview, enabled = uiState.currentPlan.points.isNotEmpty(),
+                        modifier = Modifier.heightIn(min = 48.dp).testTag(RoutePlanEditorTestTags.OVERVIEW)) { Text("プラン全体") }
+                    Button(onClick = onRegisterCursor,
+                        modifier = Modifier.heightIn(min = 48.dp).testTag(RoutePlanEditorTestTags.REGISTER)) { Text(uiState.selectedAddMode.displayName + "を登録") }
+                }
+                Card(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(height)
+                    .testTag(RoutePlanEditorTestTags.SHEET).semantics { stateDescription = level.name },
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)) {
+                    Column(Modifier.fillMaxSize()) {
+                        Box(Modifier.fillMaxWidth().height(48.dp).testTag(RoutePlanEditorTestTags.HANDLE)
+                            .semantics { contentDescription = "地点一覧を引き出す・縮める" }
+                            .clickable {
+                                level = if (level == EditorSheetState.EXPANDED) EditorSheetState.PEEK else EditorSheetState.EXPANDED
+                                onSheetStateChanged(level)
+                            }
+                            .pointerInput(level, density) {
+                                detectVerticalDragGestures(onDragEnd = { settle() }, onDragCancel = { drag = 0f }) { change, amount ->
+                                    change.consume()
+                                    val base = with(density) { heightFor(level).toPx() }
+                                    drag = (drag - amount).coerceIn(with(density) { peek.toPx() } - base, with(density) { expanded.toPx() } - base)
+                                }
+                            }, contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(Modifier.size(40.dp, 4.dp).background(MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(2.dp)))
+                                Text("地点一覧・" + uiState.currentPlan.points.size + "件", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                        val intermediates = uiState.currentPlan.points.filterNot { it.type.isEndpoint }
+                        LazyColumn(Modifier.fillMaxWidth().weight(1f).nestedScroll(nestedScroll)
+                            .testTag(RoutePlanEditorTestTags.POINT_LIST), state = listState,
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)) {
+                            item(key = "types") {
+                                AddModeSelector(uiState.selectedAddMode, onSelectAddMode)
+                                Text("地図を動かして中央の十字を合わせ、地点を登録します。", style = MaterialTheme.typography.bodySmall)
+                                Text("通過指定：" + SHAPING_HELPER, style = MaterialTheme.typography.bodySmall)
+                                Text(if (uiState.validation.isRoutingReady) "出発地・目的地を設定済み" else "出発地と目的地を設定してください",
+                                    style = MaterialTheme.typography.bodySmall)
+                                Text("開発用車両条件（実車の業務運行には使用しないでください）", style = MaterialTheme.typography.labelSmall)
+                            }
+                            item(key = "calculation") {
+                                RouteCalculationPanel(calculationState, uiState.revision, onApplyCalculatedRoute)
+                            }
+                            if (uiState.currentPlan.points.isEmpty()) item(key = "empty") {
+                                Text("地点はまだありません", Modifier.testTag(RoutePlanEditorTestTags.EMPTY))
+                            }
+                            itemsIndexed(uiState.currentPlan.points, key = { _, point -> point.id }) { _, point ->
+                                val index = intermediates.indexOfFirst { it.id == point.id }
+                                RoutePlanPointRow(point, point.id == uiState.selectedPointId, index > 0,
+                                    index >= 0 && index < intermediates.lastIndex,
+                                    { onSelectPoint(point.id) },
+                                    { if (point.type.isEndpoint) endpointPendingDeletion = point else onRemovePoint(point.id) },
+                                    { onMovePoint(point.id, -1) }, { onMovePoint(point.id, 1) }, { onTogglePointType(point.id) })
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 12.dp).testTag(RoutePlanEditorTestTags.FOOTER),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Button(onClick = {
+                                level = EditorSheetState.PARTIAL
+                                onSheetStateChanged(level)
+                                onCalculate()
+                            }, enabled = uiState.validation.isRoutingReady && calculationState !is RouteCalculationState.Calculating,
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag(RoutePlanEditorTestTags.CALCULATE)) { Text("経路探索") }
+                            Button(onClick = onComplete,
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag(RoutePlanEditorTestTags.COMPLETE)) { Text("編集完了") }
+                        }
+                    }
+                }
             }
         }
     }
@@ -175,74 +261,6 @@ fun RoutePlanEditorScreen(
                 TextButton(onClick = { endpointPendingDeletion = null }) { Text("キャンセル") }
             },
         )
-    }
-}
-
-@Composable
-private fun EditorPanel(
-    onOpenConnections: (() -> Unit)? = null,
-    uiState: RoutePlanUiState,
-    onBack: () -> Unit,
-    onSelectAddMode: (RoutePlanPointType) -> Unit,
-    onSelectPoint: (String) -> Unit,
-    onDeleteRequest: (RoutePlanPoint) -> Unit,
-    onMovePoint: (String, Int) -> Unit,
-    onTogglePointType: (String) -> Unit,
-    onComplete: () -> Unit,
-    calculationState: RouteCalculationState,
-    onCalculate: () -> Unit,
-    onApplyCalculatedRoute: () -> Unit,
-    modifier: Modifier,
-    showHeader: Boolean = true,
-) {
-    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            if (showHeader) EditorHeader(onBack)
-            Text("追加する地点", style = MaterialTheme.typography.labelLarge)
-            AddModeSelector(uiState.selectedAddMode, onSelectAddMode)
-            Text(
-                "種類を選び、地図を長押しして追加します。VIAは必ず通る地点、SHAPINGはルート形状の誘導点です。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            RoutePlanPointList(
-                uiState = uiState,
-                onSelectPoint = onSelectPoint,
-                onDeleteRequest = onDeleteRequest,
-                onMovePoint = onMovePoint,
-                onTogglePointType = onTogglePointType,
-                modifier = Modifier.fillMaxWidth().weight(1f),
-            )
-            val status = if (uiState.validation.isRoutingReady) {
-                "出発地・到着地を設定済み"
-            } else {
-                "出発地と到着地を設定してください"
-            }
-            Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                "開発用車両条件（実車の業務運行には使用しないでください）",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-            val calculating = calculationState is RouteCalculationState.Calculating
-            Button(
-                onClick = onCalculate,
-                enabled = uiState.validation.isRoutingReady && !calculating,
-                modifier = Modifier.fillMaxWidth().testTag(RoutePlanEditorTestTags.CALCULATE),
-            ) { Text(if (calculationState is RouteCalculationState.Failure) "再試行" else "経路探索") }
-            RouteCalculationPanel(
-                state = calculationState,
-                currentRevision = uiState.revision,
-                onApply = onApplyCalculatedRoute,
-            )
-            Button(
-                onClick = onComplete,
-                modifier = Modifier.fillMaxWidth().testTag(RoutePlanEditorTestTags.COMPLETE),
-            ) { Text("編集完了") }
-        }
     }
 }
 
@@ -287,45 +305,8 @@ private fun AddModeChip(
         selected = selected == type,
         onClick = { onSelect(type) },
         label = { Text(type.displayName) },
-        modifier = modifier.semantics { contentDescription = "${type.displayName}追加モード" },
+        modifier = modifier.heightIn(min = 48.dp).semantics { contentDescription = "${type.displayName}追加モード" },
     )
-}
-
-@Composable
-private fun RoutePlanPointList(
-    uiState: RoutePlanUiState,
-    onSelectPoint: (String) -> Unit,
-    onDeleteRequest: (RoutePlanPoint) -> Unit,
-    onMovePoint: (String, Int) -> Unit,
-    onTogglePointType: (String) -> Unit,
-    modifier: Modifier,
-) {
-    val intermediates = uiState.currentPlan.points.filterNot { it.type.isEndpoint }
-    if (uiState.currentPlan.points.isEmpty()) {
-        Box(modifier = modifier.testTag(RoutePlanEditorTestTags.EMPTY), contentAlignment = Alignment.Center) {
-            Text("地点はまだありません", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        return
-    }
-    LazyColumn(
-        modifier = modifier.testTag(RoutePlanEditorTestTags.POINT_LIST),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        itemsIndexed(uiState.currentPlan.points, key = { index, item -> "$index-${item.id}" }) { _, point ->
-            val intermediateIndex = intermediates.indexOfFirst { it.id == point.id }
-            RoutePlanPointRow(
-                point = point,
-                selected = point.id == uiState.selectedPointId,
-                canMoveUp = intermediateIndex > 0,
-                canMoveDown = intermediateIndex >= 0 && intermediateIndex < intermediates.lastIndex,
-                onSelect = { onSelectPoint(point.id) },
-                onDelete = { onDeleteRequest(point) },
-                onMoveUp = { onMovePoint(point.id, -1) },
-                onMoveDown = { onMovePoint(point.id, 1) },
-                onToggleType = { onTogglePointType(point.id) },
-            )
-        }
-    }
 }
 
 @Composable
@@ -350,80 +331,52 @@ private fun RoutePlanPointRow(
         ),
         shape = RoundedCornerShape(8.dp),
     ) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth().padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.fillMaxWidth()) {
                 Text(point.type.displayName, fontWeight = FontWeight.SemiBold)
-                Text(
-                    point.name ?: "%.5f, %.5f".format(point.position.latitude, point.position.longitude),
+                point.name?.let { name -> Text(
+                    name,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                )
+                ) }
             }
+            Text("%.6f, %.6f".format(java.util.Locale.ROOT, point.position.latitude, point.position.longitude),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             if (!point.type.isEndpoint) {
                 TextButton(
                     onClick = onMoveUp,
                     enabled = canMoveUp,
-                    modifier = Modifier.testTag(RoutePlanEditorTestTags.moveUp(point.id)).semantics {
+                    modifier = Modifier.heightIn(min = 48.dp).testTag(RoutePlanEditorTestTags.moveUp(point.id)).semantics {
                         contentDescription = "${point.type.displayName}を上へ移動"
                     },
                 ) { Text("↑") }
                 TextButton(
                     onClick = onMoveDown,
                     enabled = canMoveDown,
-                    modifier = Modifier.testTag(RoutePlanEditorTestTags.moveDown(point.id)).semantics {
+                    modifier = Modifier.heightIn(min = 48.dp).testTag(RoutePlanEditorTestTags.moveDown(point.id)).semantics {
                         contentDescription = "${point.type.displayName}を下へ移動"
                     },
                 ) { Text("↓") }
                 TextButton(
                     onClick = onToggleType,
-                    modifier = Modifier.testTag(RoutePlanEditorTestTags.toggle(point.id)).semantics {
-                        contentDescription = "VIAとSHAPINGを切り替え"
+                    modifier = Modifier.heightIn(min = 48.dp).testTag(RoutePlanEditorTestTags.toggle(point.id)).semantics {
+                        contentDescription = "経由地と通過指定を切り替え"
                     },
                 ) { Text("切替") }
             }
             TextButton(
                 onClick = onDelete,
-                modifier = Modifier.testTag(RoutePlanEditorTestTags.delete(point.id)).semantics {
+                modifier = Modifier.heightIn(min = 48.dp).testTag(RoutePlanEditorTestTags.delete(point.id)).semantics {
                     contentDescription = "${point.type.displayName}を削除"
                 },
             ) { Text("削除") }
+            }
         }
-    }
-}
-
-@Composable
-private fun PlanMapPanel(
-    hasPoints: Boolean,
-    hasCandidate: Boolean,
-    onPlanOverview: () -> Unit,
-    modifier: Modifier,
-    mapContent: @Composable (Modifier) -> Unit,
-) {
-    Box(modifier = modifier.testTag(RoutePlanEditorTestTags.MAP), contentAlignment = Alignment.BottomEnd) {
-        mapContent(Modifier.fillMaxSize())
-        Card(
-            modifier = Modifier.align(Alignment.TopStart).padding(10.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
-        ) {
-            Text(
-                if (hasCandidate) "探索結果（道路沿いルート）" else "仮ルート（経路探索前プレビュー）",
-                modifier = Modifier.padding(8.dp),
-                style = MaterialTheme.typography.labelMedium,
-            )
-        }
-        OutlinedButton(
-            onClick = onPlanOverview,
-            enabled = hasPoints,
-            modifier = Modifier
-                .padding(10.dp)
-                .testTag(RoutePlanEditorTestTags.OVERVIEW)
-                .semantics { contentDescription = "編集プラン全体を表示" },
-        ) { Text("プラン全体") }
     }
 }
 
@@ -479,11 +432,3 @@ private fun formatRouteSummary(distanceMeters: Double, durationSeconds: Double):
 
 private val RoutePlanPointType.isEndpoint: Boolean
     get() = this == RoutePlanPointType.START || this == RoutePlanPointType.DESTINATION
-
-private val RoutePlanPointType.displayName: String
-    get() = when (this) {
-        RoutePlanPointType.START -> "出発地"
-        RoutePlanPointType.DESTINATION -> "到着地"
-        RoutePlanPointType.VIA -> "VIA・必ず通る"
-        RoutePlanPointType.SHAPING -> "SHAPING・形状誘導"
-    }

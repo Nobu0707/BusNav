@@ -37,6 +37,8 @@ import net.nobu0707.busnav.map.basemap.BasemapConfig
 import net.nobu0707.busnav.map.basemap.BasemapMode
 import net.nobu0707.busnav.map.basemap.BasemapState
 import net.nobu0707.busnav.map.basemap.NoOpMapDiagnostics
+import net.nobu0707.busnav.ui.routeplan.EditorCamera
+import net.nobu0707.busnav.ui.routeplan.EditorCameraRequest
 import org.maplibre.android.maps.MapView
 
 @Composable
@@ -54,6 +56,12 @@ fun MapScreen(
         styleUrl = BuildConfig.BASEMAP_STYLE_URL,
         isDebug = BuildConfig.DEBUG,
     ),
+    initialCamera: EditorCamera? = null,
+    onCameraChanged: (EditorCamera) -> Unit = {},
+    editorCameraRequest: EditorCameraRequest? = null,
+    editorBottomPadding: Int? = null,
+    onEditorCameraApplied: (Long) -> Unit = {},
+    onCursorReader: (((() -> GeoPoint?)?) -> Unit) = {},
     monitorTunnel: Boolean = false,
     onTunnelChanged: (Boolean) -> Unit = {},
     onMapReady: () -> Unit,
@@ -80,6 +88,8 @@ fun MapScreen(
     }
     val controller = remember(mapView, routePaddingPx) {
         MapController(
+            initialCamera = initialCamera,
+            onCameraChanged = onCameraChanged,
             onReady = onMapReady,
             onGesture = onMapGesture,
             onError = onMapError,
@@ -89,6 +99,11 @@ fun MapScreen(
             mapDiagnostics = mapDiagnostics,
             onBasemapStateChanged = { basemapState = it },
         ).also { it.attach(mapView) }
+    }
+
+    DisposableEffect(controller) {
+        onCursorReader(controller::cursorPosition)
+        onDispose { onCursorReader(null) }
     }
 
     val tunnelCallback by androidx.compose.runtime.rememberUpdatedState(onTunnelChanged)
@@ -157,6 +172,7 @@ fun MapScreen(
         controller.update(location, isFollowingLocation, recenterRequestId)
         controller.updateRoute(activeRoute, routeOverviewRequestId)
         controller.updateRoutePlan(routePlan, planOverviewRequestId)
+        controller.updateEditorCamera(editorCameraRequest, editorBottomPadding, onEditorCameraApplied)
     }
 
     Box(
@@ -173,7 +189,8 @@ fun MapScreen(
             modifier = Modifier.align(Alignment.TopCenter).padding(8.dp),
         )
         BasemapAttributionOverlay(
-            modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
+            modifier = if (editorBottomPadding != null) Modifier.align(Alignment.TopStart).padding(start = 6.dp, top = 40.dp)
+                else Modifier.align(Alignment.BottomStart).padding(6.dp),
         )
     }
 }

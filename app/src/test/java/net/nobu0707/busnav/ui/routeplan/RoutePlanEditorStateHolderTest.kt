@@ -53,10 +53,10 @@ class RoutePlanEditorStateHolderTest {
 
     @Test fun `overview requires points and edit complete clears dirty flag`() {
         holder.requestPlanOverview()
-        assertEquals(0, holder.uiState.value.planOverviewRequestId)
+        assertEquals(null, holder.uiState.value.cameraRequest)
         holder.addPoint(GeoPoint(35.0, 139.0))
         holder.requestPlanOverview()
-        assertEquals(1, holder.uiState.value.planOverviewRequestId)
+        assertEquals(listOf(GeoPoint(35.0, 139.0)), holder.uiState.value.cameraRequest?.points)
         holder.completeEditing()
         assertFalse(holder.uiState.value.hasUnsavedChanges)
     }

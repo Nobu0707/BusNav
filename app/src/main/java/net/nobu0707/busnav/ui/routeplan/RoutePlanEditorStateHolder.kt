@@ -15,6 +15,29 @@ class RoutePlanEditorStateHolder(
     private val _uiState = MutableStateFlow(initialState.normalized())
     val uiState: StateFlow<RoutePlanUiState> = _uiState.asStateFlow()
 
+    var camera: EditorCamera? = null
+        private set
+    private var nextCameraRequest = initialState.cameraRequest?.id ?: 0L
+
+    private var fittedCandidate: net.nobu0707.busnav.domain.route.ScheduledRoute? = null
+    fun onCandidateCalculated(route: net.nobu0707.busnav.domain.route.ScheduledRoute?) {
+        if (route != null && route !== fittedCandidate) requestCamera(route.geometry.points)
+        fittedCandidate = route
+    }
+    fun saveCamera(value: EditorCamera) { camera = value }
+    fun setSheetState(value: EditorSheetState) = update { copy(sheetState = value) }
+    fun enterEditor(active: net.nobu0707.busnav.domain.route.ScheduledRoute?, candidate: net.nobu0707.busnav.domain.route.ScheduledRoute?) {
+        requestCamera(editorEntryPoints(active, candidate, _uiState.value.currentPlan))
+    }
+    fun requestCamera(points: List<GeoPoint>) {
+        update { copy(cameraRequest = points.takeIf { it.isNotEmpty() }?.let { EditorCameraRequest(++nextCameraRequest, it) }) }
+    }
+    fun cameraApplied(id: Long) = update {
+        if (cameraRequest?.id == id) copy(cameraRequest = null) else this
+    }
+    /** The caller samples the native crosshair at click time, without rounding or snapping. */
+    fun registerCursor(position: GeoPoint) = addPoint(position)
+
     fun selectAddMode(type: RoutePlanPointType) {
         update { copy(selectedAddMode = type, errorMessage = null) }
     }
@@ -68,7 +91,7 @@ class RoutePlanEditorStateHolder(
 
     fun requestPlanOverview() {
         if (_uiState.value.currentPlan.points.isEmpty()) return
-        update { copy(planOverviewRequestId = planOverviewRequestId + 1) }
+        requestCamera(_uiState.value.currentPlan.points.map { it.position })
     }
 
     fun completeEditing() = update { copy(hasUnsavedChanges = false, errorMessage = null) }

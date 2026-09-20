@@ -16,6 +16,8 @@ data class RoutePlanUiState(
     val planOverviewRequestId: Int = 0,
     val errorMessage: String? = null,
     val revision: Long = 0,
+    val sheetState: EditorSheetState = EditorSheetState.PARTIAL,
+    val cameraRequest: EditorCameraRequest? = null,
 ) {
     val planBounds: RoutePlanBounds? get() = currentPlan.boundsOrNull()
 }

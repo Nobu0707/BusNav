@@ -61,7 +61,7 @@ Phase 003 の Navigation 画面は走行表示に集中し、RoutePlan の複雑
 
 ## RoutePlan editor への遷移
 
-「ルート編集」は専用 `RoutePlanEditorScreen` へ切り替えます。Android back/「戻る」で Navigation へ戻り、「編集完了」は in-memory plan を確定します。確定しても Phase 003 では ScheduledRoute を再計算しません。Editor の縦横設計は [RoutePlan editor](route-plan-editor.md) を参照してください。
+「ルート編集」は専用 `RoutePlanEditorScreen` へ切り替えます。Android back/「戻る」で Navigation へ戻り、「編集完了」は in-memory plan を確定します。「経路探索」でcandidateを計算し、「このルートを使用」でScheduledRouteへ採用します。「編集完了」だけでは再計算・採用しません。Editor の縦横設計は [RoutePlan editor](route-plan-editor.md) を参照してください。
 
 ## 地図上の操作
 
@@ -70,7 +70,7 @@ Phase 003 の Navigation 画面は走行表示に集中し、RoutePlan の複雑
 
 両操作は独立したテストタグと content description を持ちます。MapView 自体が各レイアウトの地図領域内に収まるため、bounds fit は案内・運行情報・補助操作の外側 UI に隠れません。
 
-詳細地図が利用できない場合は地図上端に「詳細地図サーバー未接続」を小さく重ねます。MapView は埋め込み dark fallback のまま残り、長押し、地点編集、route/candidate overlay、bounds fit は停止しません。OSM/OpenMapTiles attribution は地図左下に常時表示します。
+詳細地図が利用できない場合は地図上端に「詳細地図サーバー未接続」を小さく重ねます。MapView は埋め込み dark fallback のまま残り、長押し、地点編集、route/candidate overlay、bounds fit は停止しません。OSM/OpenMapTiles attribution はNavigationでは地図左下、Editorではシートに隠れない地図左上に表示します。
 
 ## JCT 接近専用表示
 

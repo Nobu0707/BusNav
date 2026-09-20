@@ -3,6 +3,9 @@ package net.nobu0707.busnav.ui.routeplan
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -10,6 +13,8 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import net.nobu0707.busnav.domain.model.GeoPoint
@@ -36,13 +41,15 @@ class RoutePlanEditorScreenTest {
 
         composeRule.onNodeWithTag(RoutePlanEditorTestTags.SCREEN).assertIsDisplayed()
         composeRule.onNodeWithTag(RoutePlanEditorTestTags.MAP).assertIsDisplayed()
+        assertEquals(composeRule.onNodeWithTag(RoutePlanEditorTestTags.MAP).fetchSemanticsNode().boundsInRoot.center,
+            composeRule.onNodeWithTag(RoutePlanEditorTestTags.CURSOR).fetchSemanticsNode().boundsInRoot.center)
         composeRule.onNodeWithTag(RoutePlanEditorTestTags.EMPTY).fetchSemanticsNode()
         composeRule.onNodeWithTag(RoutePlanEditorTestTags.COMPLETE).assertIsDisplayed()
     }
 
     @Test
     fun landscapePlanShowsEditorAndMap() {
-        setEditor(RoutePlanUiState(currentPlan = samplePlan()), Modifier.requiredSize(1000.dp, 450.dp))
+        setEditor(RoutePlanUiState(currentPlan = samplePlan()), Modifier.requiredSize(360.dp, 320.dp))
 
         composeRule.onNodeWithTag(RoutePlanEditorTestTags.SCREEN).assertIsDisplayed()
         composeRule.onNodeWithTag(RoutePlanEditorTestTags.MAP).assertIsDisplayed()
@@ -61,7 +68,7 @@ class RoutePlanEditorScreenTest {
         composeRule.setContent {
             BusNavTheme {
                 RoutePlanEditorScreen(
-                    uiState = RoutePlanUiState(currentPlan = plan),
+                    uiState = RoutePlanUiState(currentPlan = plan, sheetState = EditorSheetState.EXPANDED),
                     onBack = {},
                     onSelectAddMode = {},
                     onSelectPoint = {},
@@ -76,6 +83,7 @@ class RoutePlanEditorScreenTest {
             }
         }
 
+        composeRule.onNodeWithTag(RoutePlanEditorTestTags.POINT_LIST).performScrollToNode(hasTestTag(RoutePlanEditorTestTags.point(via.id)))
         composeRule.onNodeWithTag(RoutePlanEditorTestTags.toggle(via.id)).performScrollTo().performClick()
         composeRule.onNodeWithTag(RoutePlanEditorTestTags.moveDown(via.id)).performScrollTo().performClick()
         composeRule.onNodeWithTag(RoutePlanEditorTestTags.delete(via.id)).performScrollTo().performClick()
@@ -139,6 +147,30 @@ class RoutePlanEditorScreenTest {
         composeRule.onNodeWithTag(RoutePlanEditorTestTags.FAILURE).assertIsDisplayed()
     }
 
+    @Test fun twentyPointsScrollTogetherWhileFooterStaysFixed() {
+        val points = (0..19).map { RoutePlanPoint("p" + it, RoutePlanPointType.VIA, GeoPoint(35.0 + it * .001, 139.0), "地点" + it) }
+        setEditor(RoutePlanUiState(currentPlan = RoutePlan("long", points = points)), Modifier.requiredSize(400.dp, 800.dp))
+        composeRule.onNodeWithText("通過指定：" + SHAPING_HELPER).assertIsDisplayed()
+        val footer = composeRule.onNodeWithTag(RoutePlanEditorTestTags.FOOTER).fetchSemanticsNode().boundsInRoot
+        composeRule.onNodeWithTag(RoutePlanEditorTestTags.POINT_LIST).performScrollToNode(hasTestTag(RoutePlanEditorTestTags.point("p19")))
+        composeRule.onNodeWithTag(RoutePlanEditorTestTags.point("p19")).assertIsDisplayed()
+        assertEquals(footer, composeRule.onNodeWithTag(RoutePlanEditorTestTags.FOOTER).fetchSemanticsNode().boundsInRoot)
+        composeRule.onNodeWithTag(RoutePlanEditorTestTags.CALCULATE).assertIsDisplayed()
+        composeRule.onNodeWithTag(RoutePlanEditorTestTags.COMPLETE).assertIsDisplayed()
+    }
+
+    @Test fun handleSwipesCollapseAndExpandWithoutRemovingControls() {
+        setEditor(RoutePlanUiState(), Modifier.requiredSize(400.dp, 800.dp))
+        val expanded = composeRule.onNodeWithTag(RoutePlanEditorTestTags.SHEET).fetchSemanticsNode().boundsInRoot.height
+        repeat(2) { composeRule.onNodeWithTag(RoutePlanEditorTestTags.HANDLE).performTouchInput { swipeDown(endY = height + 120f) } }
+        val peek = composeRule.onNodeWithTag(RoutePlanEditorTestTags.SHEET).fetchSemanticsNode().boundsInRoot.height
+        assertTrue(peek < expanded)
+        composeRule.onNodeWithTag(RoutePlanEditorTestTags.COMPLETE).assertIsDisplayed()
+        composeRule.onNodeWithTag(RoutePlanEditorTestTags.REGISTER).assertIsDisplayed()
+        repeat(2) { composeRule.onNodeWithTag(RoutePlanEditorTestTags.HANDLE).performTouchInput { swipeUp(endY = -120f) } }
+        assertEquals(expanded, composeRule.onNodeWithTag(RoutePlanEditorTestTags.SHEET).fetchSemanticsNode().boundsInRoot.height, 1f)
+    }
+
     private fun setEditor(
         state: RoutePlanUiState,
         modifier: Modifier,
@@ -148,7 +180,7 @@ class RoutePlanEditorScreenTest {
         composeRule.setContent {
             BusNavTheme {
                 RoutePlanEditorScreen(
-                    uiState = state,
+                    uiState = state.copy(sheetState = EditorSheetState.EXPANDED),
                     onBack = {},
                     onSelectAddMode = {},
                     onSelectPoint = {},

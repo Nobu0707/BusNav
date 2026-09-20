@@ -109,30 +109,18 @@ class ValhallaUiRuntimeSmokeTest {
                 nativeMap.moveCamera(org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(
                     org.maplibre.android.geometry.LatLng(point.latitude, point.longitude), 16.0))
             }
-            composeRule.waitForIdle()
-            val screen = IntArray(2)
-            var x = 0f
-            var y = 0f
-            composeRule.runOnUiThread {
-                val view = requireNotNull(find(composeRule.activity.window.decorView))
-                view.getLocationOnScreen(screen)
-                x = screen[0] + view.width / 2f
-                y = screen[1] + view.height / 2f
+            composeRule.waitUntil(5000) { planHolder.camera?.center?.let {
+                kotlin.math.abs(it.latitude - point.latitude) < .000001 && kotlin.math.abs(it.longitude - point.longitude) < .000001
+            } == true }
+            composeRule.onNodeWithTag(RoutePlanEditorTestTags.REGISTER).performClick()
+            composeRule.runOnIdle {
+                val added = planHolder.uiState.value.currentPlan.points.single { it.type == type }.position
+                org.junit.Assert.assertEquals("camera=" + nativeMap.cameraPosition + " view=" + find(composeRule.activity.window.decorView)?.height, point.latitude, added.latitude, .00001)
+                org.junit.Assert.assertEquals(point.longitude, added.longitude, .00001)
             }
-            // MapLibre uses a native wall-clock GestureDetector, not Compose's virtual event clock.
-            val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
-            val down = android.os.SystemClock.uptimeMillis()
-            fun touch(action: Int) {
-                val event = android.view.MotionEvent.obtain(down, android.os.SystemClock.uptimeMillis(), action, x, y, 0)
-                instrumentation.sendPointerSync(event)
-                event.recycle()
-            }
-            touch(android.view.MotionEvent.ACTION_DOWN)
-            android.os.SystemClock.sleep(800)
-            touch(android.view.MotionEvent.ACTION_UP)
             composeRule.waitForIdle()
         }
-        composeRule.onNodeWithText("出発地・到着地を設定済み").assertIsDisplayed()
+        composeRule.runOnIdle { assertTrue(planHolder.uiState.value.validation.isRoutingReady) }
     }
 
     private fun setEndpoints(start: GeoPoint, destination: GeoPoint) {
@@ -143,7 +131,7 @@ class ValhallaUiRuntimeSmokeTest {
             planHolder.addPoint(destination)
         }
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("出発地・到着地を設定済み").assertIsDisplayed()
+        composeRule.runOnIdle { assertTrue(planHolder.uiState.value.validation.isRoutingReady) }
     }
 
     private fun calculateAndAssert(expected: RouteExpectation): Double {
