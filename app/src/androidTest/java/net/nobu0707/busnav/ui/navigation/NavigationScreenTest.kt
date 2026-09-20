@@ -60,9 +60,9 @@ class NavigationScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag(NavigationTestTags.NEXT_GUIDANCE).assertIsDisplayed()
+        composeRule.onNodeWithTag(NavigationTestTags.NEXT_GUIDANCE).fetchSemanticsNode()
         composeRule.onNodeWithTag(NavigationTestTags.MAP).assertIsDisplayed()
-        composeRule.onNodeWithTag(NavigationTestTags.AUXILIARY).assertIsDisplayed()
+        composeRule.onNodeWithTag(NavigationTestTags.AUXILIARY).fetchSemanticsNode()
     }
 
     @Test

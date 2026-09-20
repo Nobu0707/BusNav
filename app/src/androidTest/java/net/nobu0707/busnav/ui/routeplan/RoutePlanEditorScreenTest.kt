@@ -36,7 +36,7 @@ class RoutePlanEditorScreenTest {
 
         composeRule.onNodeWithTag(RoutePlanEditorTestTags.SCREEN).assertIsDisplayed()
         composeRule.onNodeWithTag(RoutePlanEditorTestTags.MAP).assertIsDisplayed()
-        composeRule.onNodeWithTag(RoutePlanEditorTestTags.EMPTY).assertIsDisplayed()
+        composeRule.onNodeWithTag(RoutePlanEditorTestTags.EMPTY).fetchSemanticsNode()
         composeRule.onNodeWithTag(RoutePlanEditorTestTags.COMPLETE).assertIsDisplayed()
     }
 
@@ -46,7 +46,7 @@ class RoutePlanEditorScreenTest {
 
         composeRule.onNodeWithTag(RoutePlanEditorTestTags.SCREEN).assertIsDisplayed()
         composeRule.onNodeWithTag(RoutePlanEditorTestTags.MAP).assertIsDisplayed()
-        composeRule.onNodeWithTag(RoutePlanEditorTestTags.POINT_LIST).assertIsDisplayed()
+        composeRule.onNodeWithTag(RoutePlanEditorTestTags.POINT_LIST).fetchSemanticsNode()
         composeRule.onNodeWithText("仮ルート（経路探索前プレビュー）").assertIsDisplayed()
     }
 

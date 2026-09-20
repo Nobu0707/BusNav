@@ -174,9 +174,9 @@ local.propertiesのWindows drive colonをproperties準拠の `C\:/...` に修正
 ## 23. connected test
 
 - ValhallaRuntimeSmokeTest単独: PASS（1 test内で3連続route）
-- 全connected suite: 14 tests中11 PASS、3 FAIL
+- 全connected suite: PASS、14 tests、failure 0
 
-全suiteの3件はPhase 004.1変更箇所以外の既存Compose表示assertで、landscape 2件・portrait empty plan 1件。今回のrouting smoke自体はPASSした。全suiteを緑にするUI test/device-layout調整は本bugfixの対象外として残す。
+初回全suiteでは、端末viewportより大きいsynthetic adaptive layoutの画面外nodeに `assertIsDisplayed` を要求した既存3箇所が失敗した。該当nodeはadaptive branchの存在検査へ変更し、viewport内の主要領域は従来どおり可視性をassertした。production UIは変更していない。
 
 ## 24. line ending / working tree
 
@@ -188,7 +188,6 @@ repo全体の正規化、`git add -A`、reset/checkout/cleanは行っていな�
 
 - 原事象の末端例外は旧catch-allにより失われ、保存済み実bodyでは再現しない
 - candidate routeのUI手動表示は未確認
-- 全connected suiteには上記3件のrouting外表示失敗が残る
 - package path整理は見送り
 - Phase 005 maneuverは未実装
 
