@@ -4,6 +4,8 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import net.nobu0707.busnav.data.route.createDevelopmentSampleRoute
 import net.nobu0707.busnav.domain.model.GeoPoint
@@ -23,13 +25,21 @@ class BasemapHotReloadTest {
     @Test fun kantoToChubuKeepsRouteAllPointTypesAndCamera() { exercise(BasemapRegion.KANTO) }
     @Test fun chubuToKantoKeepsRouteAllPointTypesAndCamera() { exercise(BasemapRegion.CHUBU) }
 
-    private fun exercise(from: BasemapRegion?) {
+    @Test fun kantoDarkToLightKeepsAllOverlays() { exercise(BasemapRegion.KANTO, false) }
+    @Test fun kantoLightToDarkKeepsAllOverlays() { exercise(BasemapRegion.KANTO, true) }
+    @Test fun chubuDarkToLightKeepsAllOverlays() { exercise(BasemapRegion.CHUBU, false) }
+    @Test fun chubuLightToDarkKeepsAllOverlays() { exercise(BasemapRegion.CHUBU, true) }
+
+    private fun exercise(from: BasemapRegion?, targetDark: Boolean? = null) {
         LocalBasemapAssumptions.assumeAvailable()
         rule.runOnUiThread { MapLibre.getInstance(rule.activity) }
-        val target = if (from == BasemapRegion.KANTO) BasemapRegion.CHUBU else BasemapRegion.KANTO
-        val targetUrl = BasemapConfig.forRegion(LocalBasemapAssumptions.BASE_URL, target, true).styleUrl!!
+        val target = if (targetDark != null) requireNotNull(from) else if (from == BasemapRegion.KANTO) BasemapRegion.CHUBU else BasemapRegion.KANTO
+        val targetConfig = BasemapConfig.forRegion(LocalBasemapAssumptions.BASE_URL, target, true)
+            .let { if (targetDark == null) it else it.withTheme(targetDark) }
+        val targetUrl = targetConfig.styleUrl!!
         val config = mutableStateOf(if (from == null) BasemapConfig(null, BasemapMode.FALLBACK)
-            else BasemapConfig.forRegion(LocalBasemapAssumptions.BASE_URL, from, true))
+            else BasemapConfig.forRegion(LocalBasemapAssumptions.BASE_URL, from, true)
+                .let { if (targetDark == null) it else it.withTheme(!targetDark) })
         val route = createDevelopmentSampleRoute()
         val plan = RoutePlan("reload", points = listOf(
             RoutePlanPoint("start", RoutePlanPointType.START, GeoPoint(35.18, 136.90)),
@@ -39,10 +49,14 @@ class BasemapHotReloadTest {
         ))
         var ready = false
         rule.setContent {
-            MapScreen(location = null, isFollowingLocation = false, recenterRequestId = 0,
+            androidx.compose.foundation.layout.Column {
+            net.nobu0707.busnav.ui.navigation.DeviationBanner(
+                net.nobu0707.busnav.ui.navigation.DeviationUiState("所定経路から外れている可能性があります", true))
+            MapScreen(location = net.nobu0707.busnav.location.LocationState(GeoPoint(35.18,136.90),5f,73f,0f,1L), isFollowingLocation = false, recenterRequestId = 0,
                 activeRoute = route, routeOverviewRequestId = 0, routePlan = plan,
                 basemapConfig = config.value, onMapReady = { ready = true },
                 onMapGesture = {}, onMapError = {})
+            }
         }
         rule.waitUntil(15_000) { ready }
         lateinit var nativeMap: MapLibreMap
@@ -51,17 +65,18 @@ class BasemapHotReloadTest {
         rule.runOnUiThread {
             originalView = requireNotNull(findMapView(rule.activity.window.decorView))
             originalView.getMapAsync { nativeMap = it; camera = it.cameraPosition.toString() }
-            config.value = BasemapConfig.fromBuildValue(targetUrl, true)
+            config.value = targetConfig
         }
         rule.waitUntil(30_000) {
             var complete = false
             rule.runOnUiThread {
                 val style = nativeMap.style
                 complete = style?.uri == targetUrl && style.isFullyLoaded &&
-                    style.getSource(RoutePlanOverlayController.POINT_SOURCE_ID) != null
+                    (style.getSource(RoutePlanOverlayController.POINT_SOURCE_ID) as? org.maplibre.android.style.sources.GeoJsonSource)?.querySourceFeatures(null)?.size == 4
             }
             complete
         }
+        rule.onNodeWithTag("deviation_banner").assertIsDisplayed()
         rule.runOnUiThread {
             assertSame(originalView, findMapView(rule.activity.window.decorView))
             val style = requireNotNull(nativeMap.style)
@@ -69,6 +84,16 @@ class BasemapHotReloadTest {
                 RoutePlanOverlayController.SHAPING_LAYER_ID, RoutePlanOverlayController.DESTINATION_LAYER_ID,
                 RouteOverlayController.LINE_LAYER_ID).forEach { assertNotNull(style.getLayer(it)) }
             assertNotNull(style.getSource(RouteOverlayController.GEOMETRY_SOURCE_ID))
+            val vehicle=style.getLayer(OverlayLayerOrder.VEHICLE) as org.maplibre.android.style.layers.SymbolLayer
+            assertEquals(2f,vehicle.iconSize.value!!,0f)
+            assertEquals(73f,vehicle.iconRotate.value!!,0f)
+            val vehicleSource=style.getSource("busnav-vehicle-source") as org.maplibre.android.style.sources.GeoJsonSource
+            val vehiclePoint=vehicleSource.querySourceFeatures(null).single().geometry() as org.maplibre.geojson.Point
+            assertEquals(35.18,vehiclePoint.latitude(),0.000001)
+            assertEquals(136.90,vehiclePoint.longitude(),0.000001)
+            val routeSource=style.getSource(RouteOverlayController.GEOMETRY_SOURCE_ID) as org.maplibre.android.style.sources.GeoJsonSource
+            val routeLine=routeSource.querySourceFeatures(null).single().geometry() as org.maplibre.geojson.LineString
+            assertEquals(route.geometry.points.size,routeLine.coordinates().size)
             assertEquals(camera, nativeMap.cameraPosition.toString())
         }
     }

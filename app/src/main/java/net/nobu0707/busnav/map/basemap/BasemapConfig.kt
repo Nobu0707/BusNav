@@ -19,6 +19,15 @@ data class BasemapConfig(
         }
     }
 
+    /** Known BusNav endpoints have sibling light styles; custom URLs remain untouched. */
+    fun withTheme(dark: Boolean): BasemapConfig {
+        val themed = styleUrl?.replace(
+            Regex("/styles/(busnav(?:-kanto|-chubu)?)(?:-light)?/style\\.json$"),
+        ) { match -> "/styles/" + match.groupValues[1] + (if (dark) "" else "-light") + "/style.json" }
+        return copy(styleUrl = themed, fallbackStyleUrl = if (dark) FALLBACK_STYLE_URL
+            else "asset://basemap/fallback-light-style.json")
+    }
+
     companion object {
         const val FALLBACK_STYLE_URL = "asset://basemap/fallback-style.json"
 

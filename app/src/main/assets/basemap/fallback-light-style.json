@@ -1,0 +1,14 @@
+{
+  "version": 8,
+  "name": "BusNav Light embedded fallback",
+  "sources": {},
+  "layers": [
+    {
+      "id": "busnav-fallback-background",
+      "type": "background",
+      "paint": {
+        "background-color": "#f4f6f3"
+      }
+    }
+  ]
+}

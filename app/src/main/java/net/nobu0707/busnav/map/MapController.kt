@@ -66,6 +66,20 @@ class MapController(
         diagnostics = mapDiagnostics,
         onStateChanged = onBasemapStateChanged,
     )
+    private val tunnelProvider: TunnelStateProvider = TransportationTunnelProvider { style }
+    private val tunnelHysteresis = TunnelHysteresis()
+    fun resetTunnel() = tunnelHysteresis.reset()
+    fun sampleTunnel(): Boolean {
+        val now = android.os.SystemClock.elapsedRealtime()
+        val location = latestLocation
+        val age = location?.elapsedRealtimeMillis?.let { now - it }
+        val observation = if (location != null && age != null && age in 0..10_000 &&
+            location.accuracyMeters?.let { it.isFinite() && it in 0f..30f } == true) {
+            tunnelProvider.observe(location.point)
+        } else TunnelObservation.UNKNOWN
+        return tunnelHysteresis.update(observation, now)
+    }
+
     private var readyDelivered = false
     private val styleLoadedListener = MapView.OnDidFinishLoadingStyleListener {
         map?.style?.let { loadedStyle ->
@@ -217,6 +231,7 @@ class MapController(
             loadedStyle.addLayer(
                 SymbolLayer(VEHICLE_LAYER_ID, VEHICLE_SOURCE_ID).withProperties(
                     iconImage(VEHICLE_ICON_ID),
+                    org.maplibre.android.style.layers.PropertyFactory.iconSize(2f),
                     iconAllowOverlap(true),
                     iconIgnorePlacement(true),
                     iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),

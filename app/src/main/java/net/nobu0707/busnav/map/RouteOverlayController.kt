@@ -88,7 +88,7 @@ internal class RouteOverlayController {
             style.addLayer(
                 LineLayer(CASING_LAYER_ID, GEOMETRY_SOURCE_ID).withProperties(
                     lineColor("#14252E"),
-                    lineWidth(9f),
+                    lineWidth(org.maplibre.android.style.expressions.Expression.raw("[\"interpolate\",[\"linear\"],[\"zoom\"],4,7,12,9,16,12,20,16,22,20]")),
                     lineOpacity(0.9f),
                     lineCap(Property.LINE_CAP_ROUND),
                     lineJoin(Property.LINE_JOIN_ROUND),
@@ -99,7 +99,7 @@ internal class RouteOverlayController {
             style.addLayer(
                 LineLayer(LINE_LAYER_ID, GEOMETRY_SOURCE_ID).withProperties(
                     lineColor("#5BD6FF"),
-                    lineWidth(5f),
+                    lineWidth(org.maplibre.android.style.expressions.Expression.raw("[\"interpolate\",[\"linear\"],[\"zoom\"],4,3,12,5,16,8,20,12,22,16]")),
                     lineCap(Property.LINE_CAP_ROUND),
                     lineJoin(Property.LINE_JOIN_ROUND),
                 ),

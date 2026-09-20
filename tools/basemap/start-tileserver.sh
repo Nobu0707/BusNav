@@ -18,5 +18,5 @@ fi
 
 python3 "$script_dir/prepare-regions.py" "$BUSNAV_BASEMAP_DATA_DIR"
 
-docker compose -f "$script_dir/docker-compose.yml" up -d
+docker compose -f "$script_dir/docker-compose.yml" up -d --force-recreate
 bash "$script_dir/check-tileserver.sh"

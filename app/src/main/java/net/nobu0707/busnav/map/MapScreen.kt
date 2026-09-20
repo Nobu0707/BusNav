@@ -54,6 +54,8 @@ fun MapScreen(
         styleUrl = BuildConfig.BASEMAP_STYLE_URL,
         isDebug = BuildConfig.DEBUG,
     ),
+    monitorTunnel: Boolean = false,
+    onTunnelChanged: (Boolean) -> Unit = {},
     onMapReady: () -> Unit,
     onMapGesture: () -> Unit,
     onMapError: (String) -> Unit,
@@ -87,6 +89,19 @@ fun MapScreen(
             mapDiagnostics = mapDiagnostics,
             onBasemapStateChanged = { basemapState = it },
         ).also { it.attach(mapView) }
+    }
+
+    val tunnelCallback by androidx.compose.runtime.rememberUpdatedState(onTunnelChanged)
+    androidx.compose.runtime.LaunchedEffect(controller, monitorTunnel) {
+        if (!monitorTunnel) {
+            controller.resetTunnel()
+            tunnelCallback(false)
+        } else {
+            while (true) {
+                tunnelCallback(controller.sampleTunnel())
+                kotlinx.coroutines.delay(1_000)
+            }
+        }
     }
 
     DisposableEffect(lifecycleOwner, mapView) {

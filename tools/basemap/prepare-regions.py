@@ -27,17 +27,18 @@ if __name__ == "__main__":
         validate(Path(sys.argv[2]))
     else:
         data = Path(sys.argv[1])
-        template = Path(__file__).parent / "style" / "busnav.json"
         output = data / "styles"
         output.mkdir(exist_ok=True)
         for region in ("kanto", "chubu"):
             validate(data / (region + ".mbtiles"))
-            style = json.loads(template.read_text())
-            style["name"] = "BusNav " + region.title()
-            style["sources"]["openmaptiles"]["url"] = "mbtiles://{" + region + "}"
-            if region == "kanto":
-                style["center"] = [139.75, 35.75]
-            text = json.dumps(style, ensure_ascii=False, indent=2) + "\n"
-            (output / ("busnav-" + region + ".json")).write_text(text, encoding="utf-8")
-            if region == "chubu":
-                (output / "busnav.json").write_text(text, encoding="utf-8")
+            for suffix in ("", "-light"):
+                template = Path(__file__).parent / "style" / ("busnav" + suffix + ".json")
+                style = json.loads(template.read_text(encoding="utf-8"))
+                style["name"] = "BusNav " + region.title() + (" Light" if suffix else " Dark")
+                style["sources"]["openmaptiles"]["url"] = "mbtiles://{" + region + "}"
+                if region == "kanto":
+                    style["center"] = [139.75, 35.75]
+                text = json.dumps(style, ensure_ascii=False, indent=2) + "\n"
+                (output / ("busnav-" + region + suffix + ".json")).write_text(text, encoding="utf-8")
+                if region == "chubu":
+                    (output / ("busnav" + suffix + ".json")).write_text(text, encoding="utf-8")

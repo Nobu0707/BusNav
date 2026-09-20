@@ -26,6 +26,21 @@
       "style": "busnav-chubu.json",
       "serve_rendered": false,
       "serve_data": true
+    },
+    "busnav-light": {
+      "style": "busnav-light.json",
+      "serve_rendered": false,
+      "serve_data": true
+    },
+    "busnav-kanto-light": {
+      "style": "busnav-kanto-light.json",
+      "serve_rendered": false,
+      "serve_data": true
+    },
+    "busnav-chubu-light": {
+      "style": "busnav-chubu-light.json",
+      "serve_rendered": false,
+      "serve_data": true
     }
   },
   "data": {

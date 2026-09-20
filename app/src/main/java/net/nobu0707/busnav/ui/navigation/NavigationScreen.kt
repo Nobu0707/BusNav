@@ -38,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -89,6 +90,7 @@ fun NavigationRoute(
     routeRepository: ScheduledRouteRepository,
     routingEngine: RoutingEngine,
     connectionRepository: DeveloperConnectionRepository? = null,
+    presentationClock: java.time.Clock? = null,
     basemapConfig: BasemapConfig = BasemapConfig.fromBuildValue(BuildConfig.BASEMAP_STYLE_URL, BuildConfig.DEBUG),
 ) {
     val context = LocalContext.current
@@ -152,89 +154,110 @@ fun NavigationRoute(
         screen = BusNavScreen.NAVIGATION
     }
 
-    when (screen) {
-        BusNavScreen.NAVIGATION -> NavigationScreen(
-            uiState = uiState,
-            hasRoutePlan = routePlanUiState.currentPlan.points.isNotEmpty(),
-            onLayoutModeChanged = stateHolder::setLayoutMode,
-            onRequestPermission = {
-                permissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION,
-                    ),
-                )
-            },
-            onCurrentLocation = stateHolder::onCurrentLocationRequested,
-            onRouteOverview = stateHolder::onRouteOverviewRequested,
-            onEditRoute = { screen = BusNavScreen.ROUTE_EDIT },
-            mapContent = { modifier ->
-                MapScreen(
-                    basemapConfig = basemapConfig,
-                    location = uiState.location,
-                    isFollowingLocation = uiState.isFollowingLocation,
-                    recenterRequestId = uiState.recenterRequestId,
-                    activeRoute = uiState.activeRoute,
-                    routeOverviewRequestId = uiState.routeOverviewRequestId,
-                    onMapReady = stateHolder::onMapReady,
-                    onMapGesture = stateHolder::onManualMapGesture,
-                    onMapError = stateHolder::onMapError,
-                    modifier = modifier,
-                )
-            },
-        )
-        BusNavScreen.ROUTE_EDIT -> RoutePlanEditorScreen(
-            uiState = routePlanUiState,
-            onOpenConnections = if (BuildConfig.DEBUG && connectionRepository != null) ({ showConnections = true }) else null,
-            onBack = {
-                calculationHolder.cancel()
-                screen = BusNavScreen.NAVIGATION
-            },
-            onSelectAddMode = routePlanHolder::selectAddMode,
-            onSelectPoint = routePlanHolder::selectPoint,
-            onRemovePoint = routePlanHolder::removePoint,
-            onMovePoint = routePlanHolder::movePoint,
-            onTogglePointType = routePlanHolder::toggleIntermediateType,
-            onPlanOverview = routePlanHolder::requestPlanOverview,
-            onComplete = {
-                calculationHolder.cancel()
-                routePlanHolder.completeEditing()
-                screen = BusNavScreen.NAVIGATION
-            },
-            calculationState = calculationState,
-            onCalculate = {
-                calculationHolder.calculate(routePlanUiState.currentPlan, routePlanUiState.revision)
-            },
-            onApplyCalculatedRoute = {
-                calculationHolder.currentCandidate(routePlanUiState.revision)?.let { route ->
-                    stateHolder.applyCalculatedRoute(route)
+    // Guidance starts when an applicable route is adopted; viewing/editing a plan is inactive.
+    val navigationActive = screen == BusNavScreen.NAVIGATION && !showConnections &&
+        !uiState.activeRoute?.guidance?.maneuvers.isNullOrEmpty()
+    val isNight = net.nobu0707.busnav.ui.theme.rememberIsNight(uiState.location?.point, presentationClock)
+    var isTunnel by remember { mutableStateOf(false) }
+    LaunchedEffect(navigationActive) { if (!navigationActive) isTunnel = false }
+    val dark = uiState.location != null && net.nobu0707.busnav.ui.theme.ThemeModeResolver.isDark(
+        navigationActive, isNight, isTunnel,
+    )
+    SideEffect {
+        (context as? android.app.Activity)?.window?.let { window ->
+            androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+                isAppearanceLightStatusBars = !dark
+                isAppearanceLightNavigationBars = !dark
+            }
+        }
+    }
+    BusNavTheme(darkTheme = dark) {
+        when (screen) {
+            BusNavScreen.NAVIGATION -> NavigationScreen(
+                uiState = uiState,
+                hasRoutePlan = routePlanUiState.currentPlan.points.isNotEmpty(),
+                onLayoutModeChanged = stateHolder::setLayoutMode,
+                onRequestPermission = {
+                    permissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                        ),
+                    )
+                },
+                onCurrentLocation = stateHolder::onCurrentLocationRequested,
+                onRouteOverview = stateHolder::onRouteOverviewRequested,
+                onEditRoute = { screen = BusNavScreen.ROUTE_EDIT },
+                mapContent = { modifier ->
+                    MapScreen(
+                        basemapConfig = basemapConfig.withTheme(dark),
+                        location = uiState.location,
+                        monitorTunnel = navigationActive,
+                        onTunnelChanged = { isTunnel = it },
+                        isFollowingLocation = uiState.isFollowingLocation,
+                        recenterRequestId = uiState.recenterRequestId,
+                        activeRoute = uiState.activeRoute,
+                        routeOverviewRequestId = uiState.routeOverviewRequestId,
+                        onMapReady = stateHolder::onMapReady,
+                        onMapGesture = stateHolder::onManualMapGesture,
+                        onMapError = stateHolder::onMapError,
+                        modifier = modifier,
+                    )
+                },
+            )
+            BusNavScreen.ROUTE_EDIT -> RoutePlanEditorScreen(
+                uiState = routePlanUiState,
+                onOpenConnections = if (BuildConfig.DEBUG && connectionRepository != null) ({ showConnections = true }) else null,
+                onBack = {
+                    calculationHolder.cancel()
+                    screen = BusNavScreen.NAVIGATION
+                },
+                onSelectAddMode = routePlanHolder::selectAddMode,
+                onSelectPoint = routePlanHolder::selectPoint,
+                onRemovePoint = routePlanHolder::removePoint,
+                onMovePoint = routePlanHolder::movePoint,
+                onTogglePointType = routePlanHolder::toggleIntermediateType,
+                onPlanOverview = routePlanHolder::requestPlanOverview,
+                onComplete = {
+                    calculationHolder.cancel()
                     routePlanHolder.completeEditing()
                     screen = BusNavScreen.NAVIGATION
-                }
-            },
-            mapContent = { modifier ->
-                MapScreen(
-                    basemapConfig = basemapConfig,
-                    location = uiState.location,
-                    isFollowingLocation = false,
-                    recenterRequestId = 0,
-                    activeRoute = candidateRoute ?: uiState.activeRoute,
-                    routeOverviewRequestId = if (candidateRoute == null) 0 else 1,
-                    routePlan = routePlanUiState.currentPlan.takeIf { candidateRoute == null },
-                    planOverviewRequestId = routePlanUiState.planOverviewRequestId,
-                    onMapLongPress = routePlanHolder::addPoint,
-                    onMapReady = stateHolder::onMapReady,
-                    onMapGesture = {},
-                    onMapError = stateHolder::onMapError,
-                    modifier = modifier,
-                )
-            },
-        )
-    }
-    if (BuildConfig.DEBUG && showConnections && connectionRepository != null) {
-        Dialog(onDismissRequest = { showConnections = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false)) {
-            DeveloperConnectionScreen(connectionRepository, onBack = { showConnections = false })
+                },
+                calculationState = calculationState,
+                onCalculate = {
+                    calculationHolder.calculate(routePlanUiState.currentPlan, routePlanUiState.revision)
+                },
+                onApplyCalculatedRoute = {
+                    calculationHolder.currentCandidate(routePlanUiState.revision)?.let { route ->
+                        stateHolder.applyCalculatedRoute(route)
+                        routePlanHolder.completeEditing()
+                        screen = BusNavScreen.NAVIGATION
+                    }
+                },
+                mapContent = { modifier ->
+                    MapScreen(
+                        basemapConfig = basemapConfig.withTheme(dark),
+                        location = uiState.location,
+                        isFollowingLocation = false,
+                        recenterRequestId = 0,
+                        activeRoute = candidateRoute ?: uiState.activeRoute,
+                        routeOverviewRequestId = if (candidateRoute == null) 0 else 1,
+                        routePlan = routePlanUiState.currentPlan.takeIf { candidateRoute == null },
+                        planOverviewRequestId = routePlanUiState.planOverviewRequestId,
+                        onMapLongPress = routePlanHolder::addPoint,
+                        onMapReady = stateHolder::onMapReady,
+                        onMapGesture = {},
+                        onMapError = stateHolder::onMapError,
+                        modifier = modifier,
+                    )
+                },
+            )
+        }
+        if (BuildConfig.DEBUG && showConnections && connectionRepository != null) {
+            Dialog(onDismissRequest = { showConnections = false },
+                properties = DialogProperties(usePlatformDefaultWidth = false)) {
+                DeveloperConnectionScreen(connectionRepository, onBack = { showConnections = false })
+            }
         }
     }
 }
@@ -454,60 +477,41 @@ private fun PlaceholderPanel(title: String, detail: String, modifier: Modifier =
 }
 
 @Composable
-private fun AuxiliaryControls(
+internal fun AuxiliaryControls(
     onEditRoute: () -> Unit,
     modifier: Modifier = Modifier,
     vertical: Boolean = false,
 ) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    ) {
+    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         if (vertical) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(8.dp),
-                verticalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                RouteEditControl(onEditRoute)
-                FutureControl("迂回")
-                FutureControl("規制")
-                FutureControl("音声")
-                FutureControl("表示")
+            Column(Modifier.fillMaxSize().padding(4.dp), verticalArrangement = Arrangement.SpaceEvenly) {
+                BottomControl("ルート", true, onEditRoute, Modifier.fillMaxWidth())
+                BottomLabelLayout.secondaryLabels.forEach { BottomControl(it, false, {}, Modifier.fillMaxWidth()) }
             }
         } else {
-            Row(
-                modifier = Modifier.fillMaxSize().padding(8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RouteEditControl(onEditRoute)
-                FutureControl("迂回")
-                FutureControl("規制")
-                FutureControl("音声")
-                FutureControl("表示")
+            Row(Modifier.fillMaxSize().padding(4.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                BottomControl("ルート", true, onEditRoute, Modifier.weight(1.5f))
+                BottomLabelLayout.secondaryLabels.forEach { BottomControl(it, false, {}, Modifier.weight(1f)) }
             }
         }
     }
 }
 
 @Composable
-private fun RouteEditControl(onEditRoute: () -> Unit) {
+private fun BottomControl(label: String, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
     OutlinedButton(
-        onClick = onEditRoute,
-        modifier = Modifier
-            .width(88.dp)
-            .testTag(NavigationTestTags.ROUTE_EDIT)
-            .semantics { contentDescription = "ルート編集画面を開く" },
-    ) { Text("ルート編集") }
-}
-
-@Composable
-private fun FutureControl(label: String) {
-    OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.width(72.dp)) {
-        Text(label)
+        onClick = onClick, enabled = enabled,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 2.dp, vertical = 8.dp),
+        modifier = modifier.heightIn(min = 48.dp)
+            .testTag(if (enabled) NavigationTestTags.ROUTE_EDIT else "bottom_$label")
+            .semantics { if (enabled) contentDescription = "ルート編集画面を開く" },
+    ) {
+        Text(label, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            maxLines = BottomLabelLayout.maxLines, softWrap = false,
+            style = MaterialTheme.typography.labelMedium)
     }
 }
-
 private fun locationSummary(state: NavigationUiState): String = when {
     state.location != null && state.isFollowingLocation -> "現在地を追従中"
     state.location != null -> "地図操作により追従を一時停止"
