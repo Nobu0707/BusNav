@@ -69,10 +69,10 @@ highway calculator / formatter / UIからRoutingEngineへの呼出しはない�
 | lint | PASS |
 | assembleDebug / assembleRelease | PASS / PASS |
 | assembleDebugAndroidTest | PASS |
-| emulator | Android16。高速カード4件と実route smoke成功、最終全suite receiptはarchive checks参照 |
+| emulator connectedDebugAndroidTest | Android16、32件、failure/error/skip 0、PASS。highway UI/live smoke含む |
 | physical | Windows adb.exeでstate=device確認。SOG06 / Android14 |
 | physical full instrumentation | 32件、failure/error/skip 0。LAN経由のValhalla・basemapを使用 |
-| physical connectedDebugAndroidTest | 最終確認中 |
+| physical connectedDebugAndroidTest | SOG06のみ明示選択、32件、failure/error/skip 0、PASS |
 | live Valhalla | version 3.9.0-a3a5631c4。高速route計算、apply、sign、geometry index、current/next、再計算成功 |
 | basemap regression | style/vector tile/日本語glyph、hot reload、overlay成功 |
 | Developer Connections | 縦横保存/reset/接続結果、DataStore再生成によるpersist成功 |
@@ -81,7 +81,7 @@ unit新規29件の内訳: highway domain22、formatter5、state holder1、既存
 
 手動smoke相当のUI操作をandroidTestで実行: START/DESTを開発用固定地点へ配置→実探索→候補apply→模擬位置→高速案内／sign→Activity再生成→横画面→accuracy悪化／off-route抑制→通過→再計算。全thresholdはpure境界テストで保証。実GPS走行はしていない。大きいrouteの表示を分岐へ拡大するQA操作はtest内のMapLibre camera操作で補助。
 
-エミュレータと実機は明示的に対象選択。ANDROID_SERIALは実行後に解除。端末識別子・MAC・実GPS履歴は本書にもarchiveにも記録しない。Gradle connected test後はAPKと実機の元のLAN接続設定を復元する。LAN設定は既存Developer Connections画面経由、production codeにIP追加なし。server bind / firewall / .env変更なし。
+エミュレータと実機は明示的に対象選択。ANDROID_SERIALは実行後に解除。端末識別子・MAC・実GPS履歴は本書にもarchiveにも記録しない。Gradle connected test後にAPKと実機の元のLAN接続設定を復元済み。LAN設定は既存Developer Connections画面経由、production codeにIP追加なし。server bind / firewall / .env変更なし。
 
 Local assumptionsはアプリのDeveloper Connections保存値を読む。サーバー停止時はJUnit assumption SKIP、接続可能時のプロトコルエラーやUI不具合はFAIL。未実行を成功扱いしない。
 
@@ -91,8 +91,10 @@ simple projectionは高架・並行道路の誤対応を完全には判別でき
 
 ## Commits / archives
 
-実装は `feat: add highway junction guidance`、検証確定は後続docs commit。正確な最終HEADとcommit列はarchiveのmetaに記録する。BASE_SHAは上記の開始時HEADを固定して使う。
+実装commit: `3af11d4c30a0d25262a1a09b95187e5de5513fc0` (`feat: add highway junction guidance`)。検証確定は後続の `docs: finalize phase 006 verification` commit。正確な最終HEADとcommit列はarchiveのmetaに記録する。BASE_SHAは上記の開始時HEADを固定して使う。
 
 最終HEADに `scripts/run-review-checks.ps1 -BaseRef <BASE_SHA>` を実行後、`make-review-archive.ps1` と `make-full-review-archive.ps1` を同じBaseRefで実行する。配布先はrepo rootの `busnav-review-latest.zip` / `busnav-full-review-latest.zip`。local.properties、.env、PBF/MBTiles/PMTiles、APK/build/logcat、GPS履歴、端末識別子、秘密情報を除外し、slash entriesとHEAD/BaseRef整合をself-checkする。
 
-最終状態: 検証・archive作成中。
+標準review checksは全項目PASS。差分archiveと全体archiveの作成・self-checkもPASS（backslash/prohibited entries 0）。検証確定docs commit後に同じchecksとarchive生成を再実行し、最終HEADのreceiptを配布zipに含める。
+
+最終状態: Phase006 COMPLETE。実機・エミュレータともサーバーONで全suite実行済み。手動相当操作は自動化smokeとスクリーンショット目視で確認、実走行・車線案内・Map Matchingは本phaseの対象外。
