@@ -19,10 +19,17 @@ import org.maplibre.android.maps.MapLibreMap
 
 class BasemapHotReloadTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
-    @Test fun fallbackToDetailedStyleKeepsRouteAllPointTypesAndCamera() {
+    @Test fun fallbackToDetailedStyleKeepsRouteAllPointTypesAndCamera() { exercise(null) }
+    @Test fun kantoToChubuKeepsRouteAllPointTypesAndCamera() { exercise(BasemapRegion.KANTO) }
+    @Test fun chubuToKantoKeepsRouteAllPointTypesAndCamera() { exercise(BasemapRegion.CHUBU) }
+
+    private fun exercise(from: BasemapRegion?) {
         LocalBasemapAssumptions.assumeAvailable()
         rule.runOnUiThread { MapLibre.getInstance(rule.activity) }
-        val config = mutableStateOf(BasemapConfig(null, BasemapMode.FALLBACK))
+        val target = if (from == BasemapRegion.KANTO) BasemapRegion.CHUBU else BasemapRegion.KANTO
+        val targetUrl = BasemapConfig.forRegion(LocalBasemapAssumptions.BASE_URL, target, true).styleUrl!!
+        val config = mutableStateOf(if (from == null) BasemapConfig(null, BasemapMode.FALLBACK)
+            else BasemapConfig.forRegion(LocalBasemapAssumptions.BASE_URL, from, true))
         val route = createDevelopmentSampleRoute()
         val plan = RoutePlan("reload", points = listOf(
             RoutePlanPoint("start", RoutePlanPointType.START, GeoPoint(35.18, 136.90)),
@@ -44,13 +51,13 @@ class BasemapHotReloadTest {
         rule.runOnUiThread {
             originalView = requireNotNull(findMapView(rule.activity.window.decorView))
             originalView.getMapAsync { nativeMap = it; camera = it.cameraPosition.toString() }
-            config.value = BasemapConfig.fromBuildValue(LocalBasemapAssumptions.STYLE_URL, true)
+            config.value = BasemapConfig.fromBuildValue(targetUrl, true)
         }
         rule.waitUntil(30_000) {
             var complete = false
             rule.runOnUiThread {
                 val style = nativeMap.style
-                complete = style?.uri == LocalBasemapAssumptions.STYLE_URL && style.isFullyLoaded &&
+                complete = style?.uri == targetUrl && style.isFullyLoaded &&
                     style.getSource(RoutePlanOverlayController.POINT_SOURCE_ID) != null
             }
             complete

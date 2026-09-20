@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import net.nobu0707.busnav.BuildConfig
 import net.nobu0707.busnav.developer.*
+import net.nobu0707.busnav.map.basemap.BasemapRegion
 
 @Composable
 fun DeveloperConnectionScreen(
@@ -28,6 +29,7 @@ fun DeveloperConnectionScreen(
     val check = checkConnection ?: checker::check
     var valhalla by rememberSaveable { mutableStateOf("") }
     var basemap by rememberSaveable { mutableStateOf("") }
+    var region by rememberSaveable { mutableStateOf(BasemapRegion.KANTO) }
     var loaded by rememberSaveable { mutableStateOf(false) }
     var attempted by rememberSaveable { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -45,6 +47,7 @@ fun DeveloperConnectionScreen(
                 val settings = repository.settings.first()
                 valhalla = settings.valhallaBaseUrl
                 basemap = settings.basemapBaseUrl
+                region = settings.basemapRegion
                 loaded = true
             } catch (e: CancellationException) { throw e
             } catch (_: Exception) { snackbar.showSnackbar("設定を読み込めませんでした。画面を開き直してください") }
@@ -79,10 +82,24 @@ fun DeveloperConnectionScreen(
                 enabled = loaded && !busy && !basemapChecking, isError = basemapError != null,
                 supportingText = { basemapError?.let { Text(it) } },
                 modifier = Modifier.fillMaxWidth().testTag("basemap_url"))
+            Text("地図地域 / Basemap region")
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                BasemapRegion.entries.forEach { choice ->
+                    FilterChip(selected = region == choice,
+                        onClick = { region = choice; basemapStatus = null },
+                        enabled = loaded && !busy && !basemapChecking,
+                        label = { Text(choice.label) },
+                        modifier = Modifier.testTag("basemap_region_" + choice.id))
+                }
+            }
             OutlinedButton(onClick = {
                 basemapChecking = true
                 scope.launch {
-                    try { basemapStatus = check(basemap, ConnectionService.BASEMAP).message() }
+                    try {
+                        val service = if (region == BasemapRegion.KANTO) ConnectionService.KANTO else ConnectionService.CHUBU
+                        val result = check(basemap, service)
+                        basemapStatus = result.message() + if (result.httpCode == 404) "：選択した地域の地図データがありません" else ""
+                    }
                     finally { basemapChecking = false }
                 }
             }, enabled = loaded && !busy && !basemapChecking, modifier = Modifier.testTag("basemap_check")) {
@@ -95,7 +112,7 @@ fun DeveloperConnectionScreen(
                     busy = true
                     scope.launch {
                         try {
-                            val valid = DeveloperConnectionSettings(valhalla, basemap).normalized()
+                            val valid = DeveloperConnectionSettings(valhalla, basemap, region).normalized()
                             repository.update(valid)
                             valhalla = valid.valhallaBaseUrl; basemap = valid.basemapBaseUrl
                             snackbar.showSnackbar("保存しました")
@@ -112,6 +129,7 @@ fun DeveloperConnectionScreen(
                         repository.reset()
                         val defaults = repository.settings.first()
                         valhalla = defaults.valhallaBaseUrl; basemap = defaults.basemapBaseUrl
+                        region = defaults.basemapRegion
                         attempted = false; valhallaStatus = null; basemapStatus = null
                         snackbar.showSnackbar("デフォルトに戻しました")
                     } catch (e: CancellationException) { throw e

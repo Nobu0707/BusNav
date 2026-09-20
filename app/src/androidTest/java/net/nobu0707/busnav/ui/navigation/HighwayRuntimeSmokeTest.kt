@@ -37,7 +37,10 @@ import java.io.File
 /** Developer-selected route and injected positions only; never reads or records a real GPS track. */
 class HighwayRuntimeSmokeTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
-    @Test fun highwayCalculateApplySignsRolloverRecreationAndRecalculate() {
+    @Test fun highwayCalculateApplySignsRolloverRecreationAndRecalculate() { exercise(false) }
+    @Test fun kantoHighwayGuidanceAndRecreation() { exercise(true) }
+
+    private fun exercise(kanto: Boolean) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val arguments = InstrumentationRegistry.getArguments()
         val connectionRepository = createConnectionRepository(instrumentation.targetContext)
@@ -52,6 +55,11 @@ class HighwayRuntimeSmokeTest {
             rule.onNodeWithTag("connections_save").performScrollTo().performClick()
             rule.waitUntil(5000) { runBlocking { connectionRepository.settings.first().valhallaBaseUrl == valhallaOverride } }
             assertEquals(basemapOverride, runBlocking { connectionRepository.settings.first().basemapBaseUrl })
+        }
+        runBlocking {
+            connectionRepository.update(connectionRepository.settings.first().copy(
+                basemapRegion = if (kanto) net.nobu0707.busnav.map.basemap.BasemapRegion.KANTO
+                    else net.nobu0707.busnav.map.basemap.BasemapRegion.CHUBU))
         }
         LocalValhallaAssumptions.assumeAvailable()
         LocalBasemapAssumptions.assumeAvailable()
@@ -106,18 +114,18 @@ class HighwayRuntimeSmokeTest {
             instrumentation.waitForIdleSync()
             Thread.sleep(1000)
             val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: return
-            val file = File(instrumentation.targetContext.getExternalFilesDir(null), "highway-$name.png")
+            val file = File(instrumentation.targetContext.getExternalFilesDir(null), "highway-${if (kanto) "kanto-" else ""}$name.png")
             file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()
             // Keep only developer-generated smoke images outside app storage so test uninstall cannot erase QA evidence.
-            instrumentation.uiAutomation.executeShellCommand("cp ${file.absolutePath} /sdcard/Download/busnav-highway-$name.png").close()
+            instrumentation.uiAutomation.executeShellCommand("cp ${file.absolutePath} /sdcard/Download/busnav-highway-${if (kanto) "kanto-" else ""}$name.png").close()
         }
         rule.runOnUiThread { content() }
         rule.onNodeWithContentDescription("ルート編集画面を開く").performClick()
         rule.runOnUiThread {
             val editor = ViewModelProvider(rule.activity)[RoutePlanEditorViewModel::class.java].stateHolder
-            editor.selectAddMode(RoutePlanPointType.START); editor.addPoint(GeoPoint(35.161, 136.882))
-            editor.selectAddMode(RoutePlanPointType.DESTINATION); editor.addPoint(GeoPoint(35.171, 138.675))
+            editor.selectAddMode(RoutePlanPointType.START); editor.addPoint(if (kanto) GeoPoint(35.6812, 139.7671) else GeoPoint(35.161, 136.882))
+            editor.selectAddMode(RoutePlanPointType.DESTINATION); editor.addPoint(if (kanto) GeoPoint(35.9062, 139.6237) else GeoPoint(35.171, 138.675))
         }
         rule.onNodeWithTag(RoutePlanEditorTestTags.CALCULATE).performClick()
         rule.waitUntil(120000) { rule.onAllNodesWithTag(RoutePlanEditorTestTags.APPLY).fetchSemanticsNodes().isNotEmpty() }

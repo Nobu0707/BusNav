@@ -3,19 +3,25 @@ package net.nobu0707.busnav.developer
 import java.net.URI
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import net.nobu0707.busnav.map.basemap.BasemapConfig
+import net.nobu0707.busnav.map.basemap.BasemapRegion
 
-data class DeveloperConnectionSettings(val valhallaBaseUrl: String, val basemapBaseUrl: String) {
+data class DeveloperConnectionSettings(
+    val valhallaBaseUrl: String,
+    val basemapBaseUrl: String,
+    val basemapRegion: BasemapRegion = BasemapRegion.KANTO,
+) {
     fun normalized() = DeveloperConnectionSettings(
-        normalizeBaseUrl(valhallaBaseUrl), normalizeBaseUrl(basemapBaseUrl),
+        normalizeBaseUrl(valhallaBaseUrl), normalizeBaseUrl(basemapBaseUrl), basemapRegion,
     )
-    fun basemapConfig(isDebug: Boolean) = BasemapConfig.fromBuildValue(
-        if (basemapBaseUrl.isBlank()) "" else basemapBaseUrl + STYLE_PATH, isDebug,
-    )
+    fun basemapConfig(isDebug: Boolean) = BasemapConfig.forRegion(basemapBaseUrl, basemapRegion, isDebug)
     companion object {
         const val STYLE_PATH = "/styles/busnav/style.json"
-        fun defaults(valhallaUrl: String, styleUrl: String) = DeveloperConnectionSettings(
-            valhallaUrl, styleUrl.removeSuffix(STYLE_PATH).trimEnd('/'),
-        )
+        fun defaults(valhallaUrl: String, styleUrl: String): DeveloperConnectionSettings {
+            val region = BasemapRegion.entries.firstOrNull { styleUrl.endsWith(BasemapConfig.regionStylePath(it)) }
+                ?: BasemapRegion.KANTO
+            val baseUrl = styleUrl.removeSuffix(BasemapConfig.regionStylePath(region)).removeSuffix(STYLE_PATH).trimEnd('/')
+            return DeveloperConnectionSettings(valhallaUrl, baseUrl, region)
+        }
     }
 }
 

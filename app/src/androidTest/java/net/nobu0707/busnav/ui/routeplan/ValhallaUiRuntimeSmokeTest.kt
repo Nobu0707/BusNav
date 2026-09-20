@@ -44,7 +44,9 @@ class ValhallaUiRuntimeSmokeTest {
         val repository = InMemoryScheduledRouteRepository()
         val engine = ValhallaRoutingEngine(RoutingConfig(LocalValhallaAssumptions.BASE_URL))
         composeRule.setContent {
-            BusNavTheme { NavigationRoute(provider, repository, engine) }
+            BusNavTheme { NavigationRoute(provider, repository, engine,
+                basemapConfig = net.nobu0707.busnav.map.basemap.BasemapConfig.fromBuildValue(
+                    net.nobu0707.busnav.test.LocalBasemapAssumptions.STYLE_URL, true)) }
         }
         composeRule.runOnUiThread {
             planHolder = ViewModelProvider(composeRule.activity)[RoutePlanEditorViewModel::class.java]
@@ -72,6 +74,65 @@ class ValhallaUiRuntimeSmokeTest {
         val longDistance = calculateAndAssert(LONG_ROUTE)
 
         assertTrue("short route should be shorter than long route", shortDistance < longDistance)
+    }
+
+    @Test
+    fun kantoLocalSaitamaAndCrossRegionCandidates() {
+        setEndpointsOnMap(GeoPoint(35.6812, 139.7671), GeoPoint(35.7138, 139.7773))
+        calculateAndAssert(RouteExpectation("Tokyo local", 1.0, 30.0))
+        setEndpoints(GeoPoint(35.8617, 139.6455), GeoPoint(35.9062, 139.6237))
+        calculateAndAssert(RouteExpectation("Saitama local", 1.0, 30.0))
+        setEndpoints(GeoPoint(35.6812, 139.7671), GeoPoint(35.9062, 139.6237))
+        calculateAndAssert(RouteExpectation("Tokyo-Saitama", 20.0, 100.0))
+        setEndpoints(GeoPoint(35.6812, 139.7671), GeoPoint(34.9717, 138.3888))
+        calculateAndAssert(RouteExpectation("Kanto-Chubu", 100.0, 300.0))
+    }
+
+    private fun setEndpointsOnMap(start: GeoPoint, destination: GeoPoint) {
+        net.nobu0707.busnav.test.LocalBasemapAssumptions.assumeAvailable()
+        fun find(view: android.view.View): org.maplibre.android.maps.MapView? {
+            if (view is org.maplibre.android.maps.MapView) return view
+            if (view is android.view.ViewGroup) for (i in 0 until view.childCount) find(view.getChildAt(i))?.let { return it }
+            return null
+        }
+        lateinit var nativeMap: org.maplibre.android.maps.MapLibreMap
+        composeRule.waitUntil(30_000) {
+            var loaded = false
+            composeRule.runOnUiThread {
+                find(composeRule.activity.window.decorView)?.getMapAsync { nativeMap = it; loaded = it.style?.isFullyLoaded == true }
+            }
+            loaded
+        }
+        for ((type, point) in listOf(RoutePlanPointType.START to start, RoutePlanPointType.DESTINATION to destination)) {
+            composeRule.runOnUiThread {
+                planHolder.selectAddMode(type)
+                nativeMap.moveCamera(org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(
+                    org.maplibre.android.geometry.LatLng(point.latitude, point.longitude), 16.0))
+            }
+            composeRule.waitForIdle()
+            val screen = IntArray(2)
+            var x = 0f
+            var y = 0f
+            composeRule.runOnUiThread {
+                val view = requireNotNull(find(composeRule.activity.window.decorView))
+                view.getLocationOnScreen(screen)
+                x = screen[0] + view.width / 2f
+                y = screen[1] + view.height / 2f
+            }
+            // MapLibre uses a native wall-clock GestureDetector, not Compose's virtual event clock.
+            val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+            val down = android.os.SystemClock.uptimeMillis()
+            fun touch(action: Int) {
+                val event = android.view.MotionEvent.obtain(down, android.os.SystemClock.uptimeMillis(), action, x, y, 0)
+                instrumentation.sendPointerSync(event)
+                event.recycle()
+            }
+            touch(android.view.MotionEvent.ACTION_DOWN)
+            android.os.SystemClock.sleep(800)
+            touch(android.view.MotionEvent.ACTION_UP)
+            composeRule.waitForIdle()
+        }
+        composeRule.onNodeWithText("出発地・到着地を設定済み").assertIsDisplayed()
     }
 
     private fun setEndpoints(start: GeoPoint, destination: GeoPoint) {

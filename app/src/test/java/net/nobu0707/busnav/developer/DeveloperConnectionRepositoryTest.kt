@@ -4,6 +4,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import net.nobu0707.busnav.BuildConfig
+import net.nobu0707.busnav.map.basemap.BasemapRegion
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -20,10 +21,10 @@ class DeveloperConnectionRepositoryTest {
         var repository = repo()
         try {
             assertEquals(defaults, repository.settings.first())
-            repository.update(DeveloperConnectionSettings(" http://192.168.1.100:8002/ ", "https://dev.example.com/"))
-            val saved = DeveloperConnectionSettings("http://192.168.1.100:8002", "https://dev.example.com")
+            repository.update(DeveloperConnectionSettings(" http://192.168.1.100:8002/ ", "https://dev.example.com/", BasemapRegion.CHUBU))
+            val saved = DeveloperConnectionSettings("http://192.168.1.100:8002", "https://dev.example.com", BasemapRegion.CHUBU)
             assertEquals(saved, repository.settings.first())
-            assertEquals("https://dev.example.com/styles/busnav/style.json", saved.basemapConfig(true).styleUrl)
+            assertEquals("https://dev.example.com/styles/busnav-chubu/style.json", saved.basemapConfig(true).styleUrl)
             job.cancelAndJoin()
             job = SupervisorJob()
             repository = repo()

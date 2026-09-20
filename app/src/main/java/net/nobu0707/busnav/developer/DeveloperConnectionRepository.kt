@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import net.nobu0707.busnav.map.basemap.BasemapRegion
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -22,16 +23,18 @@ class DataStoreDeveloperConnectionRepository(
         DeveloperConnectionSettings(
             prefs[VALHALLA]?.let { runCatching { normalizeBaseUrl(it) }.getOrNull() } ?: defaults.valhallaBaseUrl,
             prefs[BASEMAP]?.let { runCatching { normalizeBaseUrl(it) }.getOrNull() } ?: defaults.basemapBaseUrl,
+            prefs[REGION]?.let(BasemapRegion::fromId) ?: defaults.basemapRegion,
         )
     }
     override suspend fun update(settings: DeveloperConnectionSettings) {
         val valid = settings.normalized()
-        store.edit { it[VALHALLA] = valid.valhallaBaseUrl; it[BASEMAP] = valid.basemapBaseUrl }
+        store.edit { it[VALHALLA] = valid.valhallaBaseUrl; it[BASEMAP] = valid.basemapBaseUrl; it[REGION] = valid.basemapRegion.id }
     }
-    override suspend fun reset() { store.edit { it.remove(VALHALLA); it.remove(BASEMAP) } }
+    override suspend fun reset() { store.edit { it.remove(VALHALLA); it.remove(BASEMAP); it.remove(REGION) } }
     private companion object {
         val VALHALLA = stringPreferencesKey("valhallaBaseUrl")
         val BASEMAP = stringPreferencesKey("basemapBaseUrl")
+        val REGION = stringPreferencesKey("basemapRegion")
     }
 }
 

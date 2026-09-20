@@ -39,6 +39,8 @@ class DeveloperConnectionScreenTest {
             }
         }
         rule.waitUntil(5_000) { rule.onAllNodes(hasText(defaults.valhallaBaseUrl)).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("basemap_region_kanto").performScrollTo().assertIsSelected()
+        rule.onNodeWithTag("basemap_region_chubu").performClick().assertIsSelected()
         rule.onNodeWithTag("valhalla_url").performScrollTo().performTextReplacement("host:8002")
         rule.onNodeWithTag("valhalla_url").assertTextContains("host:8002")
         closeSoftKeyboard()
@@ -54,12 +56,14 @@ class DeveloperConnectionScreenTest {
         rule.onNodeWithTag("connections_save").performScrollTo().performClick()
         rule.waitUntil(5_000) { repository.settings.value.valhallaBaseUrl == "http://192.168.1.100:8002" }
         rule.waitUntil(10_000) { rule.onAllNodes(hasTestTag("connections_save") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        rule.runOnIdle { assertEquals(net.nobu0707.busnav.map.basemap.BasemapRegion.CHUBU, repository.settings.value.basemapRegion) }
         rule.onNodeWithTag("valhalla_check").performScrollTo().performClick()
         rule.onNodeWithTag("valhalla_status").performScrollTo().assertTextEquals("接続成功")
         rule.onNodeWithTag("basemap_check").performScrollTo().performClick()
-        rule.onNodeWithTag("basemap_status").performScrollTo().assertTextEquals("HTTPエラー (404)")
+        rule.onNodeWithTag("basemap_status").performScrollTo().assertTextEquals("HTTPエラー (404)：選択した地域の地図データがありません")
         rule.onNodeWithTag("connections_reset").performScrollTo().performClick()
         rule.waitUntil(5_000) { repository.settings.value == defaults }
+        rule.onNodeWithTag("basemap_region_kanto").performScrollTo().assertIsSelected()
         rule.onNodeWithTag("valhalla_url").performScrollTo().assertTextContains(defaults.valhallaBaseUrl)
     }
 }

@@ -33,7 +33,11 @@ class BasemapRuntimeSmokeTest {
         }
         val client = LocalBasemapAssumptions.client()
 
-        assertResource(client, "/styles/busnav/style.json", minimumBytes = 1_000)
+        for (region in listOf("kanto", "chubu")) {
+            assertResource(client, "/styles/busnav-$region/style.json", minimumBytes = 1_000)
+            assertResource(client, "/data/$region.json", minimumBytes = 100)
+        }
+        assertResource(client, "/data/kanto/10/909/403.pbf", minimumBytes = 100)
         assertResource(client, "/data/chubu/10/906/404.pbf", minimumBytes = 100)
         assertResource(
             client,

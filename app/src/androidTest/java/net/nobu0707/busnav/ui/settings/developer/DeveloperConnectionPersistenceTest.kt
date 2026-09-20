@@ -17,7 +17,7 @@ class DeveloperConnectionPersistenceTest {
         fun repo() = DataStoreDeveloperConnectionRepository(PreferenceDataStoreFactory.create(
             scope = CoroutineScope(Dispatchers.IO + job), produceFile = { file }), defaults)
         var repository = repo()
-        val lan = DeveloperConnectionSettings("http://192.168.1.100:8002", "http://192.168.1.100:8080")
+        val lan = DeveloperConnectionSettings("http://192.168.1.100:8002", "http://192.168.1.100:8080", net.nobu0707.busnav.map.basemap.BasemapRegion.CHUBU)
         try {
             repository.update(lan)
             job.cancelAndJoin(); job = SupervisorJob(); repository = repo()

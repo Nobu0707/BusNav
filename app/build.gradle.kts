@@ -27,10 +27,12 @@ android {
         debug {
             val debugUrl = valhallaBaseUrl.orElse("http://10.0.2.2:8002").get()
             val debugBasemapUrl = basemapStyleUrl
-                .orElse("http://10.0.2.2:8080/styles/busnav/style.json")
+                .orElse("http://10.0.2.2:8080/styles/busnav-kanto/style.json")
                 .get()
-            require(debugBasemapUrl.isEmpty() || debugBasemapUrl.endsWith("/styles/busnav/style.json")) {
-                "Debug basemap URL must end in /styles/busnav/style.json; edit the server base URL in Developer Connections"
+            require(debugBasemapUrl.isEmpty() || listOf("busnav", "busnav-kanto", "busnav-chubu").any {
+                debugBasemapUrl.endsWith("/styles/$it/style.json")
+            }) {
+                "Debug basemap URL must use /styles/busnav[-kanto|-chubu]/style.json; edit the server base URL in Developer Connections"
             }
             buildConfigField(
                 "String",

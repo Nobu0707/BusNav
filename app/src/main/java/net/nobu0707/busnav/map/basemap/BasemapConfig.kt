@@ -22,6 +22,11 @@ data class BasemapConfig(
     companion object {
         const val FALLBACK_STYLE_URL = "asset://basemap/fallback-style.json"
 
+        fun regionStylePath(region: BasemapRegion) = "/styles/busnav-" + region.id + "/style.json"
+
+        fun forRegion(baseUrl: String, region: BasemapRegion, isDebug: Boolean): BasemapConfig =
+            fromBuildValue(if (baseUrl.isBlank()) "" else baseUrl.trimEnd('/') + regionStylePath(region), isDebug)
+
         fun fromBuildValue(styleUrl: String, isDebug: Boolean): BasemapConfig {
             val normalized = styleUrl.trim().takeIf(String::isNotEmpty)
                 ?: return BasemapConfig(null, BasemapMode.FALLBACK)

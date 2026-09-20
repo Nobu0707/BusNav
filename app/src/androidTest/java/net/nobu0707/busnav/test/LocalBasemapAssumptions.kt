@@ -9,19 +9,17 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 object LocalBasemapAssumptions {
-    val STYLE_URL: String get() = kotlinx.coroutines.runBlocking {
-        net.nobu0707.busnav.developer.createConnectionRepository(
-            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext).settings.first().basemapBaseUrl + "/styles/busnav/style.json"
-    }
+    val STYLE_URL: String get() = effectiveTestConnections().basemapConfig(true).styleUrl!!
     val BASE_URL: String get() = URI(STYLE_URL).let { "${it.scheme}://${it.rawAuthority}" }
 
     fun assumeAvailable() {
-        val available = runCatching {
-            client().newCall(Request.Builder().url(STYLE_URL).build())
-                .execute()
-                .use { it.isSuccessful }
+        val reachable = runCatching {
+            client().newCall(Request.Builder().url(BASE_URL + "/fonts.json").build()).execute().use { true }
         }.getOrDefault(false)
-        assumeTrue("Local TileServer is unavailable", available)
+        assumeTrue("Local TileServer is unavailable", reachable)
+        client().newCall(Request.Builder().url(STYLE_URL).build()).execute().use {
+            org.junit.Assert.assertTrue("Selected basemap region is unavailable: HTTP " + it.code, it.isSuccessful)
+        }
     }
 
     fun client(): OkHttpClient = OkHttpClient.Builder()

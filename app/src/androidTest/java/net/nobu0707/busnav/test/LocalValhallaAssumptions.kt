@@ -8,10 +8,7 @@ import org.junit.Assume.assumeTrue
 
 object LocalValhallaAssumptions {
     // Follow the application's Developer Connections on physical devices as well as emulators.
-    val BASE_URL: String get() = kotlinx.coroutines.runBlocking {
-        net.nobu0707.busnav.developer.createConnectionRepository(
-            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext).settings.first().valhallaBaseUrl
-    }
+    val BASE_URL: String get() = effectiveTestConnections().valhallaBaseUrl
 
     fun assumeAvailable() {
         val client = OkHttpClient.Builder()
