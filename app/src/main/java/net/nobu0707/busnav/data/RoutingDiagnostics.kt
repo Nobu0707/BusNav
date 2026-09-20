@@ -3,26 +3,40 @@ package net.nobu0707.busnav.data.routing.valhalla
 import android.util.Log
 
 interface RoutingDiagnostics {
-    fun debug(event: String, details: String)
+    val isDebugEnabled: Boolean
 
-    fun error(event: String, details: String, throwable: Throwable? = null)
+    val isErrorEnabled: Boolean
+
+    fun debug(event: String, details: () -> String)
+
+    fun error(event: String, throwable: Throwable? = null, details: () -> String)
 }
 
 object NoOpRoutingDiagnostics : RoutingDiagnostics {
-    override fun debug(event: String, details: String) = Unit
+    override val isDebugEnabled = false
 
-    override fun error(event: String, details: String, throwable: Throwable?) = Unit
+    override val isErrorEnabled = false
+
+    override fun debug(event: String, details: () -> String) = Unit
+
+    override fun error(event: String, throwable: Throwable?, details: () -> String) = Unit
 }
 
 class AndroidLogRoutingDiagnostics(
     private val tag: String = DEFAULT_TAG,
 ) : RoutingDiagnostics {
-    override fun debug(event: String, details: String) {
-        Log.d(tag, "$event $details")
+    override val isDebugEnabled: Boolean
+        get() = Log.isLoggable(tag, Log.DEBUG)
+
+    override val isErrorEnabled: Boolean
+        get() = Log.isLoggable(tag, Log.ERROR)
+
+    override fun debug(event: String, details: () -> String) {
+        if (isDebugEnabled) Log.d(tag, "$event ${details()}")
     }
 
-    override fun error(event: String, details: String, throwable: Throwable?) {
-        Log.e(tag, "$event $details", throwable)
+    override fun error(event: String, throwable: Throwable?, details: () -> String) {
+        if (isErrorEnabled) Log.e(tag, "$event ${details()}", throwable)
     }
 
     private companion object {

@@ -1,7 +1,9 @@
 package net.nobu0707.busnav.data.routing.valhalla
 
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.Executors
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -115,17 +117,65 @@ class ValhallaRoutingEngineTest {
 
         server.enqueue(MockResponse().setBody("""{"trip":{"summary":{"length":1,"time":2},"legs":[{"shape":"_"}]}}"""))
         assertFailure(RoutingFailure.INVALID_RESPONSE, engine.calculateRoute(request()))
-        assertTrue(diagnostics.errorFor("response.invalid").details.contains("stage=POLYLINE"))
+        assertTrue(diagnostics.errorFor("response.parse.failed").details.contains("stage=POLYLINE"))
 
         diagnostics.errorEntries.clear()
         server.enqueue(MockResponse().setBody("not-json"))
         assertFailure(RoutingFailure.INVALID_RESPONSE, engine.calculateRoute(request()))
-        assertTrue(diagnostics.errorFor("response.invalid").details.contains("stage=JSON_DECODE"))
+        assertTrue(diagnostics.errorFor("response.parse.failed").details.contains("stage=JSON_DECODE"))
 
         diagnostics.errorEntries.clear()
         server.enqueue(MockResponse().setBody(""))
         assertFailure(RoutingFailure.INVALID_RESPONSE, engine.calculateRoute(request()))
-        assertTrue(diagnostics.errorFor("response.invalid").details.contains("stage=EMPTY_BODY"))
+        assertTrue(diagnostics.errorFor("response.parse.failed").details.contains("stage=EMPTY_BODY"))
+    }
+
+    @Test
+    fun `route invariant failure uses route construction event`() = runBlocking {
+        val diagnostics = RecordingRoutingDiagnostics()
+        val invalidRequest = request().copy(
+            points = request().points.mapIndexed { index, point ->
+                if (index == 0) point.copy(id = "") else point
+            },
+        )
+        server.enqueue(MockResponse().setBody(successBody()))
+
+        assertFailure(RoutingFailure.INVALID_RESPONSE, engine(diagnostics).calculateRoute(invalidRequest))
+
+        assertTrue(
+            diagnostics.errorFor("route.construction.failed").details
+                .contains("stage=ROUTE_CONSTRUCTION"),
+        )
+    }
+
+    @Test
+    fun `response parsing runs on injected computation dispatcher`() = runBlocking {
+        val ioDispatcher = Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "routing-io-test")
+        }.asCoroutineDispatcher()
+        val computationDispatcher = Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "routing-computation-test")
+        }.asCoroutineDispatcher()
+        try {
+            val diagnostics = RecordingRoutingDiagnostics()
+            server.enqueue(MockResponse().setBody(longFixture()))
+
+            val result = engine(
+                diagnostics = diagnostics,
+                dispatchers = RoutingDispatchers(ioDispatcher, computationDispatcher),
+            ).calculateRoute(failingRouteRequest())
+
+            assertTrue(result is RoutingResult.Success)
+            val parseEntries = diagnostics.debugEntries.filter { it.event.startsWith("parse.") }
+            assertTrue(parseEntries.isNotEmpty())
+            assertTrue(
+                "parse threads=${parseEntries.map { it.threadName }}",
+                parseEntries.all { it.threadName.startsWith("routing-computation-test") },
+            )
+        } finally {
+            ioDispatcher.close()
+            computationDispatcher.close()
+        }
     }
 
     @Test
@@ -188,11 +238,15 @@ class ValhallaRoutingEngineTest {
         }
     }
 
-    private fun engine(diagnostics: RoutingDiagnostics = NoOpRoutingDiagnostics) =
+    private fun engine(
+        diagnostics: RoutingDiagnostics = NoOpRoutingDiagnostics,
+        dispatchers: RoutingDispatchers = RoutingDispatchers(),
+    ) =
         ValhallaRoutingEngine(
             config = RoutingConfig(server.url("/").toString()),
             routeIdFactory = { "result" },
             diagnostics = diagnostics,
+            dispatchers = dispatchers,
         )
 
     private fun request() = (plan().toRoutingRequest() as RoutingRequestResult.Ready).request

@@ -7,7 +7,10 @@ import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import net.nobu0707.busnav.domain.routeplan.RoutePlanPointType
@@ -30,6 +33,17 @@ data class RoutingConfig(
     val readTimeoutSeconds: Long = 60,
 )
 
+data class RoutingDispatchers(
+    val io: CoroutineDispatcher = Dispatchers.IO,
+    val computation: CoroutineDispatcher = Dispatchers.Default,
+)
+
+private data class ResponsePayload(
+    val body: String,
+    val contentType: String?,
+    val reportedContentLength: Long?,
+)
+
 class ValhallaRoutingEngine(
     private val config: RoutingConfig,
     client: OkHttpClient? = null,
@@ -40,6 +54,7 @@ class ValhallaRoutingEngine(
     },
     routeIdFactory: () -> String = { UUID.randomUUID().toString() },
     private val diagnostics: RoutingDiagnostics = NoOpRoutingDiagnostics,
+    private val dispatchers: RoutingDispatchers = RoutingDispatchers(),
 ) : RoutingEngine {
     private val httpClient = client ?: OkHttpClient.Builder()
         .connectTimeout(config.connectTimeoutSeconds, TimeUnit.SECONDS)
@@ -49,71 +64,132 @@ class ValhallaRoutingEngine(
 
     override suspend fun calculateRoute(request: RoutingRequest): RoutingResult {
         if (request.points.size < 2) {
-            diagnostics.error("request.invalid", "pointCount=${request.points.size}")
+            diagnostics.error("request.invalid") { "pointCount=${request.points.size}" }
             return RoutingResult.Failure(RoutingFailure.INVALID_REQUEST)
         }
         val endpoint = routeEndpoint()
         if (endpoint == null) {
-            diagnostics.error("request.configuration", "baseUrl is blank or invalid")
+            diagnostics.error("request.configuration") { "baseUrl is blank or invalid" }
             return RoutingResult.Failure(RoutingFailure.CONFIGURATION)
         }
-        val pointIds = request.points.joinToString(",") { it.id }
-        val pointTypes = request.points.joinToString(",") { it.type.name }
-        val duplicateIds = request.points.size - request.points.map { it.id }.distinct().size
-        diagnostics.debug(
-            "request.start",
+        diagnostics.debug("request.start") {
+            val pointIds = request.points.joinToString(",") { it.id }
+            val pointTypes = request.points.joinToString(",") { it.type.name }
+            val duplicateIds = request.points.size - request.points.map { it.id }.distinct().size
             "routePlanId=${request.routePlanId} pointCount=${request.points.size} " +
                 "pointIds=$pointIds pointTypes=$pointTypes duplicateIds=$duplicateIds " +
                 "startCount=${request.points.count { it.type == RoutePlanPointType.START }} " +
                 "destinationCount=${request.points.count { it.type == RoutePlanPointType.DESTINATION }} " +
-                "endpoint=${endpoint.host}:${endpoint.port}",
-        )
+                "endpoint=${endpoint.host}:${endpoint.port}"
+        }
 
-        return try {
-            val requestBody = json.encodeToString(request.toValhallaRequest())
-            val httpRequest = Request.Builder()
+        val httpRequest = try {
+            val requestBody = withContext(dispatchers.computation) {
+                json.encodeToString(request.toValhallaRequest())
+            }
+            Request.Builder()
                 .url(endpoint)
                 .post(requestBody.toRequestBody(JSON_MEDIA_TYPE))
                 .header("Accept", "application/json")
                 .build()
-            httpClient.newCall(httpRequest).await().use { response ->
-                val responseBodySource = response.body
-                val contentType = responseBodySource?.contentType()
-                val reportedContentLength = responseBodySource?.contentLength()
-                val responseBody = responseBodySource?.string().orEmpty()
-                diagnostics.debug(
-                    "response.received",
-                    "status=${response.code} bodyLength=${responseBody.length} " +
-                        "bodyByteLength=${responseBody.toByteArray(StandardCharsets.UTF_8).size} " +
-                        "contentType=$contentType contentLength=$reportedContentLength " +
-                        "headerContentLength=${response.header("Content-Length")} " +
-                        "bodySha256=${responseBody.sha256()}",
-                )
-                if (!response.isSuccessful) {
-                    RoutingResult.Failure(classifyHttpFailure(response.code, responseBody))
-                } else {
-                    responseParser.parse(request, responseBody)
-                }
-            }
         } catch (error: CancellationException) {
-            diagnostics.debug("request.cancelled", "routePlanId=${request.routePlanId}")
+            throw error
+        } catch (error: Exception) {
+            diagnostics.error("request.encode.failed", error) { error.describe() }
+            return RoutingResult.Failure(RoutingFailure.INVALID_RESPONSE)
+        }
+
+        val response = try {
+            httpClient.newCall(httpRequest).await()
+        } catch (error: CancellationException) {
+            diagnostics.debug("http.request.cancelled") { "routePlanId=${request.routePlanId}" }
             throw error
         } catch (error: SocketTimeoutException) {
-            diagnostics.error("request.timeout", error.describe(), error)
-            RoutingResult.Failure(RoutingFailure.TIMEOUT)
+            diagnostics.error("http.request.failed", error) {
+                "classification=TIMEOUT ${error.describe()}"
+            }
+            return RoutingResult.Failure(RoutingFailure.TIMEOUT)
         } catch (error: IOException) {
-            diagnostics.error("request.network", error.describe(), error)
-            RoutingResult.Failure(RoutingFailure.NETWORK)
-        } catch (error: ValhallaResponseException) {
-            diagnostics.error(
-                "response.invalid",
-                "stage=${error.stage} ${error.describe()}",
-                error,
-            )
-            RoutingResult.Failure(RoutingFailure.INVALID_RESPONSE)
+            diagnostics.error("http.request.failed", error) {
+                "classification=NETWORK ${error.describe()}"
+            }
+            return RoutingResult.Failure(RoutingFailure.NETWORK)
         } catch (error: Exception) {
-            diagnostics.error("response.unexpected", error.describe(), error)
-            RoutingResult.Failure(RoutingFailure.INVALID_RESPONSE)
+            diagnostics.error("unexpected", error) { "stage=HTTP_REQUEST ${error.describe()}" }
+            return RoutingResult.Failure(RoutingFailure.INVALID_RESPONSE)
+        }
+
+        return response.use {
+            val payload = try {
+                withContext(dispatchers.io) {
+                    val responseBody = response.body
+                    val contentType = responseBody?.contentType()?.toString()
+                    val reportedContentLength = responseBody?.contentLength()
+                    ResponsePayload(
+                        body = responseBody?.string().orEmpty(),
+                        contentType = contentType,
+                        reportedContentLength = reportedContentLength,
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: SocketTimeoutException) {
+                diagnostics.error("response.read.failed", error) {
+                    "classification=TIMEOUT status=${response.code} ${error.describe()}"
+                }
+                return@use RoutingResult.Failure(RoutingFailure.TIMEOUT)
+            } catch (error: IOException) {
+                diagnostics.error("response.read.failed", error) {
+                    "classification=NETWORK status=${response.code} ${error.describe()}"
+                }
+                return@use RoutingResult.Failure(RoutingFailure.NETWORK)
+            } catch (error: Exception) {
+                diagnostics.error("response.read.failed", error) {
+                    "classification=INVALID_RESPONSE status=${response.code} ${error.describe()}"
+                }
+                return@use RoutingResult.Failure(RoutingFailure.INVALID_RESPONSE)
+            }
+
+            try {
+                withContext(dispatchers.computation) {
+                    diagnostics.debug("response.received") {
+                        val bodyBytes = payload.body.toByteArray(StandardCharsets.UTF_8)
+                        "status=${response.code} bodyLength=${payload.body.length} " +
+                            "bodyByteLength=${bodyBytes.size} contentType=${payload.contentType} " +
+                            "contentLength=${payload.reportedContentLength} " +
+                            "headerContentLength=${response.header("Content-Length")} " +
+                            "bodySha256=${bodyBytes.sha256()}"
+                    }
+                    if (!response.isSuccessful) {
+                        RoutingResult.Failure(classifyHttpFailure(response.code, payload.body))
+                    } else {
+                        responseParser.parse(request, payload.body)
+                            .also { result ->
+                                diagnostics.debug("route.success") {
+                                    "geometryPointCount=${result.route.geometry.points.size} " +
+                                        "routePointCount=${result.route.points.size}"
+                                }
+                            }
+                    }
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: ValhallaResponseException) {
+                val event = if (error.stage == ValhallaResponseStage.ROUTE_CONSTRUCTION) {
+                    "route.construction.failed"
+                } else {
+                    "response.parse.failed"
+                }
+                diagnostics.error(event, error) {
+                    "stage=${error.stage} ${error.describe()}"
+                }
+                RoutingResult.Failure(RoutingFailure.INVALID_RESPONSE)
+            } catch (error: Exception) {
+                diagnostics.error("response.parse.failed", error) {
+                    "stage=UNEXPECTED ${error.describe()}"
+                }
+                RoutingResult.Failure(RoutingFailure.INVALID_RESPONSE)
+            }
         }
     }
 
@@ -156,9 +232,9 @@ class ValhallaRoutingEngine(
         })
     }
 
-    private fun String.sha256(): String =
+    private fun ByteArray.sha256(): String =
         MessageDigest.getInstance("SHA-256")
-            .digest(toByteArray(StandardCharsets.UTF_8))
+            .digest(this)
             .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
     private fun Throwable.describe(): String =

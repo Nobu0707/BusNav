@@ -46,12 +46,12 @@ internal class ValhallaRouteResponseParser(
         val response = try {
             json.decodeFromString<ValhallaRouteResponse>(body)
         } catch (error: SerializationException) {
-            diagnostics.debug("parse.json", "success=false")
+            diagnostics.debug("parse.json") { "success=false" }
             fail(ValhallaResponseStage.JSON_DECODE, "Unable to decode Valhalla response", error)
         }
-        diagnostics.debug("parse.json", "success=true")
+        diagnostics.debug("parse.json") { "success=true" }
 
-        diagnostics.debug("parse.trip", "present=${response.trip != null}")
+        diagnostics.debug("parse.trip") { "present=${response.trip != null}" }
         val trip = response.trip
             ?: fail(ValhallaResponseStage.TRIP, "Response does not contain trip")
 
@@ -61,25 +61,24 @@ internal class ValhallaRouteResponseParser(
             ?: fail(ValhallaResponseStage.SUMMARY, "Summary length is missing or invalid")
         val durationSeconds = summaryJson.time?.takeIf { it >= 0.0 && it.isFinite() }
             ?: fail(ValhallaResponseStage.SUMMARY, "Summary time is missing or invalid")
-        diagnostics.debug(
-            "parse.summary",
-            "lengthKm=$distanceKm durationSeconds=$durationSeconds",
-        )
+        diagnostics.debug("parse.summary") {
+            "lengthKm=$distanceKm durationSeconds=$durationSeconds"
+        }
 
         if (trip.legs.isEmpty()) fail(ValhallaResponseStage.LEGS, "Trip does not contain legs")
-        diagnostics.debug("parse.legs", "count=${trip.legs.size}")
+        diagnostics.debug("parse.legs") { "count=${trip.legs.size}" }
 
         val geometryPoints = mutableListOf<GeoPoint>()
         trip.legs.forEachIndexed { index, leg ->
             val shape = leg.shape?.takeIf(String::isNotEmpty)
                 ?: fail(ValhallaResponseStage.SHAPE, "Leg $index does not contain shape")
-            diagnostics.debug("parse.shape", "leg=$index encodedLength=${shape.length}")
+            diagnostics.debug("parse.shape") { "leg=$index encodedLength=${shape.length}" }
             val decoded = try {
                 Polyline6Decoder.decode(shape)
             } catch (error: IllegalArgumentException) {
                 fail(ValhallaResponseStage.POLYLINE, "Unable to decode shape for leg $index", error)
             }
-            diagnostics.debug("parse.polyline", "leg=$index decodedPointCount=${decoded.size}")
+            diagnostics.debug("parse.polyline") { "leg=$index decodedPointCount=${decoded.size}" }
             if (geometryPoints.lastOrNull() == decoded.firstOrNull()) {
                 geometryPoints += decoded.drop(1)
             } else {
@@ -92,7 +91,7 @@ internal class ValhallaRouteResponseParser(
         } catch (error: IllegalArgumentException) {
             fail(ValhallaResponseStage.GEOMETRY, "Decoded route geometry is invalid", error)
         }
-        diagnostics.debug("parse.geometry", "pointCount=${geometry.points.size}")
+        diagnostics.debug("parse.geometry") { "pointCount=${geometry.points.size}" }
 
         val summary = try {
             RoutingSummary(distanceKm * 1_000.0, durationSeconds)
@@ -128,7 +127,7 @@ internal class ValhallaRouteResponseParser(
         } catch (error: IllegalArgumentException) {
             fail(ValhallaResponseStage.ROUTE_CONSTRUCTION, "Scheduled route is invalid", error)
         }
-        diagnostics.debug("parse.route", "success=true routePointCount=${route.points.size}")
+        diagnostics.debug("parse.route") { "success=true routePointCount=${route.points.size}" }
         return RoutingResult.Success(route, summary)
     }
 
