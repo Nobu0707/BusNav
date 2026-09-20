@@ -11,3 +11,4 @@
 busnav-review-*.zip
 busnav-full-review-*.zip
 build/review-checks/
+busnav-logcat*.txt

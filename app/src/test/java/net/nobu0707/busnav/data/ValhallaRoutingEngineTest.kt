@@ -85,18 +85,72 @@ class ValhallaRoutingEngineTest {
         assertEquals(12_300.0, success.summary.distanceMeters, 0.0)
         assertEquals(901.0, success.summary.durationSeconds, 0.0)
         assertEquals(3, success.route.geometry.points.size)
-        assertEquals(listOf(RoutePointType.START, RoutePointType.VIA, RoutePointType.SHAPING, RoutePointType.DESTINATION), success.route.points.map { it.type })
+        assertEquals(
+            listOf(RoutePointType.START, RoutePointType.VIA, RoutePointType.SHAPING, RoutePointType.DESTINATION),
+            success.route.points.map { it.type },
+        )
         assertEquals("Plan", success.route.name)
         assertEquals(12_300.0, success.route.metadata.distanceMeters!!, 0.0)
         assertEquals("valhalla", success.route.metadata.routingSource)
     }
 
     @Test
-    fun `malformed shape and malformed json are invalid response`() = runBlocking {
+    fun `actual long response records body fingerprint and succeeds`() = runBlocking {
+        val diagnostics = RecordingRoutingDiagnostics()
+        server.enqueue(MockResponse().setBody(longFixture()))
+        val success = engine(diagnostics).calculateRoute(failingRouteRequest()) as RoutingResult.Success
+
+        assertEquals(88_881.0, success.summary.distanceMeters, 0.001)
+        assertEquals(3_075, success.route.geometry.points.size)
+        val responseEntry = diagnostics.debugEntries.single { it.event == "response.received" }
+        assertTrue(responseEntry.details.contains("status=200"))
+        assertTrue(responseEntry.details.contains("bodyLength=12972"))
+        assertTrue(responseEntry.details.contains("bodySha256="))
+    }
+
+    @Test
+    fun `malformed responses return invalid response with diagnostic stage`() = runBlocking {
+        val diagnostics = RecordingRoutingDiagnostics()
+        val engine = engine(diagnostics)
+
         server.enqueue(MockResponse().setBody("""{"trip":{"summary":{"length":1,"time":2},"legs":[{"shape":"_"}]}}"""))
-        assertFailure(RoutingFailure.INVALID_RESPONSE, engine().calculateRoute(request()))
+        assertFailure(RoutingFailure.INVALID_RESPONSE, engine.calculateRoute(request()))
+        assertTrue(diagnostics.errorFor("response.invalid").details.contains("stage=POLYLINE"))
+
+        diagnostics.errorEntries.clear()
         server.enqueue(MockResponse().setBody("not-json"))
-        assertFailure(RoutingFailure.INVALID_RESPONSE, engine().calculateRoute(request()))
+        assertFailure(RoutingFailure.INVALID_RESPONSE, engine.calculateRoute(request()))
+        assertTrue(diagnostics.errorFor("response.invalid").details.contains("stage=JSON_DECODE"))
+
+        diagnostics.errorEntries.clear()
+        server.enqueue(MockResponse().setBody(""))
+        assertFailure(RoutingFailure.INVALID_RESPONSE, engine.calculateRoute(request()))
+        assertTrue(diagnostics.errorFor("response.invalid").details.contains("stage=EMPTY_BODY"))
+    }
+
+    @Test
+    fun `same engine handles twelve consecutive long responses`() = runBlocking {
+        val engine = engine()
+        repeat(12) { server.enqueue(MockResponse().setBody(longFixture())) }
+
+        repeat(12) {
+            val result = engine.calculateRoute(failingRouteRequest())
+            assertTrue("request $it should succeed", result is RoutingResult.Success)
+        }
+        assertEquals(12, server.requestCount)
+    }
+
+    @Test
+    fun `same engine handles alternating short and long responses`() = runBlocking {
+        val bodies = listOf(successBody(), longFixture(), successBody(), longFixture(), successBody(), longFixture())
+        bodies.forEach { server.enqueue(MockResponse().setBody(it)) }
+        val engine = engine()
+
+        bodies.indices.forEach { index ->
+            val result = engine.calculateRoute(if (index % 2 == 0) request() else failingRouteRequest())
+            assertTrue("request $index should succeed", result is RoutingResult.Success)
+        }
+        assertEquals(bodies.size, server.requestCount)
     }
 
     @Test
@@ -112,7 +166,9 @@ class ValhallaRoutingEngineTest {
     @Test
     fun `read timeout is classified`() = runBlocking {
         server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
-        val engine = ValhallaRoutingEngine(RoutingConfig(server.url("/").toString(), readTimeoutSeconds = 1))
+        val engine = ValhallaRoutingEngine(
+            RoutingConfig(server.url("/").toString(), readTimeoutSeconds = 1),
+        )
         assertFailure(RoutingFailure.TIMEOUT, engine.calculateRoute(request()))
     }
 
@@ -132,12 +188,31 @@ class ValhallaRoutingEngineTest {
         }
     }
 
-    private fun engine() = ValhallaRoutingEngine(
-        config = RoutingConfig(server.url("/").toString()),
-        routeIdFactory = { "result" },
-    )
+    private fun engine(diagnostics: RoutingDiagnostics = NoOpRoutingDiagnostics) =
+        ValhallaRoutingEngine(
+            config = RoutingConfig(server.url("/").toString()),
+            routeIdFactory = { "result" },
+            diagnostics = diagnostics,
+        )
 
     private fun request() = (plan().toRoutingRequest() as RoutingRequestResult.Ready).request
+
+    private fun failingRouteRequest() = (RoutePlan(
+        id = "failing-plan",
+        name = "Failing route",
+        points = listOf(
+            RoutePlanPoint(
+                "s",
+                RoutePlanPointType.START,
+                GeoPoint(35.52755965924169, 138.79653353327427),
+            ),
+            RoutePlanPoint(
+                "d",
+                RoutePlanPointType.DESTINATION,
+                GeoPoint(35.609542457517534, 138.29084069799353),
+            ),
+        ),
+    ).toRoutingRequest() as RoutingRequestResult.Ready).request
 
     private fun plan() = RoutePlan(
         id = "plan",
@@ -149,6 +224,9 @@ class ValhallaRoutingEngineTest {
             RoutePlanPoint("d", RoutePlanPointType.DESTINATION, GeoPoint(43.252, -126.453), "End"),
         ),
     )
+
+    private fun longFixture(): String =
+        requireNotNull(javaClass.getResource("/valhalla/route-88km-valhalla-3.9.0.json")).readText()
 
     private fun successBody() = """
         {"trip":{"summary":{"length":12.3,"time":901},"legs":[

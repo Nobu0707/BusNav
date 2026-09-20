@@ -46,6 +46,26 @@ class RouteCalculationStateHolderTest {
     }
 
     @Test
+    fun `success can be calculated again for the same plan`() = runTest {
+        var calls = 0
+        val holder = RouteCalculationStateHolder(
+            RoutingEngine {
+                calls++
+                success()
+            },
+            this,
+        )
+
+        assertTrue(holder.calculate(plan(), 3))
+        advanceUntilIdle()
+        assertTrue(holder.calculate(plan(), 3))
+        advanceUntilIdle()
+
+        assertEquals(2, calls)
+        assertTrue(holder.state.value is RouteCalculationState.Success)
+    }
+
+    @Test
     fun `failure can be retried`() = runTest {
         var calls = 0
         val holder = RouteCalculationStateHolder(
@@ -61,6 +81,35 @@ class RouteCalculationStateHolderTest {
         holder.calculate(plan(), 1)
         advanceUntilIdle()
         assertTrue(holder.state.value is RouteCalculationState.Success)
+    }
+
+    @Test
+    fun `success transitions accept short long and repeated long results`() = runTest {
+        val results = ArrayDeque(
+            listOf(
+                RoutingResult.Success(route(), RoutingSummary(1_000.0, 60.0)),
+                RoutingResult.Success(route(), RoutingSummary(88_881.0, 7_188.89)),
+                RoutingResult.Success(route(), RoutingSummary(88_881.0, 7_188.89)),
+            ),
+        )
+        val holder = RouteCalculationStateHolder(RoutingEngine { results.removeFirst() }, this)
+
+        holder.calculate(plan(), 9)
+        advanceUntilIdle()
+        assertEquals(
+            1_000.0,
+            (holder.state.value as RouteCalculationState.Success).summary.distanceMeters,
+            0.0,
+        )
+        repeat(2) {
+            holder.calculate(plan(), 9)
+            advanceUntilIdle()
+            assertEquals(
+                88_881.0,
+                (holder.state.value as RouteCalculationState.Success).summary.distanceMeters,
+                0.0,
+            )
+        }
     }
 
     @Test

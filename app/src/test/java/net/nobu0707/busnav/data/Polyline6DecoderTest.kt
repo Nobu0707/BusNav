@@ -1,6 +1,8 @@
 package net.nobu0707.busnav.data.routing.valhalla
 
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class Polyline6DecoderTest {
@@ -21,6 +23,24 @@ class Polyline6DecoderTest {
         val point = Polyline6Decoder.decode("_izlhA~rlgdF").single()
         assertEquals(38.5, point.latitude, 0.000001)
         assertEquals(-120.2, point.longitude, 0.000001)
+    }
+
+    @Test
+    fun `actual twelve thousand character shape decodes deterministically`() {
+        val body = requireNotNull(
+            javaClass.getResource("/valhalla/route-88km-valhalla-3.9.0.json"),
+        ).readText()
+        val shape = Json { ignoreUnknownKeys = true }
+            .decodeFromString<ValhallaRouteResponse>(body)
+            .trip!!.legs.single().shape!!
+        assertEquals(12_208, shape.length)
+
+        val first = Polyline6Decoder.decode(shape)
+        val second = Polyline6Decoder.decode(shape)
+
+        assertEquals(3_075, first.size)
+        assertEquals(first, second)
+        assertTrue(first.all { it.latitude in -90.0..90.0 && it.longitude in -180.0..180.0 })
     }
 
     @Test(expected = IllegalArgumentException::class)

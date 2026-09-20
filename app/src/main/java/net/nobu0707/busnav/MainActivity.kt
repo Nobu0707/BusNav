@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import net.nobu0707.busnav.data.route.InMemoryScheduledRouteRepository
+import net.nobu0707.busnav.data.routing.valhalla.AndroidLogRoutingDiagnostics
+import net.nobu0707.busnav.data.routing.valhalla.NoOpRoutingDiagnostics
 import net.nobu0707.busnav.data.routing.valhalla.RoutingConfig
 import net.nobu0707.busnav.data.routing.valhalla.ValhallaRoutingEngine
 import net.nobu0707.busnav.domain.route.ScheduledRouteRepository
@@ -26,7 +28,15 @@ class MainActivity : ComponentActivity() {
                 null
             },
         )
-        val routingEngine = ValhallaRoutingEngine(RoutingConfig(BuildConfig.VALHALLA_BASE_URL))
+        val diagnostics = if (BuildConfig.DEBUG) {
+            AndroidLogRoutingDiagnostics()
+        } else {
+            NoOpRoutingDiagnostics
+        }
+        val routingEngine = ValhallaRoutingEngine(
+            config = RoutingConfig(BuildConfig.VALHALLA_BASE_URL),
+            diagnostics = diagnostics,
+        )
         setContent {
             BusNavTheme {
                 NavigationRoute(
