@@ -141,7 +141,7 @@ localhost Valhallaへのdirect smokeも10/10回同一結果だった。
 
 ## 18. Emulator manual / runtime test
 
-接続device: `emulator-5554`（Pixel_8 AVD / Android 16）。
+接続device: `[device-id-redacted]`（Pixel_8 AVD / Android 16）。
 
 `ValhallaRuntimeSmokeTest` をGradle connected testとして単独実行しPASS。同一engine、同一失敗routeで3/3回Success、各回3,075点を構築した。
 
@@ -286,7 +286,7 @@ commit `087b7c8` の `assertIsDisplayed()` から `fetchSemanticsNode()` への�
 
 ## 34. Emulator Activity UI smoke
 
-- Emulator: `Pixel_8` AVD / Android 16 / API 36 / `emulator-5554`
+- Emulator: `Pixel_8` AVD / Android 16 / API 36 / `[device-id-redacted]`
 - APK: debug
 - endpoint: `http://10.0.2.2:8002`
 - Valhalla: `3.9.0-a3a5631c4`
@@ -380,7 +380,7 @@ engine live smokeもdistanceを50–150 km、durationを正値として検証す
 
 ### Valhalla OFF verification
 
-- Emulator: `emulator-5554`、Android 16
+- Emulator: `[device-id-redacted]`、Android 16
 - `busnav-valhalla` containerを停止し、endpoint unreachableを確認
 - `gradlew connectedDebugAndroidTest --console=plain`: **BUILD SUCCESSFUL**
 - 通常UI instrumentation: 13/13 PASS
