@@ -1,4 +1,4 @@
-Set-StrictMode -Version Latest
+﻿Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 function Resolve-ReviewRepositoryRoot {
@@ -703,7 +703,18 @@ function New-ZipFromDirectory {
             $inputStream = [System.IO.File]::OpenRead($_.FullName)
             $outputStream = $entry.Open()
             try {
-                $inputStream.CopyTo($outputStream)
+                # Historical device identifiers can remain in deleted diff lines.
+                # Redact archive text as well as current source; preserve binary bytes.
+                if (-not (Test-BinaryFile -Path $_.FullName)) {
+                    $content = [System.IO.File]::ReadAllText($_.FullName)
+                    $redacted = $content -replace '\bemulator-\d{4,5}\b', '[device-id-redacted]'
+                    if ($redacted -cne $content) {
+                        $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($redacted)
+                        $outputStream.Write($bytes, 0, $bytes.Length)
+                    }
+                    else { $inputStream.CopyTo($outputStream) }
+                }
+                else { $inputStream.CopyTo($outputStream) }
             }
             finally {
                 $outputStream.Dispose()

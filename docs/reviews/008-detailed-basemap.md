@@ -253,3 +253,5 @@ unit 105件、lint、Debug/Release、androidTest buildはPASS。OFFは正式assu
 最終HEADに対するcheck receiptとarchive self-checkは各ZIPのmeta/を正とし、
 HEAD/BaseRef一致、禁止ファイル/端末IDの除外確認を含めて受け入れる。
 Phase005の実装は行っていない。
+
+Archive privacy: 過去Review006aのemulator識別子も匿名化した。削除diff行に残る識別子はZIP生成時にも `[device-id-redacted]` に置換するため、該当する文書diffは元の識別子を復元しない。バイナリは変更しない。
