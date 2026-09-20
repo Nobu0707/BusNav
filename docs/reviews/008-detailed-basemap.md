@@ -122,7 +122,8 @@ Phase 005 は既存 Valhalla response に maneuver / road name / turn direction 
 
 ## 31. Commit SHA
 
-実装 commit SHA は commit 後に本節へ追記する。最終 HEAD は review archive の `meta/review-info.txt` を正とする。
+- `8946d867b77856f6a528b960647edfcefe1e86d8` — `feat: add detailed local vector basemap`
+- 本 Review008 の確定 commit と最終 HEAD は review archive の `meta/review-info.txt` を正とする。
 
 ## 32. Archive names
 
