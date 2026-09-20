@@ -1,6 +1,7 @@
 package net.nobu0707.busnav.ui.navigation
 
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.lifecycle.ViewModelProvider
 import net.nobu0707.busnav.MainActivity
 import net.nobu0707.busnav.data.route.createDevelopmentSampleRoute
@@ -16,13 +17,22 @@ class NavigationRotationTest {
         val sample = createDevelopmentSampleRoute()
         val route = ScheduledRoute("rotation-guidance", "Rotation route", sample.geometry, sample.points,
             guidance = RouteGuidance(listOf(RouteManeuver(0,ManeuverType.RIGHT,"",0,1))))
+        awaitNavigationContent()
         rule.runOnIdle { ViewModelProvider(rule.activity)[NavigationViewModel::class.java].stateHolder.applyCalculatedRoute(route) }
         rule.activityRule.scenario.recreate()
-        rule.waitForIdle()
+        awaitNavigationContent()
         rule.runOnIdle {
             val state = ViewModelProvider(rule.activity)[NavigationViewModel::class.java].stateHolder.uiState.value
             assertSame(route, state.activeRoute)
             assertSame(route.guidance, state.activeRoute!!.guidance)
+        }
+    }
+
+    private fun awaitNavigationContent() {
+        // MainActivity waits for DataStore before creating NavigationRoute and its ViewModel.
+        // Compose being idle does not imply that the asynchronous settings read has finished.
+        rule.waitUntil(10_000) {
+            rule.onAllNodesWithTag(NavigationTestTags.MAP).fetchSemanticsNodes().isNotEmpty()
         }
     }
 }

@@ -123,6 +123,8 @@ Gradle再installで実機設定が初期化され、追加live testがassumption
 `testValhallaBaseUrl` / `testBasemapBaseUrl` の実行時引数で本番DataStoreへ設定して再実行。
 実機全37件でfailures/errors/skipped=0、追加した実機の地図長押しsmokeもPASS。
 Emulatorの最終一括結果はarchive内checksとXML集計で確認する。
+再検証時に既存NavigationRotationTestがDataStore読込前にViewModelを取得する競合を検出。
+ComposeのidleだけでなくNavigation画面の存在を待つようテストを修正し、再検証した。
 実サーバー接続テスト、Kanto/Chubu保存、Activity再生成後のKanto保持も検証対象。
 
 ## 24–26. Regression / release / quality
