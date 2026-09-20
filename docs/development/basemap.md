@@ -85,3 +85,7 @@ Noto Sans CJK glyphのlicense/attributionは固定revisionのupstreamに従い�
 
 入力PBFやPlanetilerが初回取得する補助データも同じファイルを保持してください。
 今回のpinは実行ツールとglyphを固定し、OSM更新・補助データ更新を含むbyte-for-byte同一生成まで保証するものではありません。
+
+## Phase 004.5.1 regional basemaps
+
+全国Valhallaのrouting coverageとKanto/Chubuの表示coverageは独立しています。BasemapRegionをDeveloper ConnectionsのDataStoreへ保存し、BasemapConfigが地域別style URLを生成します。MapViewと経路状態を保持したままstyleをreloadします。単一style templateからruntimeで2地域のstyleを生成し、日本語glyphと旧Chubu成果物を維持します。[構築・切替・rollback手順](japan-routing-and-regional-basemaps.md)。

@@ -35,7 +35,7 @@ Wi-Fiの端末間分離、VPN、サーバー内の127.0.0.1限定bindも確認�
 
 1. Debug APKをインストールし、ルート編集 → 開発接続設定を開く。
 2. Valhallaに `http://192.168.1.100:8002`、地図に `http://192.168.1.100:8080` を入力。
-3. 各「接続テスト」で接続成功を確認して保存。テストは入力中の値を使い、保存はしない。
+3. 地図地域をKantoまたはChubuから選択（既定Kanto）。各「接続テスト」で接続成功を確認して保存。テストは入力中の値を使い、保存はしない。
 4. 地図の道路・日本語ラベルを確認し、道路付近を長押ししてSTART / DESTを配置する。
 5. 経路探索、candidate route overlay、再探索、VIA / SHAPINGを確認する。
 6. アプリを終了して再起動し、入力値と地図接続が維持されることを確認する。
@@ -43,7 +43,7 @@ Wi-Fiの端末間分離、VPN、サーバー内の127.0.0.1限定bindも確認�
    続けて実機テストする場合はLAN IPを再保存する。
 
 入力はhttp/https・host必須、userinfo/query/fragment禁止、pathは空または `/` のみ。
-前後空白と末尾 `/` は正規化する。style pathは `/styles/busnav/style.json` に固定。
+前後空白と末尾 `/` は正規化する。style pathは選択地域に応じ `/styles/busnav-kanto/style.json` または `/styles/busnav-chubu/style.json`。
 接続結果は成功、HTTPステータスエラー、タイムアウト、DNS/host接続失敗、URL不正を表示し、生の応答を表示しない。
 HTTP接続はDebugだけで許可する。
 
@@ -60,9 +60,11 @@ TODO: 将来、入口を Settings → Developer Options → 接続先へ移設�
 `developer/` のrepository/storeと `ui/settings/developer/` の画面を分離しているため、
 MainActivityやMapControllerに保存形式の知識を持たせず移設できる。
 
-## 現環境の実機結果
+## Phase004.5当時の実機結果（履歴）
 
 Physical Android test: NOT RUN
 Reason: no physical device attached
 
 接続されたのは Pixel 8 AVD / Android 16 のみ。端末ID/serialは記録しない。
+
+現在の全国routing・両地域地図の手順と実機検証は [環境ガイド](japan-routing-and-regional-basemaps.md) と [Review011](../reviews/011-kanto-japan-routing-environment.md) を参照してください。

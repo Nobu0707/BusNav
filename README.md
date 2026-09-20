@@ -4,6 +4,8 @@ BusNav は、高速バス・夜行バスの実運用を想定した業務用ナ�
 
 Phase 006 は、高速道路・ランプ・出口・分岐に専用カード、模式図、路線 badge、次の分岐を表示します。詳細は [高速案内](docs/highway-guidance.md) を参照してください。詳細 vector basemap 上で Valhalla maneuver による走行案内を表示します。現在位置から次の操作・距離・道路/方面・その次の案内を算出し、位置が不確実な場合は案内を抑制します。自動リルートは行いません。
 
+Phase 004.5.1 の [全国routing・関東/中部basemap環境](docs/development/japan-routing-and-regional-basemaps.md) は、全国Valhallaと地域別地図を独立して利用します。Debugの開発接続設定でKanto/Chubuを保存・切替できます。
+
 ## 現在の実装範囲
 
 - Kotlin / Jetpack Compose の単一 Android アプリモジュール

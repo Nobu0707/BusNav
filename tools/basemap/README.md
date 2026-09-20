@@ -25,3 +25,7 @@ Endpoints:
 - Valhalla remains separate at `http://10.0.2.2:8002`
 
 Stop with `./tools/basemap/stop-tileserver.sh`. Verify style, TileJSON, a Japanese glyph range, and a Fuji-area vector tile with `./tools/basemap/check-tileserver.sh`.
+
+## Phase 004.5.1 regional basemaps
+
+全国Valhallaのrouting coverageとKanto/Chubuの表示coverageは独立しています。BasemapRegionをDeveloper ConnectionsのDataStoreへ保存し、BasemapConfigが地域別style URLを生成します。MapViewと経路状態を保持したままstyleをreloadします。単一style templateからruntimeで2地域のstyleを生成し、日本語glyphと旧Chubu成果物を維持します。[構築・切替・rollback手順](../../docs/development/japan-routing-and-regional-basemaps.md)。
