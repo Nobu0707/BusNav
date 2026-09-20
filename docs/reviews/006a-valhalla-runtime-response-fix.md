@@ -347,8 +347,76 @@ remaining limitations:
 - Phase 005 maneuver/navigation guidanceは未実装
 - 未追跡の自動生成 `gradle/gradle-daemon-jvm.properties` は本修正に不要なため、削除もcommitもしていない
 
-## 37. Final conclusion
+## 37. Follow-up: live smoke isolation
 
-**Phase 004.1 COMPLETE**。
+### ChatGPT final review finding
 
-original transient triggerを断定できたからではなく、confirmed defectを修正し、Release NoOp負荷とMain-thread依存を除去し、stage diagnosticsを整えたうえで、実Emulatorのproduction Activity UI経路を短長切替を含め7回連続で通し、元エラー0回、全quality gate PASSを確認したことを完了根拠とする。
+最終査読で、外部のlocal Valhallaへ依存する `ValhallaUiRuntimeSmokeTest` が通常の `connectedDebugAndroidTest` に無条件で含まれ、Valhalla停止中でもBusNav本体と無関係に失敗し得る点と、実OSM由来の距離・時間を完全一致で契約にしていた点が指摘された。
+
+### Availability guard
+
+androidTest共通utility `LocalValhallaAssumptions` を追加した。`http://10.0.2.2:8002/status` をcall/connect/read各2秒timeoutでGETし、2xx以外または通信例外の場合はJUnit4 `Assume.assumeTrue` でtest本体をskipする。既存 `ValhallaRuntimeSmokeTest` の独自probeも同utilityへ統合し、HTTP availability判定を重複させていない。
+
+通常の `connectedDebugAndroidTest` では次の方針とする。
+
+- Valhallaあり: engine/UI runtime smokeを実行する
+- Valhallaなし: engine/UI runtime smokeをassumption skipし、suiteはPASS可能
+- Unit/fixture tests: external Valhalla不要かつdeterministicで、parser/regressionの主検証を担う
+- Live runtime smoke: environment integrationを確認し、exact OSM resultを契約にしない
+
+### Live summary assertion stabilization
+
+UI smokeの表示完全一致 `29.6 km / 35分`、`88.9 km / 1時間59分` を廃止し、画面上のsummary文字列を解析して次を検証する形へ変更した。
+
+- short route: 10 km以上60 km以下
+- long route: 50 km以上150 km以下
+- duration: 0分より大きい
+- short distance < long distance
+- result card、非空summary、candidate label「探索結果（道路沿いルート）」を表示
+- failure text「経路探索結果を読み取れませんでした」を表示しない
+- sequence `short -> short -> long -> long -> long -> short -> long` とretry/repeated routeを維持
+
+engine live smokeもdistanceを50–150 km、durationを正値として検証する。一方、実Valhalla 3.9 response fixtureのunit testは `88,881 m`、`7,188.89 sec` の厳密assertを維持する。
+
+### Valhalla OFF verification
+
+- Emulator: `emulator-5554`、Android 16
+- `busnav-valhalla` containerを停止し、endpoint unreachableを確認
+- `gradlew connectedDebugAndroidTest --console=plain`: **BUILD SUCCESSFUL**
+- 通常UI instrumentation: 13/13 PASS
+- live runtime smoke: 2/2 assumption skip
+- AndroidJUnitRunner生出力: `INSTRUMENTATION_STATUS_CODE: -4` が2件、最終結果 `OK (2 tests)`
+
+AndroidJUnitRunnerではstatus `-4` がassumption skipを表す。現行AGP/UTPの生成XML/HTMLはこの `-4` を `failure` 欄へ変換する表示上の制約があり `skipped=0` と出るが、Gradle taskは正しく成功する。skip判定と件数はrunner生出力で確認した。
+
+### Valhalla ON verification
+
+- `busnav-valhalla` を再起動
+- `/status`: HTTP success、Valhalla `3.9.0-a3a5631c4`
+- `gradlew connectedDebugAndroidTest --console=plain`: **BUILD SUCCESSFUL**
+- suite: 15/15 PASS、failure 0
+- `ValhallaRuntimeSmokeTest`: 1/1 PASS（同一engineでroute 3/3成功）
+- `ValhallaUiRuntimeSmokeTest`: 1/1 PASS（画面上のroute操作 7/7成功）
+
+### Regression and build verification
+
+- `gradlew test --console=plain`: PASS、85 tests、failure 0
+- `gradlew lint --console=plain`: PASS
+- `gradlew assembleDebug --console=plain`: PASS
+- `gradlew assembleDebugAndroidTest --console=plain`: PASS
+- long fixture、12,208文字polyline、repeated same engine、short/long alternating、malformed JSON/polyline、route construction diagnostics、lazy diagnostics、dispatcher、cancellation、timeout/network classification、retry、stale revision guardを維持
+
+### Remaining limitations
+
+- 原事象のexact transient triggerは、旧catch-allで末端例外が失われていたため不明のまま
+- UI smokeの地点投入はMap pixel long-pressではなく、実Activityが共有するViewModel経由
+- route lineはproduction MapController連携まで確認したが、OpenGL pixel image comparisonは未実施
+- AGP/UTPのHTML/XMLではAndroidJUnitRunner assumption status `-4` がfailure欄に表示される
+- 未追跡の自動生成 `gradle/gradle-daemon-jvm.properties` は削除もcommitもしていない
+- Phase 005 maneuver/navigation guidanceは未着手
+
+## 38. Final conclusion
+
+confirmed defectの修正、live smokeの外部依存隔離、実OSM値への過度な依存除去、Valhalla OFF/ON双方のconnected suite、全regression/build gateを確認した。
+
+**Phase 004.1: COMPLETE**
