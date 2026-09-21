@@ -1,5 +1,9 @@
 package net.nobu0707.busnav.ui.navigation
 
+import net.nobu0707.busnav.ui.free.*
+import net.nobu0707.busnav.domain.prescribed.NavigationMode
+import net.nobu0707.busnav.domain.navigation.ArrivalState
+import androidx.compose.material3.AlertDialog
 import android.Manifest
 import net.nobu0707.busnav.BuildConfig
 import net.nobu0707.busnav.developer.DeveloperConnectionRepository
@@ -85,7 +89,7 @@ object NavigationTestTags {
     const val ROUTE_EDIT = "route_edit"
 }
 
-private enum class BusNavScreen { NAVIGATION, ROUTE_EDIT, LIBRARY }
+private enum class BusNavScreen { NAVIGATION, ROUTE_EDIT, LIBRARY, FREE }
 
 @Composable
 fun NavigationRoute(
@@ -101,6 +105,9 @@ fun NavigationRoute(
     val lifecycleOwner = LocalLifecycleOwner.current
     val stateHolder = viewModel { NavigationViewModel(locationProvider, routeRepository) }.stateHolder
     val uiState by stateHolder.uiState.collectAsState()
+    val freeHolder = viewModel { FreeNavigationViewModel(routingEngine, stateHolder) }.holder
+    val freeState by freeHolder.state.collectAsState()
+    var freeCursorReader by remember { mutableStateOf<(() -> GeoPoint?)?>(null) }
     val routePlanHolder = viewModel<RoutePlanEditorViewModel>().stateHolder
     val routePlanUiState by routePlanHolder.uiState.collectAsState()
     val calculationHolder = viewModel { RouteCalculationViewModel(routingEngine) }.stateHolder
@@ -124,6 +131,39 @@ fun NavigationRoute(
     }
     var showConnections by rememberSaveable { mutableStateOf(false) }
     var screen by rememberSaveable { mutableStateOf(BusNavScreen.NAVIGATION) }
+    var routeMenu by rememberSaveable { mutableStateOf(false) }
+    var pendingScreen by rememberSaveable { mutableStateOf<BusNavScreen?>(null) }
+
+    fun enterScreen(target: BusNavScreen) {
+        routeMenu = false
+        when (target) {
+            BusNavScreen.FREE -> {
+                if (!freeHolder.beginSelection()) return
+                library?.clearCurrent()
+            }
+            BusNavScreen.ROUTE_EDIT -> {
+                val id = uiState.activePrescribedRouteId
+                if (id != null && library != null) {
+                    library.edit(id) {
+                        calculationHolder.cancel()
+                        routePlanHolder.replacePlan(it.routePlan)
+                        routePlanHolder.enterEditor(it.route, null)
+                        editorViewport = null
+                        screen = target
+                    }
+                    return
+                }
+                routePlanHolder.enterEditor(uiState.activeRoute, candidateRoute)
+                editorViewport = null
+            }
+            else -> Unit
+        }
+        screen = target
+    }
+    fun requestScreen(target: BusNavScreen) {
+        routeMenu = false
+        if (stateHolder.uiState.value.isNavigationStarted) pendingScreen = target else enterScreen(target)
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -171,12 +211,12 @@ fun NavigationRoute(
         library?.cancelDraft()
         screen = BusNavScreen.NAVIGATION
     }
-    BackHandler(enabled = screen != BusNavScreen.NAVIGATION) { cancelEditing() }
+    BackHandler(enabled = screen != BusNavScreen.NAVIGATION) {
+        if (screen == BusNavScreen.FREE) { freeHolder.cancel(); screen = BusNavScreen.NAVIGATION }
+        else cancelEditing()
+    }
 
-    // Guidance starts when an applicable route is adopted; viewing/editing a plan is inactive.
-    val navigationActive = screen == BusNavScreen.NAVIGATION && !showConnections &&
-        (uiState.activePrescribedRouteId == null || uiState.isNavigationStarted) &&
-        !uiState.activeRoute?.guidance?.maneuvers.isNullOrEmpty()
+    val navigationActive = screen == BusNavScreen.NAVIGATION && !showConnections && uiState.navigationActive
     val isNight = net.nobu0707.busnav.ui.theme.rememberIsNight(uiState.location?.point, presentationClock)
     var isTunnel by remember { mutableStateOf(false) }
     LaunchedEffect(navigationActive) { if (!navigationActive) isTunnel = false }
@@ -192,11 +232,40 @@ fun NavigationRoute(
         }
     }
     BusNavTheme(darkTheme = dark) {
+        if (routeMenu) AlertDialog(onDismissRequest = { routeMenu = false },
+            title = { Text("ルート") },
+            text = { Column {
+                TextButton(onClick = { requestScreen(BusNavScreen.FREE) }, modifier = Modifier.testTag("open_free")) { Text("現在地からナビ") }
+                if (library != null) TextButton(onClick = { requestScreen(BusNavScreen.LIBRARY) }) { Text("所定経路・一覧と保存") }
+                TextButton(onClick = { requestScreen(BusNavScreen.ROUTE_EDIT) }) { Text("経路編集") }
+                if (uiState.activeRoute != null && !uiState.isNavigationStarted)
+                    TextButton(onClick = { stateHolder.startNavigation(); routeMenu = false }) { Text("案内開始") }
+                if (uiState.isNavigationStarted)
+                    TextButton(onClick = { freeHolder.endNavigation(); library?.clearCurrent(); routeMenu = false }) { Text("案内終了") }
+            } },
+            confirmButton = { TextButton(onClick = { routeMenu = false }) { Text("閉じる") } })
+        pendingScreen?.let { target ->
+            AlertDialog(onDismissRequest = { pendingScreen = null },
+                title = { Text("現在の案内を終了しますか？") },
+                text = { Text(when (target) {
+                    BusNavScreen.FREE -> "現在の案内を終了して現在地からナビを設定します。"
+                    BusNavScreen.LIBRARY -> "現在の案内を終了して所定経路を開きます。"
+                    else -> "現在の案内を終了して経路を編集します。"
+                }) },
+                confirmButton = { TextButton(onClick = {
+                    freeHolder.endNavigation()
+                    pendingScreen = null
+                    enterScreen(target)
+                }, modifier = Modifier.testTag("session_switch_confirm")) { Text("終了して続ける") } },
+                dismissButton = { TextButton(onClick = { pendingScreen = null }) { Text("キャンセル") } })
+        }
         when (screen) {
             BusNavScreen.NAVIGATION -> NavigationScreen(
                 uiState = uiState,
                 hasRoutePlan = routePlanUiState.currentPlan.points.isNotEmpty(),
-                onOpenLibrary = library?.let { { screen = BusNavScreen.LIBRARY } },
+                onOpenLibrary = library?.let { { requestScreen(BusNavScreen.LIBRARY) } },
+                onFreeRecalculate = { freeHolder.recalculate(); if (freeHolder.state.value.stage != FreeNavigationStage.IDLE) screen = BusNavScreen.FREE },
+                onEndNavigation = { freeHolder.endNavigation(); library?.clearCurrent() },
                 onLayoutModeChanged = stateHolder::setLayoutMode,
                 onRequestPermission = {
                     permissionLauncher.launch(
@@ -208,22 +277,7 @@ fun NavigationRoute(
                 },
                 onCurrentLocation = stateHolder::onCurrentLocationRequested,
                 onRouteOverview = stateHolder::onRouteOverviewRequested,
-                onEditRoute = {
-                    val id = uiState.activePrescribedRouteId
-                    if (id != null && library != null) {
-                        library.edit(id) {
-                            calculationHolder.cancel()
-                            routePlanHolder.replacePlan(it.routePlan)
-                            routePlanHolder.enterEditor(it.route, null)
-                            editorViewport = null
-                            screen = BusNavScreen.ROUTE_EDIT
-                        }
-                    } else {
-                        routePlanHolder.enterEditor(uiState.activeRoute, candidateRoute)
-                        editorViewport = null
-                        screen = BusNavScreen.ROUTE_EDIT
-                    }
-                },
+                onEditRoute = { routeMenu = true },
                 mapContent = { modifier ->
                     MapScreen(
                         initialCamera = routePlanHolder.camera,
@@ -235,10 +289,39 @@ fun NavigationRoute(
                         isFollowingLocation = uiState.isFollowingLocation,
                         recenterRequestId = uiState.recenterRequestId,
                         activeRoute = uiState.activeRoute,
+                        routePlan = uiState.freePlan?.destinationOverlay(),
                         routeOverviewRequestId = uiState.routeOverviewRequestId,
                         onMapReady = stateHolder::onMapReady,
                         onMapGesture = stateHolder::onManualMapGesture,
                         onMapError = stateHolder::onMapError,
+                        modifier = modifier,
+                    )
+                },
+            )
+            BusNavScreen.FREE -> FreeNavigationScreen(
+                state = freeState,
+                onCancel = { freeHolder.cancel(); screen = BusNavScreen.NAVIGATION },
+                onSetDestination = { freeCursorReader?.invoke()?.let { freeHolder.selectDestination(it) } },
+                onCalculate = { freeHolder.calculate() },
+                onStart = { if (freeHolder.start()) screen = BusNavScreen.NAVIGATION },
+                onChangeDestination = freeHolder::changeDestination,
+                onPermission = { permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) },
+                needsPermission = uiState.locationPermissionState != LocationPermissionState.Granted,
+                cursorReady = freeCursorReader != null && uiState.isMapReady,
+                mapContent = { modifier ->
+                    MapScreen(
+                        initialCamera = freeHolder.camera ?: uiState.location?.let { net.nobu0707.busnav.ui.routeplan.EditorCamera(it.point, 14.0) },
+                        onCameraChanged = freeHolder::saveCamera,
+                        basemapConfig = basemapConfig.withTheme(false),
+                        location = uiState.location, isFollowingLocation = false, recenterRequestId = 0,
+                        activeRoute = freeState.previewRoute ?: uiState.activeRoute.takeIf { freeState.isRecalculation },
+                        routeOverviewRequestId = 0,
+                        routePlan = freeState.plan?.destinationOverlay(),
+                        editorCameraRequest = freeState.cameraRequest, editorBottomPadding = 0,
+                        onEditorCameraApplied = freeHolder::cameraApplied,
+                        onCursorReader = { freeCursorReader = it },
+                        selectionMode = if (freeState.stage == FreeNavigationStage.SELECTING && !freeState.isRecalculation) net.nobu0707.busnav.map.MapSelectionMode.FREE_DESTINATION else net.nobu0707.busnav.map.MapSelectionMode.NONE,
+                        onMapReady = stateHolder::onMapReady, onMapGesture = {}, onMapError = stateHolder::onMapError,
                         modifier = modifier,
                     )
                 },
@@ -328,7 +411,7 @@ fun NavigationRoute(
                             saveAsNew = false
                             saveDialog = true
                         } else {
-                            stateHolder.applyCalculatedRoute(route)
+                            stateHolder.previewEditorCandidate(route)
                             routePlanHolder.completeEditing()
                             screen = BusNavScreen.NAVIGATION
                         }
@@ -393,6 +476,8 @@ fun NavigationScreen(
     onEditRoute: () -> Unit = {},
     hasRoutePlan: Boolean = false,
     onOpenLibrary: (() -> Unit)? = null,
+    onFreeRecalculate: () -> Unit = {},
+    onEndNavigation: () -> Unit = {},
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     BoxWithConstraints(
@@ -413,6 +498,8 @@ fun NavigationScreen(
                 onEditRoute = onEditRoute,
                 hasRoutePlan = hasRoutePlan,
                 onOpenLibrary = onOpenLibrary,
+                onFreeRecalculate = onFreeRecalculate,
+                onEndNavigation = onEndNavigation,
                 mapContent = mapContent,
             )
             NavigationLayoutMode.LandscapeThreeColumn -> LandscapeNavigationLayout(
@@ -423,6 +510,8 @@ fun NavigationScreen(
                 onEditRoute = onEditRoute,
                 hasRoutePlan = hasRoutePlan,
                 onOpenLibrary = onOpenLibrary,
+                onFreeRecalculate = onFreeRecalculate,
+                onEndNavigation = onEndNavigation,
                 mapContent = mapContent,
             )
         }
@@ -438,6 +527,8 @@ private fun PortraitNavigationLayout(
     onEditRoute: () -> Unit,
     hasRoutePlan: Boolean,
     onOpenLibrary: (() -> Unit)?,
+    onFreeRecalculate: () -> Unit,
+    onEndNavigation: () -> Unit,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     Column(
@@ -445,6 +536,7 @@ private fun PortraitNavigationLayout(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         DeviationBanner(uiState.deviation)
+        FreeNavigationActions(uiState, onFreeRecalculate, onEndNavigation)
         NavigationGuidanceCard(uiState, Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.35f).dp))
         MapArea(
             uiState = uiState,
@@ -455,7 +547,7 @@ private fun PortraitNavigationLayout(
             mapContent = mapContent,
         )
         PlaceholderPanel(
-            title = if (onOpenLibrary != null) "所定経路 • 一覧・保存" else "運行情報",
+            title = if (uiState.navigationMode == NavigationMode.FREE) "現在地からナビ" else if (onOpenLibrary != null) "所定経路 • 一覧・保存" else "運行情報",
             detail = operationsSummary(uiState, hasRoutePlan),
             modifier = Modifier.fillMaxWidth().height(70.dp).testTag(NavigationTestTags.OPERATIONS)
                 .then(if (onOpenLibrary != null) Modifier.clickable(onClick = onOpenLibrary).semantics { contentDescription = "所定経路一覧を開く" } else Modifier),
@@ -476,6 +568,8 @@ private fun LandscapeNavigationLayout(
     onEditRoute: () -> Unit,
     hasRoutePlan: Boolean,
     onOpenLibrary: (() -> Unit)?,
+    onFreeRecalculate: () -> Unit,
+    onEndNavigation: () -> Unit,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     Row(
@@ -487,9 +581,10 @@ private fun LandscapeNavigationLayout(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             DeviationBanner(uiState.deviation)
+            FreeNavigationActions(uiState, onFreeRecalculate, onEndNavigation)
             NavigationGuidanceCard(uiState, Modifier.fillMaxWidth().weight(2f))
             PlaceholderPanel(
-                title = if (onOpenLibrary != null) "所定経路 • 一覧・保存" else "運行情報",
+                title = if (uiState.navigationMode == NavigationMode.FREE) "現在地からナビ" else if (onOpenLibrary != null) "所定経路 • 一覧・保存" else "運行情報",
                 detail = operationsSummary(uiState, hasRoutePlan),
                 modifier = Modifier.fillMaxWidth().weight(1f).testTag(NavigationTestTags.OPERATIONS)
                 .then(if (onOpenLibrary != null) Modifier.clickable(onClick = onOpenLibrary).semantics { contentDescription = "所定経路一覧を開く" } else Modifier),
@@ -541,7 +636,7 @@ private fun MapArea(
                 enabled = uiState.activeRoute != null,
                 modifier = Modifier
                     .testTag(NavigationTestTags.ROUTE_OVERVIEW)
-                    .semantics { contentDescription = "所定経路全体を表示" },
+                    .semantics { contentDescription = uiState.routeLabel + "全体を表示" },
             ) {
                 Text("経路全体")
             }
@@ -632,7 +727,7 @@ private fun BottomControl(label: String, enabled: Boolean, onClick: () -> Unit, 
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 2.dp, vertical = 8.dp),
         modifier = modifier.heightIn(min = 48.dp)
             .testTag(if (enabled) NavigationTestTags.ROUTE_EDIT else "bottom_$label")
-            .semantics { if (enabled) contentDescription = "ルート編集画面を開く" },
+            .semantics { if (enabled) contentDescription = "ルートメニューを開く" },
     ) {
         Text(label, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             maxLines = BottomLabelLayout.maxLines, softWrap = false,
@@ -646,12 +741,12 @@ private fun locationSummary(state: NavigationUiState): String = when {
     else -> "位置情報なしでも地図を閲覧できます"
 }
 
-private fun operationsSummary(state: NavigationUiState, hasRoutePlan: Boolean = false): String {
+internal fun operationsSummary(state: NavigationUiState, hasRoutePlan: Boolean = false): String {
     val route = when {
-        state.isRouteLoading -> "所定経路：読み込み中"
-        state.routeError != null -> "所定経路：読込失敗"
-        state.activeRoute != null -> "所定経路：${state.activePrescribedRouteName ?: state.activeRoute.name}"
-        else -> "所定経路：未選択"
+        state.isRouteLoading -> "経路：読み込み中"
+        state.routeError != null -> "経路：読込失敗"
+        state.activeRoute != null -> "${state.routeLabel}：${if (state.navigationMode == NavigationMode.FREE) state.freePlan?.destinationName ?: "目的地まで" else state.activePrescribedRouteName ?: state.activeRoute.name}"
+        else -> "経路：未選択"
     }
     val location = state.locationError ?: locationSummary(state)
     val plan = if (hasRoutePlan) "・編集プランあり" else ""
@@ -692,5 +787,18 @@ private fun LandscapePreview() = BusNavTheme {
 private fun PreviewMap(modifier: Modifier) {
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
         Text("MapLibre 地図")
+    }
+}
+
+@Composable
+private fun FreeNavigationActions(state: NavigationUiState, recalculate: () -> Unit, end: () -> Unit) {
+    if (!state.navigationActive || state.navigationMode != NavigationMode.FREE) return
+    Column {
+        if (state.arrival.state == ArrivalState.ARRIVED) Text("目的地周辺です", Modifier.testTag("free_arrived"))
+        Row {
+            if (state.arrival.state != ArrivalState.ARRIVED)
+                TextButton(onClick = recalculate, modifier = Modifier.testTag("free_recalculate")) { Text("現在地から再計算") }
+            TextButton(onClick = end, modifier = Modifier.testTag("free_end")) { Text("案内終了") }
+        }
     }
 }

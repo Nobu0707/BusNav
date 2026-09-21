@@ -48,7 +48,12 @@ class GuidanceRuntimeSmokeTest {
             }
         }
         rule.setContent { BusNavTheme { NavigationRoute(provider, InMemoryScheduledRouteRepository(), engine) } }
-        rule.onNodeWithContentDescription("ルート編集画面を開く").performClick()
+        run {
+                rule.onNodeWithContentDescription("ルートメニューを開く").performClick()
+                rule.onNodeWithText("経路編集").performClick()
+                if (rule.onAllNodesWithTag("session_switch_confirm").fetchSemanticsNodes().isNotEmpty())
+                    rule.onNodeWithTag("session_switch_confirm").performClick()
+            }
         rule.runOnUiThread {
             val holder = ViewModelProvider(rule.activity)[RoutePlanEditorViewModel::class.java].stateHolder
             holder.selectAddMode(RoutePlanPointType.START); holder.addPoint(GeoPoint(35.161,136.882))
@@ -58,6 +63,8 @@ class GuidanceRuntimeSmokeTest {
             rule.onNodeWithTag(RoutePlanEditorTestTags.CALCULATE).performClick()
             rule.waitUntil(120_000) { rule.onAllNodesWithTag(RoutePlanEditorTestTags.APPLY).fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithTag(RoutePlanEditorTestTags.APPLY).performClick()
+            rule.onNodeWithContentDescription("ルートメニューを開く").performClick()
+            rule.onNodeWithText("案内開始").performClick()
             rule.waitUntil(10_000) { rule.onAllNodesWithTag("guidance_distance").fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithText("出発").assertIsDisplayed()
             rule.onNodeWithTag("guidance_distance").assertIsDisplayed()
@@ -67,7 +74,12 @@ class GuidanceRuntimeSmokeTest {
             rule.waitUntil(10_000) { rule.onAllNodesWithText("経路付近の位置を確認中").fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithTag("guidance_distance").assertDoesNotExist()
             rule.runOnIdle { assertEquals(attempt + 1, calls) }
-            if (attempt == 0) rule.onNodeWithContentDescription("ルート編集画面を開く").performClick()
+            if (attempt == 0) run {
+                rule.onNodeWithContentDescription("ルートメニューを開く").performClick()
+                rule.onNodeWithText("経路編集").performClick()
+                if (rule.onAllNodesWithTag("session_switch_confirm").fetchSemanticsNodes().isNotEmpty())
+                    rule.onNodeWithTag("session_switch_confirm").performClick()
+            }
         }
     }
 }

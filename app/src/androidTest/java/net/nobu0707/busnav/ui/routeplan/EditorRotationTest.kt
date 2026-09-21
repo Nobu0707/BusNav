@@ -23,6 +23,9 @@ class EditorRotationTest {
     @Test fun portraitLandscapeAndRecreationRetainEditorStateWithoutRefit() {
         rule.waitUntil(15000) { rule.onAllNodesWithTag(NavigationTestTags.ROUTE_EDIT).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag(NavigationTestTags.ROUTE_EDIT).performClick()
+        rule.onNodeWithText("経路編集").performClick()
+        if (rule.onAllNodesWithTag("session_switch_confirm").fetchSemanticsNodes().isNotEmpty())
+            rule.onNodeWithTag("session_switch_confirm").performClick()
         lateinit var holder: RoutePlanEditorStateHolder
         rule.runOnIdle { holder = ViewModelProvider(rule.activity)[RoutePlanEditorViewModel::class.java].stateHolder }
         awaitMap()

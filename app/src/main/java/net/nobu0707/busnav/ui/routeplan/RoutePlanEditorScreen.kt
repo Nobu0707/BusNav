@@ -160,14 +160,7 @@ fun RoutePlanEditorScreen(
             }
             Box(Modifier.fillMaxWidth().weight(1f).testTag(RoutePlanEditorTestTags.MAP)) {
                 mapContent(Modifier.fillMaxSize())
-                val cursorColor = MaterialTheme.colorScheme.primary
-                Canvas(Modifier.fillMaxSize().testTag(RoutePlanEditorTestTags.CURSOR)
-                    .semantics { contentDescription = "登録位置・地図中央" }) {
-                    val c = center
-                    drawCircle(androidx.compose.ui.graphics.Color.White, 8.dp.toPx(), c)
-                    drawLine(cursorColor, Offset(c.x, c.y - 16.dp.toPx()), Offset(c.x, c.y + 16.dp.toPx()), 2.dp.toPx())
-                    drawLine(cursorColor, Offset(c.x - 16.dp.toPx(), c.y), Offset(c.x + 16.dp.toPx(), c.y), 2.dp.toPx())
-                }
+                net.nobu0707.busnav.map.MapSelectionCursor(net.nobu0707.busnav.map.MapSelectionMode.ROUTE_POINT)
                 Card(Modifier.align(Alignment.TopStart).padding(8.dp)) {
                     Text(if (calculationState is RouteCalculationState.Success && calculationState.planRevision == uiState.revision)
                         "探索結果（道路沿いルート）" else "仮ルート（経路探索前プレビュー）",

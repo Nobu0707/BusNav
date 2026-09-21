@@ -34,7 +34,7 @@ class MatchingStateHolderTest {
             val events=mutableListOf<String>()
             val h=NavigationStateHolder(p,object:ScheduledRouteRepository{override suspend fun getActiveRoute()=r},
                 backgroundScope,StandardTestDispatcher(testScheduler),{testScheduler.currentTime},diagnostics=events::add)
-            h.setPermission(LocationPermissionState.Granted);runCurrent()
+            h.setPermission(LocationPermissionState.Granted);runCurrent();h.applyCalculatedRoute(r);runCurrent()
             var calls=0
             val calculation=RouteCalculationStateHolder(RoutingEngine { calls++;RoutingResult.Success(r,RoutingSummary(1000.0,60.0)) },backgroundScope)
             val plan=RoutePlan("plan",points=listOf(RoutePlanPoint("s",RoutePlanPointType.START,r.geometry.first),
@@ -67,7 +67,7 @@ class MatchingStateHolderTest {
         val r=route();val p=Provider()
         val h=NavigationStateHolder(p,object:ScheduledRouteRepository{override suspend fun getActiveRoute()=r},
             backgroundScope,StandardTestDispatcher(testScheduler),{testScheduler.currentTime})
-        h.setPermission(LocationPermissionState.Granted);runCurrent()
+        h.setPermission(LocationPermissionState.Granted);runCurrent();h.applyCalculatedRoute(r);runCurrent()
         p.send(0);runCurrent();assertEquals(GuidanceStatus.RELIABLE,h.uiState.value.guidance.status)
         advanceTimeBy(10000);runCurrent()
         assertEquals(RouteMatchQuality.UNRELIABLE,h.uiState.value.deviationSnapshot.matchQuality)
@@ -81,7 +81,7 @@ class MatchingStateHolderTest {
         val r=route();val p=Provider()
         val h=NavigationStateHolder(p,object:ScheduledRouteRepository{override suspend fun getActiveRoute()=r},
             backgroundScope,StandardTestDispatcher(testScheduler),{testScheduler.currentTime})
-        h.setPermission(LocationPermissionState.Granted);runCurrent()
+        h.setPermission(LocationPermissionState.Granted);runCurrent();h.applyCalculatedRoute(r);runCurrent()
         advanceTimeBy(1000);p.send(1000);runCurrent()
         val before=h.uiState.value
         p.send(999,.001);p.send(1000,.001);runCurrent()
@@ -91,12 +91,12 @@ class MatchingStateHolderTest {
         val r=route();val p=Provider()
         val h=NavigationStateHolder(p,object:ScheduledRouteRepository{override suspend fun getActiveRoute()=r},
             backgroundScope,StandardTestDispatcher(testScheduler),{testScheduler.currentTime})
-        h.setPermission(LocationPermissionState.Granted);runCurrent()
+        h.setPermission(LocationPermissionState.Granted);runCurrent();h.applyCalculatedRoute(r);runCurrent()
         p.send(0,.001);runCurrent()
         advanceTimeBy(1500);p.send(1500,.001);runCurrent()
         advanceTimeBy(1500);p.send(3000,.001);runCurrent()
         assertEquals(RouteDeviationState.OFF_ROUTE,h.uiState.value.deviationSnapshot.state)
-        val other=route("replacement");h.applyCalculatedRoute(other)
+        val other=route("replacement");h.clearRoute();h.applyCalculatedRoute(other)
         assertEquals(RouteDeviationState.UNKNOWN,h.uiState.value.deviationSnapshot.state)
         runCurrent()
         assertSame(other,h.uiState.value.activeRoute)
@@ -113,7 +113,7 @@ class MatchingStateHolderTest {
         val r=route();val p=Provider();val worker=QueuedDispatcher()
         val h=NavigationStateHolder(p,object:ScheduledRouteRepository{override suspend fun getActiveRoute()=r},
             backgroundScope,worker,{testScheduler.currentTime})
-        h.setPermission(LocationPermissionState.Granted);runCurrent();worker.runAll();runCurrent()
+        h.setPermission(LocationPermissionState.Granted);runCurrent();h.applyCalculatedRoute(r);runCurrent();worker.runAll();runCurrent()
         p.send(0,.001);runCurrent() // A is pending on the worker.
         advanceTimeBy(1000);p.send(1000);runCurrent() // B replaces A.
         worker.runLast();runCurrent()
@@ -121,7 +121,7 @@ class MatchingStateHolderTest {
         val newest=h.uiState.value
         worker.runAll();runCurrent();assertEquals(newest,h.uiState.value)
         advanceTimeBy(1000);p.send(2000,.001);runCurrent()
-        h.applyCalculatedRoute(route("new"));runCurrent()
+        h.clearRoute();h.applyCalculatedRoute(route("new"));runCurrent()
         worker.runLast();runCurrent();worker.runAll();runCurrent()
         assertEquals("new",h.uiState.value.activeRoute!!.id)
         assertEquals(1,h.uiState.value.deviationSnapshot.consecutiveOffRouteFixes)
@@ -132,7 +132,7 @@ class MatchingStateHolderTest {
         val p=Provider()
         val h=NavigationStateHolder(p,object:ScheduledRouteRepository{override suspend fun getActiveRoute()=r},
             backgroundScope,StandardTestDispatcher(testScheduler),{testScheduler.currentTime})
-        h.setPermission(LocationPermissionState.Granted);runCurrent()
+        h.setPermission(LocationPermissionState.Granted);runCurrent();h.applyCalculatedRoute(r);runCurrent()
         repeat(3){advanceTimeBy(1500);p.send(testScheduler.currentTime,.001);runCurrent()}
         assertEquals(RouteDeviationState.OFF_ROUTE,h.uiState.value.deviationSnapshot.state)
         assertEquals(GuidanceStatus.NO_GUIDANCE,h.uiState.value.guidance.status)
@@ -141,7 +141,7 @@ class MatchingStateHolderTest {
         val r=route();val p=Provider()
         val h=NavigationStateHolder(p,object:ScheduledRouteRepository{override suspend fun getActiveRoute()=r},
             backgroundScope,StandardTestDispatcher(testScheduler),{testScheduler.currentTime})
-        h.setPermission(LocationPermissionState.Granted);runCurrent();p.send(0);runCurrent()
+        h.setPermission(LocationPermissionState.Granted);runCurrent();h.applyCalculatedRoute(r);runCurrent();p.send(0);runCurrent()
         val snapshot=h.uiState.value.deviationSnapshot
         h.setLayoutMode(NavigationLayoutMode.LandscapeThreeColumn);runCurrent()
         assertSame(snapshot,h.uiState.value.deviationSnapshot)
@@ -151,7 +151,7 @@ class MatchingStateHolderTest {
         val r=route();val p=Provider();val worker=QueuedDispatcher()
         val h=NavigationStateHolder(p,object:ScheduledRouteRepository{override suspend fun getActiveRoute()=r},
             backgroundScope,worker,{testScheduler.currentTime})
-        h.setPermission(LocationPermissionState.Granted);runCurrent()
+        h.setPermission(LocationPermissionState.Granted);runCurrent();h.applyCalculatedRoute(r);runCurrent()
         h.applyCalculatedRoute(r)
         worker.runAll();runCurrent()
         p.send(0);runCurrent();worker.runAll();runCurrent()

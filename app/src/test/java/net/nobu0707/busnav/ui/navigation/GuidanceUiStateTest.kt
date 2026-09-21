@@ -53,7 +53,7 @@ class GuidanceUiStateTest {
         }
     }
     private fun holder(route: ScheduledRoute?, provider: TestProvider, scope: CoroutineScope) = NavigationStateHolder(
-        provider, object : ScheduledRouteRepository { override suspend fun getActiveRoute() = route }, scope, Dispatchers.Unconfined, elapsedMillis = { provider.now })
+        provider, object : ScheduledRouteRepository { override suspend fun getActiveRoute() = route }, scope, Dispatchers.Unconfined, elapsedMillis = { provider.now }).also { h -> route?.let(h::applyCalculatedRoute) }
     @Test fun noRouteHasNoGuidance() {
         val scope = CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
         try { assertEquals(GuidanceStatus.NO_ROUTE, holder(null,TestProvider(),scope).uiState.value.guidance.status) } finally { scope.cancel() }
@@ -94,7 +94,7 @@ class GuidanceUiStateTest {
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
         try {
             val p=TestProvider();val h=holder(route(),p,scope);h.setPermission(LocationPermissionState.Granted)
-            p.position(lon=0.0029);h.applyCalculatedRoute(route("new"));p.position()
+            p.position(lon=0.0029);h.clearRoute();h.applyCalculatedRoute(route("new"));p.position()
             assertEquals("new",h.uiState.value.activeRoute!!.id)
             assertEquals("右折",h.uiState.value.guidance.primaryText)
         } finally { scope.cancel() }

@@ -17,6 +17,33 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PrescribedRouteTest {
+    @Test fun freeCalculationStartAndEndNeverWriteSavedLibrary() = runTest {
+        val record = prescribedFixture()
+        val repository = FakeRepository(record)
+        val positions = MutableStateFlow<LocationUpdate>(LocationUpdate.Position(LocationState(
+            record.route.start.position, 5f, null, null, 0, 0)))
+        val provider = object : LocationProvider {
+            override fun updates() = positions
+            override fun isLocationEnabled() = true
+        }
+        val nav = NavigationStateHolder(provider, object : ScheduledRouteRepository {
+            override suspend fun getActiveRoute() = null
+        }, backgroundScope, StandardTestDispatcher(testScheduler), { testScheduler.currentTime })
+        val library = PrescribedRouteLibraryStateHolder(repository, backgroundScope, { nav.uiState.value.activePrescribedRouteId })
+        val free = net.nobu0707.busnav.ui.free.FreeNavigationStateHolder(RoutingEngine {
+            RoutingResult.Success(record.route, RoutingSummary(1000.0, 120.0))
+        }, nav, backgroundScope, { testScheduler.currentTime })
+        nav.setPermission(LocationPermissionState.Granted); runCurrent()
+        val before = repository.records.toMap()
+        free.beginSelection(); free.selectDestination(record.route.destination.position); free.calculate(); runCurrent()
+        assertEquals(0, repository.writes)
+        assertTrue(free.start()); runCurrent()
+        free.endNavigation(); runCurrent()
+        assertEquals(before, repository.records)
+        assertEquals(0, repository.writes)
+        assertEquals(1, library.state.value.routes.size)
+    }
+
     private fun roundtrip(r: PrescribedRouteRecord) = PrescribedRouteCodec.record(r.id, r.name, r.description,
         r.createdAtEpochMillis, r.updatedAtEpochMillis, PrescribedRouteCodec.decode(PrescribedRouteCodec.encode(r)))
     @Test fun largePayloadRoundtripPreservesEveryFieldExactly() {
@@ -177,6 +204,9 @@ class PrescribedRouteTest {
         val b = prescribedFixture("b", size = 200)
         nav.openPrescribedRoute(a); runCurrent()
         nav.startNavigation()
+        assertFalse(nav.openPrescribedRoute(b))
+        assertEquals("a", nav.uiState.value.activePrescribedRouteId)
+        nav.clearRoute()
         nav.openPrescribedRoute(b); runCurrent()
         assertEquals("b", nav.uiState.value.activePrescribedRouteId)
         assertEquals(NavigationMode.PRESCRIBED, nav.uiState.value.navigationMode)

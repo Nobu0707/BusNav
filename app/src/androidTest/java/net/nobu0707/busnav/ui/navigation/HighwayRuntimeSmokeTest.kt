@@ -121,7 +121,12 @@ class HighwayRuntimeSmokeTest {
             instrumentation.uiAutomation.executeShellCommand("cp ${file.absolutePath} /sdcard/Download/busnav-highway-${if (kanto) "kanto-" else ""}$name.png").close()
         }
         rule.runOnUiThread { content() }
-        rule.onNodeWithContentDescription("ルート編集画面を開く").performClick()
+        run {
+                rule.onNodeWithContentDescription("ルートメニューを開く").performClick()
+                rule.onNodeWithText("経路編集").performClick()
+                if (rule.onAllNodesWithTag("session_switch_confirm").fetchSemanticsNodes().isNotEmpty())
+                    rule.onNodeWithTag("session_switch_confirm").performClick()
+            }
         rule.runOnUiThread {
             val editor = ViewModelProvider(rule.activity)[RoutePlanEditorViewModel::class.java].stateHolder
             editor.selectAddMode(RoutePlanPointType.START); editor.addPoint(if (kanto) GeoPoint(35.6812, 139.7671) else GeoPoint(35.161, 136.882))
@@ -129,7 +134,11 @@ class HighwayRuntimeSmokeTest {
         }
         rule.onNodeWithTag(RoutePlanEditorTestTags.CALCULATE).performClick()
         rule.waitUntil(120000) { rule.onAllNodesWithTag(RoutePlanEditorTestTags.APPLY).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag(RoutePlanEditorTestTags.POINT_LIST).performScrollToNode(hasTestTag(RoutePlanEditorTestTags.APPLY))
         rule.onNodeWithTag(RoutePlanEditorTestTags.APPLY).performClick()
+        rule.waitUntil(10000) { rule.onAllNodesWithTag(NavigationTestTags.MAP).fetchSemanticsNodes().isNotEmpty() }
+            rule.onNodeWithContentDescription("ルートメニューを開く").performClick()
+            rule.onNodeWithText("案内開始").performClick()
         val calculator = NavigationProgressCalculator(route)
         val decisions = calculator.highwayCalculator.decisions
         assertTrue(decisions.isNotEmpty())
@@ -183,10 +192,19 @@ class HighwayRuntimeSmokeTest {
                 rule.runOnIdle { assertSame(route, holder().uiState.value.activeRoute) }
             }
         }
-        rule.onNodeWithContentDescription("ルート編集画面を開く").performClick()
+        run {
+                rule.onNodeWithContentDescription("ルートメニューを開く").performClick()
+                rule.onNodeWithText("経路編集").performClick()
+                if (rule.onAllNodesWithTag("session_switch_confirm").fetchSemanticsNodes().isNotEmpty())
+                    rule.onNodeWithTag("session_switch_confirm").performClick()
+            }
         rule.onNodeWithTag(RoutePlanEditorTestTags.CALCULATE).performClick()
         rule.waitUntil(120000) { rule.onAllNodesWithTag(RoutePlanEditorTestTags.APPLY).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag(RoutePlanEditorTestTags.POINT_LIST).performScrollToNode(hasTestTag(RoutePlanEditorTestTags.APPLY))
         rule.onNodeWithTag(RoutePlanEditorTestTags.APPLY).performClick()
+        rule.waitUntil(10000) { rule.onAllNodesWithTag(NavigationTestTags.MAP).fetchSemanticsNodes().isNotEmpty() }
+            rule.onNodeWithContentDescription("ルートメニューを開く").performClick()
+            rule.onNodeWithText("案内開始").performClick()
         rule.runOnIdle { assertEquals(2, calls) }
         rule.onNodeWithText("経路探索結果を読み取れませんでした").assertDoesNotExist()
     }

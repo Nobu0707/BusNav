@@ -60,6 +60,9 @@ class EditorMapRuntimeTest {
     private fun enter() {
         val previous = view
         rule.onNodeWithTag(NavigationTestTags.ROUTE_EDIT).performClick()
+        rule.onNodeWithText("経路編集").performClick()
+        if (rule.onAllNodesWithTag("session_switch_confirm").fetchSemanticsNodes().isNotEmpty())
+            rule.onNodeWithTag("session_switch_confirm").performClick()
         rule.waitUntil(10000) {
             rule.onAllNodesWithTag(RoutePlanEditorTestTags.SCREEN).fetchSemanticsNodes().isNotEmpty()
         }

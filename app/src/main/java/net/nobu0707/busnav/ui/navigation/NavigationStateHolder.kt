@@ -27,6 +27,7 @@ class NavigationStateHolder(
     private var matcher: RouteMatcher? = null
     private var matcherState = RouteMatcherState()
     private val detector = RouteDeviationDetector()
+    private val arrivalDetector = ArrivalDetector()
     private var deviation = RouteDeviationSnapshot()
     private var previousHighway: HighwayGuidanceSnapshot? = null
     private var generation = 0L
@@ -42,7 +43,10 @@ class NavigationStateHolder(
         scope.launch {
             try {
                 val route = routeRepository.getActiveRoute()
-                if (revision == routeGeneration) update { copy(activeRoute = route, isRouteLoading = false, routeError = null) }
+                if (revision == routeGeneration) update { copy(activeRoute = route,
+                    freePlan = route?.let { FreeNavigationPlan(it.destination.position, it.name) },
+                    navigationMode = if (route != null) net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE else navigationMode,
+                    isRouteLoading = false, routeError = null) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -101,21 +105,70 @@ class NavigationStateHolder(
         update { copy(isFollowingLocation = false, routeOverviewRequestId = routeOverviewRequestId + 1) }
     }
 
+    fun previewEditorCandidate(route: ScheduledRoute) =
+        previewFreeRoute(FreeNavigationPlan(route.destination.position, route.name), route)
+
     fun applyCalculatedRoute(route: ScheduledRoute) {
-        update { copy(activeRoute = route, activePrescribedRouteId = null, activePrescribedRouteName = null, isNavigationStarted = true, isRouteLoading = false, routeError = null, routeOverviewRequestId = routeOverviewRequestId + 1) }
+        // Compatibility for explicitly applied unsaved editor candidates.
+        if (_uiState.value.isNavigationStarted) return
+        val following = _uiState.value.isFollowingLocation
+        previewEditorCandidate(route)
+        startFreeNavigation()
+        update { copy(isFollowingLocation = following) }
     }
 
-    fun openPrescribedRoute(record: net.nobu0707.busnav.domain.prescribed.PrescribedRouteRecord) {
-        update { copy(activeRoute = record.route, activePrescribedRouteId = record.id, activePrescribedRouteName = record.name,
+    /** Cross-session replacements require an explicit end of the active session. */
+    fun beginFreeSelection(): Boolean {
+        if (_uiState.value.isNavigationStarted) return false
+        clearRoute()
+        update { copy(navigationMode = net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE) }
+        return true
+    }
+
+    fun previewFreeRoute(plan: FreeNavigationPlan, route: ScheduledRoute): Boolean {
+        if (_uiState.value.isNavigationStarted) return false
+        update { copy(activeRoute = route, freePlan = plan, activePrescribedRouteId = null,
+            activePrescribedRouteName = null, navigationMode = net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE,
+            isNavigationStarted = false, isFollowingLocation = false, isRouteLoading = false, routeError = null,
+            routeOverviewRequestId = routeOverviewRequestId + 1) }
+        return true
+    }
+
+    fun startFreeNavigation(): Boolean {
+        if (_uiState.value.navigationMode != net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE ||
+            _uiState.value.freePlan == null || _uiState.value.activeRoute == null) return false
+        update { copy(isNavigationStarted = true, isFollowingLocation = true) }
+        return true
+    }
+
+    fun replaceFreeRoute(plan: FreeNavigationPlan, route: ScheduledRoute): Boolean {
+        if (!_uiState.value.navigationActive || _uiState.value.navigationMode != net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE ||
+            _uiState.value.freePlan != plan) return false
+        update { copy(activeRoute = route, isFollowingLocation = true, routeOverviewRequestId = routeOverviewRequestId + 1) }
+        return true
+    }
+
+    fun openPrescribedRoute(record: net.nobu0707.busnav.domain.prescribed.PrescribedRouteRecord): Boolean {
+        if (_uiState.value.isNavigationStarted) return false
+        update { copy(activeRoute = record.route, freePlan = null, activePrescribedRouteId = record.id, activePrescribedRouteName = record.name,
             navigationMode = net.nobu0707.busnav.domain.prescribed.NavigationMode.PRESCRIBED,
             isNavigationStarted = false, isFollowingLocation = false, isRouteLoading = false,
             routeError = null, routeOverviewRequestId = routeOverviewRequestId + 1) }
+        return true
     }
     fun refreshPrescribedName(id: String, name: String) {
         if (_uiState.value.activePrescribedRouteId == id) update { copy(activePrescribedRouteName = name) }
     }
-    fun startNavigation() { if (_uiState.value.activeRoute != null) update { copy(isNavigationStarted = true) } }
-    fun clearRoute() = update { copy(activeRoute = null, activePrescribedRouteId = null, activePrescribedRouteName = null, isNavigationStarted = false) }
+    fun startNavigation() {
+        if (_uiState.value.navigationMode == net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE) startFreeNavigation()
+        else if (_uiState.value.activeRoute != null && _uiState.value.activePrescribedRouteId != null)
+            update { copy(isNavigationStarted = true) }
+    }
+    fun clearRoute() {
+        routeGeneration++ // Invalidate even a pending initial load when activeRoute is already null.
+        update { copy(activeRoute = null, freePlan = null, arrival = ArrivalSnapshot(), activePrescribedRouteId = null,
+            activePrescribedRouteName = null, isNavigationStarted = false, isRouteLoading = false) }
+    }
 
     private fun emitTransitions() {
         if (lastDiagnosticQuality != deviation.matchQuality) {
@@ -135,10 +188,11 @@ class NavigationStateHolder(
         emitTransitions()
         val state = _uiState.value
         _uiState.value = state.copy(
-            guidance = if (state.activeRoute == null) GuidanceUiState() else GuidanceUiState(GuidanceStatus.WAITING_LOCATION, "位置情報を確認中"),
+            guidance = if (!state.navigationActive) GuidanceUiState() else GuidanceUiState(GuidanceStatus.WAITING_LOCATION, "位置情報を確認中"),
             highwayGuidance = null,
-            deviation = if (state.activeRoute == null) DeviationUiState() else deviationUiState(deviation),
+            deviation = if (!state.navigationActive) DeviationUiState() else deviationUiState(deviation, state.navigationMode),
             deviationSnapshot = deviation,
+            arrival = if (state.arrival.state == ArrivalState.ARRIVED) state.arrival else ArrivalSnapshot(),
         )
     }
 
@@ -150,7 +204,7 @@ class NavigationStateHolder(
         val location = state.location
         val prepared = calculator
         val matching = matcher
-        if (route == null || location == null || state.locationPermissionState != LocationPermissionState.Granted ||
+        if (!state.navigationActive || route == null || location == null || state.locationPermissionState != LocationPermissionState.Granted ||
             state.locationError != null || prepared == null || matching == null) {
             markUnavailable()
             return
@@ -183,9 +237,13 @@ class NavigationStateHolder(
                 else guidanceUiState(progress)
             val highway = prepared.highwayCalculator.calculate(progress.distanceAlongRouteMeters, reliability, highwayBefore)
             previousHighway = highway
+            val arrival = state.freePlan?.let { plan ->
+                arrivalDetector.update(_uiState.value.arrival, location, plan.destination, progress.remainingRouteMeters,
+                    progress.isProjectionReliable, elapsedMillis())
+            } ?: ArrivalSnapshot()
             emitTransitions()
             _uiState.value = _uiState.value.copy(guidance = display, highwayGuidance = HighwayInstructionFormatter.format(highway),
-                deviation = deviationUiState(deviation), deviationSnapshot = deviation)
+                deviation = deviationUiState(deviation, state.navigationMode), deviationSnapshot = deviation, arrival = arrival)
         }
     }
 
@@ -194,6 +252,7 @@ class NavigationStateHolder(
         val after = before.transform()
         _uiState.value = after
         if (before.activeRoute !== after.activeRoute) {
+            _uiState.value = _uiState.value.copy(arrival = ArrivalSnapshot())
             routeGeneration++
             preparationJob?.cancel()
             calculator = null
@@ -218,7 +277,7 @@ class NavigationStateHolder(
             }
         }
         if (before.activeRoute !== after.activeRoute) return
-        if (before.location != after.location ||
+        if (before.location != after.location || before.isNavigationStarted != after.isNavigationStarted ||
             before.locationPermissionState != after.locationPermissionState || before.locationError != after.locationError) refreshGuidance()
     }
 }

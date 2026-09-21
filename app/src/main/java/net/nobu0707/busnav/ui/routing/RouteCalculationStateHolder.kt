@@ -24,6 +24,7 @@ class RouteCalculationStateHolder(
     private val _state = MutableStateFlow<RouteCalculationState>(RouteCalculationState.Idle)
     val state: StateFlow<RouteCalculationState> = _state.asStateFlow()
     private var calculationJob: Job? = null
+    private var generation = 0L
 
     fun calculate(plan: RoutePlan, planRevision: Long, profile: VehicleProfile = vehicleProfile): Boolean {
         val request = when (val result = plan.toRoutingRequest(profile)) {
@@ -31,21 +32,22 @@ class RouteCalculationStateHolder(
             is RoutingRequestResult.Ready -> result.request
         }
         calculationJob?.cancel()
+        val requestGeneration = ++generation
         _state.value = RouteCalculationState.Calculating(planRevision)
         calculationJob = scope.launch {
             try {
                 when (val result = routingEngine.calculateRoute(request)) {
-                    is RoutingResult.Success -> if (isCurrentCalculation(planRevision)) {
+                    is RoutingResult.Success -> if (isCurrentCalculation(planRevision, requestGeneration)) {
                         _state.value = RouteCalculationState.Success(planRevision, result.route, result.summary)
                     }
-                    is RoutingResult.Failure -> if (isCurrentCalculation(planRevision)) {
+                    is RoutingResult.Failure -> if (isCurrentCalculation(planRevision, requestGeneration)) {
                         _state.value = RouteCalculationState.Failure(planRevision, result.reason)
                     }
                 }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                if (isCurrentCalculation(planRevision)) {
+                if (isCurrentCalculation(planRevision, requestGeneration)) {
                     _state.value = RouteCalculationState.Failure(planRevision, RoutingFailure.NETWORK)
                 }
             }
@@ -57,6 +59,7 @@ class RouteCalculationStateHolder(
         val current = _state.value
         when {
             current is RouteCalculationState.Calculating && current.planRevision != currentRevision -> {
+                generation++
                 calculationJob?.cancel()
                 calculationJob = null
                 _state.value = RouteCalculationState.Idle
@@ -73,11 +76,12 @@ class RouteCalculationStateHolder(
             ?.route
 
     fun cancel() {
+        generation++
         calculationJob?.cancel()
         calculationJob = null
         if (_state.value is RouteCalculationState.Calculating) _state.value = RouteCalculationState.Idle
     }
 
-    private fun isCurrentCalculation(revision: Long): Boolean =
-        (_state.value as? RouteCalculationState.Calculating)?.planRevision == revision
+    private fun isCurrentCalculation(revision: Long, requestGeneration: Long): Boolean =
+        generation == requestGeneration && (_state.value as? RouteCalculationState.Calculating)?.planRevision == revision
 }

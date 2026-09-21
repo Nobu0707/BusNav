@@ -62,6 +62,7 @@ fun MapScreen(
     editorBottomPadding: Int? = null,
     onEditorCameraApplied: (Long) -> Unit = {},
     onCursorReader: (((() -> GeoPoint?)?) -> Unit) = {},
+    selectionMode: MapSelectionMode = if (onMapLongPress != null) MapSelectionMode.ROUTE_POINT else MapSelectionMode.NONE,
     monitorTunnel: Boolean = false,
     onTunnelChanged: (Boolean) -> Unit = {},
     onMapReady: () -> Unit,
@@ -101,8 +102,8 @@ fun MapScreen(
         ).also { it.attach(mapView) }
     }
 
-    DisposableEffect(controller) {
-        onCursorReader(controller::cursorPosition)
+    DisposableEffect(controller, selectionMode) {
+        onCursorReader(if (selectionMode != MapSelectionMode.NONE) controller::cursorPosition else null)
         onDispose { onCursorReader(null) }
     }
 

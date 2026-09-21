@@ -126,7 +126,15 @@ class MatchingRuntimeSmokeTest {
         }
         rule.runOnUiThread { content() }
         rule.waitUntil(10000) { rule.onAllNodesWithTag(NavigationTestTags.MAP).fetchSemanticsNodes().isNotEmpty() }
-        rule.runOnIdle { holder().applyCalculatedRoute(route) }
+        rule.runOnIdle {
+            holder().openPrescribedRoute(net.nobu0707.busnav.domain.prescribed.PrescribedRouteRecord(
+                "matching-saved", route.name, null,
+                net.nobu0707.busnav.domain.routeplan.RoutePlan("matching-plan", points = route.points.map {
+                    net.nobu0707.busnav.domain.routeplan.RoutePlanPoint(it.id,
+                        net.nobu0707.busnav.domain.routeplan.RoutePlanPointType.valueOf(it.type.name), it.position, it.name)
+                }), route, VehicleProfile.DEVELOPMENT_LARGE_BUS, 0, 0))
+            holder().startNavigation()
+        }
         position(pair.first);await(RouteDeviationState.ON_ROUTE)
         rule.onNodeWithTag("deviation_banner").assertDoesNotExist()
         rule.runOnIdle { assertEquals(GuidanceStatus.RELIABLE,holder().uiState.value.guidance.status) }

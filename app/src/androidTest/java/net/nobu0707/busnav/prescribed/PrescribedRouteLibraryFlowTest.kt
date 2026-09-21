@@ -111,6 +111,7 @@ class PrescribedRouteLibraryFlowTest {
             assertEquals(1, calls)
             openLibrary()
             rule.onNodeWithText("編集", substring = false).performClick()
+            waitTag(RoutePlanEditorTestTags.SCREEN)
             rule.runOnIdle { editor().removePoint("via") }
             rule.onNodeWithTag(RoutePlanEditorTestTags.BACK).performClick()
             assertEquals(saved, record(original.id))
@@ -118,6 +119,7 @@ class PrescribedRouteLibraryFlowTest {
 
             openLibrary()
             rule.onNodeWithText("編集", substring = false).performClick()
+            waitTag(RoutePlanEditorTestTags.SCREEN)
             rule.runOnIdle { editor().removePoint("via") }
             offline = false
             calculateApply()

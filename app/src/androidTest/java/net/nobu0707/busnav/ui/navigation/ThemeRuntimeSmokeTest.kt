@@ -145,6 +145,9 @@ class ThemeRuntimeSmokeTest {
         rule.runOnIdle { clock.value=night }
         awaitTheme(true)
         rule.onNodeWithTag(NavigationTestTags.ROUTE_EDIT).performClick()
+        rule.onNodeWithText("経路編集").performClick()
+        if (rule.onAllNodesWithTag("session_switch_confirm").fetchSemanticsNodes().isNotEmpty())
+            rule.onNodeWithTag("session_switch_confirm").performClick()
         rule.onNodeWithTag(net.nobu0707.busnav.ui.routeplan.RoutePlanEditorTestTags.SCREEN).assertIsDisplayed()
         rule.waitUntil(30000) {
             var light=false
@@ -155,6 +158,11 @@ class ThemeRuntimeSmokeTest {
         }
         screenshot("editor-night-light")
         rule.onNodeWithTag(net.nobu0707.busnav.ui.routeplan.RoutePlanEditorTestTags.BACK).performClick()
+        rule.runOnIdle {
+            assertFalse(holder().uiState.value.isNavigationStarted)
+            // The confirmed editor switch ended the session; explicitly adopt it for the next theme checks.
+            holder().applyCalculatedRoute(route)
+        }
         rule.runOnUiThread { rule.activity.requestedOrientation=ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
         rule.waitUntil(15000) { rule.activity.resources.configuration.orientation==Configuration.ORIENTATION_LANDSCAPE }
         rule.runOnUiThread { content() }

@@ -36,6 +36,7 @@ class NavigationStateHolderTest {
             }
         },
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+        computationDispatcher = Dispatchers.Unconfined,
     )
 
     @Test

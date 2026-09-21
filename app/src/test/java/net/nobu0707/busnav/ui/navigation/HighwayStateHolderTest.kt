@@ -21,6 +21,7 @@ class HighwayStateHolderTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         try {
             val holder = NavigationStateHolder(provider, object : ScheduledRouteRepository { override suspend fun getActiveRoute() = route }, scope, Dispatchers.Unconfined, elapsedMillis = { now })
+            holder.applyCalculatedRoute(route)
             holder.setPermission(LocationPermissionState.Granted)
             fun position(accuracy: Float, lon: Double = .009) { now += 5000; flow.value = LocationUpdate.Position(LocationState(GeoPoint(0.0, lon), accuracy, null, null, 1, now)) }
             position(5f)
@@ -37,6 +38,7 @@ class HighwayStateHolderTest {
             repeat(3) { position(5f) }
             assertEquals(initial, holder.uiState.value.highwayGuidance)
             val general = ScheduledRoute("g", "general", geometry, route.points, guidance = RouteGuidance(listOf(RouteManeuver(0, ManeuverType.LEFT, "", 1, 2))))
+            holder.clearRoute()
             holder.applyCalculatedRoute(general)
             assertNull(holder.uiState.value.highwayGuidance)
             assertEquals("左折", holder.uiState.value.guidance.primaryText)

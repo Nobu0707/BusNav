@@ -52,7 +52,12 @@ class ValhallaUiRuntimeSmokeTest {
             planHolder = ViewModelProvider(composeRule.activity)[RoutePlanEditorViewModel::class.java]
                 .stateHolder
         }
-        composeRule.onNodeWithContentDescription("ルート編集画面を開く").performClick()
+        run {
+                composeRule.onNodeWithContentDescription("ルートメニューを開く").performClick()
+                composeRule.onNodeWithText("経路編集").performClick()
+                if (composeRule.onAllNodesWithTag("session_switch_confirm").fetchSemanticsNodes().isNotEmpty())
+                    composeRule.onNodeWithTag("session_switch_confirm").performClick()
+            }
         composeRule.onNodeWithText("ルート編集").assertIsDisplayed()
     }
 
