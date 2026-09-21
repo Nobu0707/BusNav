@@ -309,21 +309,24 @@ fun NavigationRoute(
                 needsPermission = uiState.locationPermissionState != LocationPermissionState.Granted,
                 cursorReady = freeCursorReader != null && uiState.isMapReady,
                 mapContent = { modifier ->
-                    MapScreen(
-                        initialCamera = freeHolder.camera ?: uiState.location?.let { net.nobu0707.busnav.ui.routeplan.EditorCamera(it.point, 14.0) },
-                        onCameraChanged = freeHolder::saveCamera,
-                        basemapConfig = basemapConfig.withTheme(false),
-                        location = uiState.location, isFollowingLocation = false, recenterRequestId = 0,
-                        activeRoute = freeState.previewRoute ?: uiState.activeRoute.takeIf { freeState.isRecalculation },
-                        routeOverviewRequestId = 0,
-                        routePlan = freeState.plan?.destinationOverlay(),
-                        editorCameraRequest = freeState.cameraRequest, editorBottomPadding = 0,
-                        onEditorCameraApplied = freeHolder::cameraApplied,
-                        onCursorReader = { freeCursorReader = it },
-                        selectionMode = if (freeState.stage == FreeNavigationStage.SELECTING && !freeState.isRecalculation) net.nobu0707.busnav.map.MapSelectionMode.FREE_DESTINATION else net.nobu0707.busnav.map.MapSelectionMode.NONE,
-                        onMapReady = stateHolder::onMapReady, onMapGesture = {}, onMapError = stateHolder::onMapError,
-                        modifier = modifier,
-                    )
+                    // The preview has different bounds from selection/calculation. Fit a laid-out preview viewport.
+                    androidx.compose.runtime.key(freeState.stage == FreeNavigationStage.PREVIEW) {
+                        MapScreen(
+                            initialCamera = freeHolder.camera ?: uiState.location?.let { net.nobu0707.busnav.ui.routeplan.EditorCamera(it.point, 14.0) },
+                            onCameraChanged = freeHolder::saveCamera,
+                            basemapConfig = basemapConfig.withTheme(false),
+                            location = uiState.location, isFollowingLocation = false, recenterRequestId = 0,
+                            activeRoute = freeState.previewRoute ?: uiState.activeRoute.takeIf { freeState.isRecalculation },
+                            routeOverviewRequestId = 0,
+                            routePlan = freeState.plan?.destinationOverlay(),
+                            editorCameraRequest = freeState.cameraRequest, editorBottomPadding = 0,
+                            onEditorCameraApplied = freeHolder::cameraApplied,
+                            onCursorReader = { freeCursorReader = it },
+                            selectionMode = if (freeState.stage == FreeNavigationStage.SELECTING && !freeState.isRecalculation) net.nobu0707.busnav.map.MapSelectionMode.FREE_DESTINATION else net.nobu0707.busnav.map.MapSelectionMode.NONE,
+                            onMapReady = stateHolder::onMapReady, onMapGesture = {}, onMapError = stateHolder::onMapError,
+                            modifier = modifier,
+                        )
+                    }
                 },
             )
             BusNavScreen.LIBRARY -> libraryState?.let { ls ->

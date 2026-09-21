@@ -119,6 +119,20 @@ class FreeNavigationFlowTest {
             }
             instrumentation.waitForIdleSync()
             Thread.sleep(1000) // Wait for platform rotation and GPU rendering after checking installed overlays.
+            if (label.startsWith("preview")) rule.runOnUiThread {
+                val view = requireNotNull(findMap(rule.activity.window.decorView))
+                val route = requireNotNull(free().state.value.previewRoute)
+                view.getMapAsync { native ->
+                    val points = route.geometry.points
+                    val extremes = listOf(points.minBy { it.latitude }, points.maxBy { it.latitude },
+                        points.minBy { it.longitude }, points.maxBy { it.longitude })
+                    for (point in extremes) {
+                        val pixel = native.projection.toScreenLocation(LatLng(point.latitude, point.longitude))
+                        assertTrue("Preview geometry must fit the visible map", pixel.x in 0f..view.width.toFloat() &&
+                            pixel.y in 0f..view.height.toFloat())
+                    }
+                }
+            }
             val bitmap = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
             val suffix = if (live) "live" else if (highway) "highway" else "general"
             val file = java.io.File(context.getExternalFilesDir(null), "free-$suffix-$label.png")
