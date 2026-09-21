@@ -1,4 +1,4 @@
-# BusNav Phase008 アーキテクチャ
+# BusNav Phase008.5C アーキテクチャ
 
 ## 方針
 
@@ -51,7 +51,7 @@ net.nobu0707.busnav
 
 ### Activity
 
-`MainActivity` は MapLibre のプロセス初期化、位置情報実装と所定経路 repository の生成、Compose ルートの設置だけを担当します。debug build だけに架空 sample route を注入し、release build は経路未選択で正常動作します。権限、地図、画面状態のロジックは持ちません。
+`MainActivity` は MapLibre のプロセス初期化、位置情報実装と所定経路 repository の生成、Compose ルートの設置だけを担当します。Debug / Release とも経路未選択で開始します。BusNavContainer が Room singleton を所有し、PrescribedRouteRepository を注入します。権限、地図、画面状態のロジックは持ちません。
 
 ### domain / repository
 
@@ -175,3 +175,8 @@ Camera snapshotはMapViewを含まない純粋な値として保持し、fit pad
 シートは3状態のdraggable領域と単一LazyColumn、scroll外footerで構成する。
 RouteCalculationViewModelは探索・candidateをActivity再生成をまたいで保持する。
 詳細は[editor UI](ui/route-plan-editor.md)と[review011b](reviews/011b-route-editor-ux.md)を参照。
+
+## Phase008.5C persistent prescribed routes
+
+`domain/prescribed` に stable ID と repository interface、`data/storage/prescribed` に Room DB/DAO と版付きDTO、`ui/prescribed` に CRUD と draft state holder を追加しました。DB construction は `BusNavContainer` へ集約し、IO 上で payload を encode/decode します。production の sample 自動読込を廃止しました。
+保存済み経路を開く処理は RoutingEngine に依存せず、既存の route replacement reset を通して geometry / guidance をナビへ渡します。[詳細](prescribed-route-library.md)。

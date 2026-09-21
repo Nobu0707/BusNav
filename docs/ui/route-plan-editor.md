@@ -49,9 +49,15 @@ fit完了時は見えている中心を保ってMapLibreの持続paddingを解�
 
 RoutePlanEditorViewModel は plan・選択種類・シート状態・カメラと未処理の fit intent を保持します。
 RouteCalculationViewModel は計算と candidate を Activity再生成をまたいで保持します。
-process death とDB永続化は対象外です。
+未保存 draft の process death 復元は対象外です。Phase008.5C で保存済み経路の Room 永続化を追加しました。
 
 ScheduledRoute／candidate と RoutePlan preview は既存の別source/layerを使います。
 探索前の直線previewは「仮ルート（経路探索前プレビュー）」と表示し、探索成功時は道路沿いcandidateへ
 切り替えます。route matching／guidance／deviation／テーマ切り替えのロジックは変更しません。
 Phase009 の Detour/Rejoin や自動再探索は未実装です。
+
+## Phase008.5C 保存・編集
+
+下部「ルート」の直接入口と中央cursor / PEEK・PARTIAL・EXPANDED / 固定footer は維持します。地点一覧に所定経路一覧への入口を追加しました。
+保存済み経路の編集は source record ID を保持する draft。保存まで DB 不変、戻る・Back はキャンセルです。地点変更後は明示的な経路探索→候補適用が必要です。編集完了で保存ダイアログを開き、上書きまたは別名保存を選びます。saved VehicleProfile を再計算へ渡します。
+[所定経路ライブラリ](../prescribed-route-library.md)を参照してください。

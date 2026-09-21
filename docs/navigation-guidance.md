@@ -2,7 +2,7 @@
 
 ## Route snapshot and parsing
 
-ScheduledRoute owns geometry and optional RouteGuidance together. Applying a candidate replaces that complete snapshot. NavigationViewModel retains the applied snapshot across Activity recreation; process death persistence remains outside this phase. Legacy sample routes without maneuvers display an explicit no-guidance state.
+ScheduledRoute owns geometry and optional RouteGuidance together. Applying a candidate replaces that complete snapshot. NavigationViewModel retains the applied snapshot across Activity recreation; saved prescribed routes persist in Room and can be reopened after process death; automatic restoration of the last selected route remains outside this phase. Legacy sample routes without maneuvers display an explicit no-guidance state.
 
 The adapter requests directions_type=maneuvers, units=kilometers, shape_format=polyline6 and the existing truck costing/options. The effective URL still comes from Developer Connection Settings at request time. The [Valhalla API reference](https://valhalla.github.io/valhalla/api/route/api-reference/) distinguishes maneuvers from narrative instructions: this mode may omit instruction/verbal strings. These optional fields are read when present; BusNav formats domain types in Japanese even when narrative strings are absent. Unknown JSON fields are ignored; unknown integer types map to UNKNOWN, never reach UI as integers, and do not invalidate the route.
 
@@ -47,3 +47,9 @@ Phase 006 reuses the typed sign model for IC/JCT emphasis, route badges and sche
 ## Phase008による位置判定の更新
 
 productionでは最近傍投影を直接案内に使わず、RouteMatcherの候補評価を通したprojectionをcalculatorへ入力します。MATCHEDかつON_ROUTEのみ通常案内。それ以外は距離・方向・その次の指示を抑制し、位置確認と逸脱bannerを表示します。復帰には3 fix/2秒を要求します。raw GPS markerは保持し、自動rerouteしません。旧projector/calculator単体APIは後方互換の幾何計算として残します。[仕様と制限](map-matching-deviation.md)。
+
+## Phase008.5C identity and restored snapshots
+
+`activePrescribedRouteId` retains library identity independently of the calculation route ID. `NavigationMode.PRESCRIBED` is the current mode; FREE remains a future implementation.
+Opening a saved route restores all geometry, maneuvers and signs with zero RoutingEngine calls and rebuilds existing matcher/progress/highway caches. Selection does not start the navigation theme; “ナビに使用” explicitly starts it. Library and editor remain LIGHT. Active library deletion is blocked until use is ended.
+See [prescribed route library](prescribed-route-library.md).

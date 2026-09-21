@@ -18,7 +18,7 @@ Phase 004.5.1 の [全国routing・関東/中部basemap環境](docs/development/
 - 基本ライト、案内中の夜間・明示的トンネルのみ自動ダーク（[テーマ・地図表示](docs/theme-map-presentation.md)）
 - 純粋ロジックの単体テストと Compose UI テスト
 - Android/MapLibre 非依存の ScheduledRoute / RouteGeometry / RoutePoint domain model
-- debug build の架空 sample route と repository 境界
+- Room による所定経路ライブラリ、UUID identity、正確な geometry / guidance / RoutePlan / 車両条件の保存
 - GeoJSON LineString、casing/main line、START / STOP / DESTINATION marker による所定経路表示
 - style reload 時の overlay 復元と、位置追従を解除する「経路全体」bounds fit
 - Android/MapLibre/Valhalla 非依存の RoutePlan、validation、pure editing operations、RoutingRequest 境界
@@ -99,7 +99,7 @@ Host の style URL は `http://localhost:8080/styles/busnav/style.json`、Androi
 - 高頻度ナビ更新向けの平滑化、センサ融合、進行方向上固定は未実装です。
 - truck costing は物理寸法を優先するため、bus/psv access と完全には一致せず、本来バスが通れる道路を過剰回避する可能性があります。
 - 開発用車両条件は仮値であり、実車の業務運行に使用できません。
-- RoutePlan/vehicle profile の永続保存、逸脱判定、自動reroute、VICS、音声案内、オフライン地図は対象外です。
+- RoutePlan/vehicle profile の永続保存と逸脱判定は実装済みです。自動reroute、VICS、音声案内、オフライン地図は対象外です。
 
 ## 次フェーズ候補
 
@@ -118,3 +118,8 @@ Phase 005 では Valhalla maneuver を使う案内、route 上の進捗、次の
 
 編集開始時のroute fitとcamera保持、中央カーソル登録、経由地／通過指定の表示、共通スクロールと固定footerを実装。
 [UI仕様](docs/ui/route-plan-editor.md)・[レビュー](docs/reviews/011b-route-editor-ux.md)。Phase009は未着手。
+
+## Phase008.5C: 所定経路ライブラリ
+
+ナビ画面の「所定経路 • 一覧・保存」から新規作成、保存、呼び出し、編集、上書き・別名保存、名前変更、複製、削除を行えます。保存済み経路は Valhalla へ再問い合わせせず、そのまま復元します。
+[仕様と操作](docs/prescribed-route-library.md)・[Review011c](docs/reviews/011c-prescribed-route-library.md)。Phase009 は未実装です。
