@@ -102,3 +102,8 @@ Phase 003 の Navigation 画面は走行表示に集中し、RoutePlan の複雑
 「ルート編集画面を開く」を維持する。固定幅88/72dpを廃止し、portraitではweight配分、
 landscapeでは列幅に合わせる。TextはmaxLines=1、softWrap=false、中央配置、最小ボタン高48dp。
 320dp画面相当の304dpバー（画面左右8dp）と狭い横画面列をComposeテストで確認する。
+
+## Phase008.5D ルートメニュー
+
+下部5項目を維持し、「ルート」は「現在地からナビ」「所定経路・一覧と保存」「経路編集」のメニューを開きます。active session 中に別画面の設定へ入る場合は「終了して続ける」の確認が必要です。
+FREE の地図中央カーソル・目的地設定・車両条件付き preview と「案内開始」は独立画面です。案内画面には「現在地から再計算」「案内終了」、到着確認時には「目的地周辺です」を表示します。詳細は [Free Navigation](../free-navigation.md)。

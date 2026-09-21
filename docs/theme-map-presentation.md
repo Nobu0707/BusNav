@@ -14,9 +14,9 @@ dark = navigationActive && (isNight || isTunnel)。位置未取得時はLIGHT。
 | active + day + confirmed tunnel exit | LIGHT |
 | editor / Developer Connections | LIGHT |
 
-現行の案内開始は「案内maneuver付き経路の採用」であり、独立した開始/停止ボタンはない。
-NavigationRoute は、その経路をナビ画面で表示中だけACTIVEとする。案内なしsample、単なる
-経路閲覧、編集、候補プレビュー、設定はinactive。将来のlibrary画面もこのACTIVE条件に入れない。
+Phase008.5D では「案内開始」/「ナビに使用」と「案内終了」が明示操作です。
+NavigationRoute は isNavigationStarted と activeRoute を持つ案内画面を ACTIVE とします。
+経路閲覧、編集、候補プレビュー、設定、library は inactive。maneuvers の有無から開始状態を推測しません。
 逸脱や一時的な測位不確実性はナビセッションを終了させない。
 
 Compose再描画とMapLibre style reloadで切り替える。Activity再起動は不要。
@@ -116,3 +116,7 @@ live smokeは現在の実道路タイルに合成位置と注入Clockを使い�
 地域ごと両方向のstyle switchでroute、全地点種別、deviation、vehicle size/heading、cameraを確認する。
 画面証跡・logs・APKはbuild配下のみでcommit/archive対象外。
 最終結果は [Review011a](reviews/011a-ui-theme-map-refresh.md) を参照。
+
+## Phase008.5D activation
+
+navigationActive の source は isNavigationStarted と activeRoute の存在です。saved ID の null/non-null や maneuvers の有無から activation を推測しません。FREE preview・再計算 preview・editor・library は LIGHT、明示開始後の案内画面のみ夜間/トンネル条件で DARK に切り替わります。

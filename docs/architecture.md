@@ -1,4 +1,4 @@
-# BusNav Phase008.5C アーキテクチャ
+# BusNav Phase008.5D アーキテクチャ
 
 ## 方針
 
@@ -180,3 +180,8 @@ RouteCalculationViewModelは探索・candidateをActivity再生成をまたい�
 
 `domain/prescribed` に stable ID と repository interface、`data/storage/prescribed` に Room DB/DAO と版付きDTO、`ui/prescribed` に CRUD と draft state holder を追加しました。DB construction は `BusNavContainer` へ集約し、IO 上で payload を encode/decode します。production の sample 自動読込を廃止しました。
 保存済み経路を開く処理は RoutingEngine に依存せず、既存の route replacement reset を通して geometry / guidance をナビへ渡します。[詳細](prescribed-route-library.md)。
+## Phase008.5D FREE session
+
+[Free Navigation](free-navigation.md) を追加。FreeNavigationPlan / FreeNavigationConfig / ArrivalDetector は純粋な domain、FreeNavigationStateHolder は既存 RouteCalculationStateHolder と共有 NavigationStateHolder を合成します。新しい GPS 購読と保存 repository 依存はありません。
+NavigationMode と isNavigationStarted が session の用途と開始状態を所有します。FREE 計算完了は previewFreeRoute、明示開始は startFreeNavigation、再計算採用は replaceFreeRoute。editor 候補適用は previewEditorCandidate として開始から分離しました。
+MapSelectionCursor を editor/FREE で共用し、MapSelectionMode で listener 寿命を制御します。経路置換は既存の index・案内・逸脱 reset を再利用し、arrival も reset します。

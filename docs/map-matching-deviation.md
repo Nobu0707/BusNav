@@ -146,3 +146,8 @@ Phase008は元routeへ戻った観測を確認するだけで、新しいrejoin 
 代替経路、復帰点候補、運行管理/運転者の承認操作はPhase009で設計する。
 実運行・長時間GPS・トンネル・高架/側道の走行評価とthreshold調整は今後必要。
 全国graphやKanto/Chubu basemapの再生成はこのPhaseで行わない。
+
+## FREE integration (Phase008.5D)
+
+FREE でも既存 matcher と raw GPS marker policy を維持します。NavigationMode に応じて「所定経路」/「案内経路」の逸脱文言を表示します。preview では案内を開始しません。
+OFF_ROUTE 単独の RoutingEngine 呼出し増分は0。手動操作の1要求→preview→採用確認でのみ置換し、そのとき matcher/deviation/highway/arrival を reset します。詳細は [Free Navigation](free-navigation.md)。Phase009 detour/rejoin は未実装です。

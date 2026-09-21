@@ -53,3 +53,7 @@ productionでは最近傍投影を直接案内に使わず、RouteMatcherの候�
 `activePrescribedRouteId` retains library identity independently of the calculation route ID. `NavigationMode.PRESCRIBED` is the current mode; FREE remains a future implementation.
 Opening a saved route restores all geometry, maneuvers and signs with zero RoutingEngine calls and rebuilds existing matcher/progress/highway caches. Selection does not start the navigation theme; “ナビに使用” explicitly starts it. Library and editor remain LIGHT. Active library deletion is blocked until use is ended.
 See [prescribed route library](prescribed-route-library.md).
+## FREE の開始条件
+
+[Phase008.5D](free-navigation.md) では一般道/高速案内を共用します。activeRoute だけでは開始せず、isNavigationStarted が true のときだけ案内を更新します。保存経路を開く操作と FREE 計算成功はプレビューです。案内情報のない FREE route は経路線を表示し、その旨を明記します。
+到着は reliable progress と raw destination proximity の2連続fixで確認し、「目的地周辺です」を表示します。明示終了まで経路は残ります。

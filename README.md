@@ -123,3 +123,8 @@ Phase 005 では Valhalla maneuver を使う案内、route 上の進捗、次の
 
 ナビ画面の「所定経路 • 一覧・保存」から新規作成、保存、呼び出し、編集、上書き・別名保存、名前変更、複製、削除を行えます。保存済み経路は Valhalla へ再問い合わせせず、そのまま復元します。
 [仕様と操作](docs/prescribed-route-library.md)・[Review011c](docs/reviews/011c-prescribed-route-library.md)。Phase009 は未実装です。
+## Phase008.5D: 現在地からナビ
+
+「ルート」→「現在地からナビ」で地図中央から目的地を選び、大型車条件で計算・プレビュー後に「案内開始」できます。一般道・高速案内、手動再計算、到着確認と明示終了に対応します。FREE は保存経路と分離し、OFF_ROUTE で自動再計算しません。
+
+設計・操作: [Free Navigation](docs/free-navigation.md)。検証: [Review011d](docs/reviews/011d-free-navigation.md)。Phase009 detour/rejoin は未実装です。

@@ -61,3 +61,7 @@ Phase009 の Detour/Rejoin や自動再探索は未実装です。
 下部「ルート」の直接入口と中央cursor / PEEK・PARTIAL・EXPANDED / 固定footer は維持します。地点一覧に所定経路一覧への入口を追加しました。
 保存済み経路の編集は source record ID を保持する draft。保存まで DB 不変、戻る・Back はキャンセルです。地点変更後は明示的な経路探索→候補適用が必要です。編集完了で保存ダイアログを開き、上書きまたは別名保存を選びます。saved VehicleProfile を再計算へ渡します。
 [所定経路ライブラリ](../prescribed-route-library.md)を参照してください。
+## Phase008.5D との分離
+
+editor の START/DEST/VIA/SHAPING と FREE の目的地選択は別状態です。中央カーソル描画のみ MapSelectionCursor を共用し、ROUTE_POINT と FREE_DESTINATION を区別します。
+「ルート」→「経路編集」から入ります。候補の適用はプレビューになり、保存操作を継続できます。案内は「ルート」→「案内開始」で明示開始します。計算中に同じ revision へ再要求しても、古い世代の結果は採用しません。

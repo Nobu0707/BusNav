@@ -84,3 +84,7 @@ Debug / Release とも自動 sample load はありません。`createDevelopment
 地図背景のオフライン配布は対象外。保存経路線と案内の復元は通信不要です。
 export/import、検索、FREE navigation は今回未実装で UI にダミー項目を出しません。
 Phase008.5D は session UI と FREE navigation、Phase009 は stable prescribedRouteId を参照する detour/rejoin を担当します。迂回処理は未実装です。
+## Phase008.5D FREE との関係
+
+NavigationMode.FREE が通常ナビとして有効になりました。保存済みレコードは PRESCRIBED と stable UUID を維持し、FREE 計算/開始/終了は repository に書き込みません。activePrescribedRouteId から mode を推測しません。
+案内中にライブラリへ移る操作は終了確認を経由します。確認キャンセルで元の session を保持し、FREE 終了後に前の所定経路を勝手に復元しません。保存経路の「開く」は preview、「ナビに使用」は明示開始です。[Free Navigation](free-navigation.md) を参照してください。
