@@ -17,6 +17,9 @@ object OverlayLayerOrder {
     const val VIA = "busnav-route-plan-via-layer"
     const val SHAPING = "busnav-route-plan-shaping-layer"
     const val DESTINATION = "busnav-route-plan-destination-layer"
+    const val DETOUR_CASING = "busnav-detour-casing"
+    const val DETOUR_LINE = "busnav-detour-line"
+    const val DETOUR_MARKERS = "busnav-detour-markers"
     const val VEHICLE = "busnav-vehicle-layer"
 
     val orderedLayerIds = listOf(
@@ -27,6 +30,9 @@ object OverlayLayerOrder {
         ACTIVE_VIA,
         ACTIVE_SHAPING,
         ACTIVE_DESTINATION,
+        DETOUR_CASING,
+        DETOUR_LINE,
+        DETOUR_MARKERS,
         PLAN_PREVIEW,
         START,
         VIA,

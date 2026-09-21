@@ -1,6 +1,9 @@
 package net.nobu0707.busnav.ui.navigation
 
 import net.nobu0707.busnav.ui.free.*
+import net.nobu0707.busnav.ui.detour.*
+import net.nobu0707.busnav.domain.detour.*
+import net.nobu0707.busnav.map.DetourOverlayData
 import net.nobu0707.busnav.domain.prescribed.NavigationMode
 import net.nobu0707.busnav.domain.navigation.ArrivalState
 import androidx.compose.material3.AlertDialog
@@ -89,7 +92,7 @@ object NavigationTestTags {
     const val ROUTE_EDIT = "route_edit"
 }
 
-private enum class BusNavScreen { NAVIGATION, ROUTE_EDIT, LIBRARY, FREE }
+private enum class BusNavScreen { NAVIGATION, ROUTE_EDIT, LIBRARY, FREE, DETOUR }
 
 @Composable
 fun NavigationRoute(
@@ -107,6 +110,9 @@ fun NavigationRoute(
     val uiState by stateHolder.uiState.collectAsState()
     val freeHolder = viewModel { FreeNavigationViewModel(routingEngine, stateHolder) }.holder
     val freeState by freeHolder.state.collectAsState()
+    val detourHolder = viewModel { DetourViewModel(routingEngine, stateHolder) }.holder
+    val detourState by detourHolder.state.collectAsState()
+    var detourCursorReader by remember { mutableStateOf<(() -> GeoPoint?)?>(null) }
     var freeCursorReader by remember { mutableStateOf<(() -> GeoPoint?)?>(null) }
     val routePlanHolder = viewModel<RoutePlanEditorViewModel>().stateHolder
     val routePlanUiState by routePlanHolder.uiState.collectAsState()
@@ -118,8 +124,8 @@ fun NavigationRoute(
         } }.holder
     }
     val libraryState = library?.state?.collectAsState()?.value
-    LaunchedEffect(libraryState?.current?.name) {
-        libraryState?.current?.let { stateHolder.refreshPrescribedName(it.id, it.name) }
+    LaunchedEffect(libraryState?.current) {
+        libraryState?.current?.let { stateHolder.refreshPrescribedRecord(it) }
     }
     var saveDialog by rememberSaveable { mutableStateOf(false) }
     var saveAsNew by rememberSaveable { mutableStateOf(false) }
@@ -134,6 +140,16 @@ fun NavigationRoute(
     var routeMenu by rememberSaveable { mutableStateOf(false) }
     var pendingScreen by rememberSaveable { mutableStateOf<BusNavScreen?>(null) }
 
+    LaunchedEffect(detourState.stage) {
+        if (detourState.stage == DetourSessionState.COMPLETED) {
+            if (screen == BusNavScreen.DETOUR) screen = BusNavScreen.NAVIGATION
+            kotlinx.coroutines.delay(4000)
+            detourHolder.clearCompleted()
+        } else if (detourState.stage == DetourSessionState.IDLE && screen == BusNavScreen.DETOUR) screen = BusNavScreen.NAVIGATION
+    }
+    fun beginDetour() {
+        if (detourHolder.begin()) screen = BusNavScreen.DETOUR
+    }
     fun enterScreen(target: BusNavScreen) {
         routeMenu = false
         when (target) {
@@ -212,7 +228,8 @@ fun NavigationRoute(
         screen = BusNavScreen.NAVIGATION
     }
     BackHandler(enabled = screen != BusNavScreen.NAVIGATION) {
-        if (screen == BusNavScreen.FREE) { freeHolder.cancel(); screen = BusNavScreen.NAVIGATION }
+        if (screen == BusNavScreen.DETOUR) { detourHolder.cancelPlanning(); screen = BusNavScreen.NAVIGATION }
+        else if (screen == BusNavScreen.FREE) { freeHolder.cancel(); screen = BusNavScreen.NAVIGATION }
         else cancelEditing()
     }
 
@@ -264,6 +281,9 @@ fun NavigationRoute(
                 uiState = uiState,
                 hasRoutePlan = routePlanUiState.currentPlan.points.isNotEmpty(),
                 onOpenLibrary = library?.let { { requestScreen(BusNavScreen.LIBRARY) } },
+                onDetour = { beginDetour() },
+                onEndDetour = detourHolder::endDetour,
+                detourMessage = if (detourState.stage == DetourSessionState.COMPLETED) "所定経路に復帰しました" else detourState.error,
                 onFreeRecalculate = { freeHolder.recalculate(); if (freeHolder.state.value.stage != FreeNavigationStage.IDLE) screen = BusNavScreen.FREE },
                 onEndNavigation = { freeHolder.endNavigation(); library?.clearCurrent() },
                 onLayoutModeChanged = stateHolder::setLayoutMode,
@@ -288,7 +308,10 @@ fun NavigationRoute(
                         onTunnelChanged = { isTunnel = it },
                         isFollowingLocation = uiState.isFollowingLocation,
                         recenterRequestId = uiState.recenterRequestId,
-                        activeRoute = uiState.activeRoute,
+                        activeRoute = uiState.prescribedRouteSnapshot ?: uiState.activeRoute,
+                        detourOverlay = uiState.activeDetour?.candidate?.let {
+                            DetourOverlayData(it.route, selected = it.draft.rejoinTarget, points = it.draft.points)
+                        } ?: DetourOverlayData(),
                         routePlan = uiState.freePlan?.destinationOverlay(),
                         routeOverviewRequestId = uiState.routeOverviewRequestId,
                         onMapReady = stateHolder::onMapReady,
@@ -296,6 +319,38 @@ fun NavigationRoute(
                         onMapError = stateHolder::onMapError,
                         modifier = modifier,
                     )
+                },
+            )
+            BusNavScreen.DETOUR -> DetourScreen(
+                state = detourState,
+                onCancel = { detourHolder.cancelPlanning(); screen = BusNavScreen.NAVIGATION },
+                onTarget = detourHolder::selectTarget, onMapMode = detourHolder::selectMapMode,
+                onCursor = { detourCursorReader?.invoke()?.let(detourHolder::setCursor) },
+                onRemove = detourHolder::removePoint, onMove = detourHolder::movePoint,
+                onCalculate = { detourHolder.calculate() },
+                onActivate = { if (detourHolder.activate()) screen = BusNavScreen.NAVIGATION },
+                onEdit = detourHolder::edit, cursorReady = detourCursorReader != null && uiState.isMapReady,
+                guidanceContent = { NavigationGuidanceCard(uiState, it) },
+                mapContent = { modifier ->
+                    androidx.compose.runtime.key(detourState.stage == DetourSessionState.PREVIEW) {
+                        MapScreen(
+                            location = uiState.location, isFollowingLocation = false, recenterRequestId = 0,
+                            activeRoute = uiState.prescribedRouteSnapshot, routeOverviewRequestId = 0,
+                            detourOverlay = DetourOverlayData(detourState.candidate?.route ?: uiState.activeDetour?.candidate?.route,
+                                detourState.candidates, detourState.target, detourState.points),
+                            initialCamera = detourHolder.camera, onCameraChanged = detourHolder::saveCamera,
+                            editorCameraRequest = detourState.cameraRequest, editorBottomPadding = 0,
+                            onEditorCameraApplied = detourHolder::cameraApplied,
+                            selectionMode = when (detourState.mapMode) {
+                                DetourMapMode.NONE -> net.nobu0707.busnav.map.MapSelectionMode.NONE
+                                DetourMapMode.REJOIN -> net.nobu0707.busnav.map.MapSelectionMode.DETOUR_REJOIN
+                                else -> net.nobu0707.busnav.map.MapSelectionMode.DETOUR_POINT
+                            },
+                            onCursorReader = { detourCursorReader = it }, basemapConfig = basemapConfig.withTheme(false),
+                            onMapReady = stateHolder::onMapReady, onMapGesture = {}, onMapError = stateHolder::onMapError,
+                            modifier = modifier,
+                        )
+                    }
                 },
             )
             BusNavScreen.FREE -> FreeNavigationScreen(
@@ -481,6 +536,9 @@ fun NavigationScreen(
     onOpenLibrary: (() -> Unit)? = null,
     onFreeRecalculate: () -> Unit = {},
     onEndNavigation: () -> Unit = {},
+    onDetour: () -> Unit = {},
+    onEndDetour: () -> Unit = {},
+    detourMessage: String? = null,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     BoxWithConstraints(
@@ -503,6 +561,7 @@ fun NavigationScreen(
                 onOpenLibrary = onOpenLibrary,
                 onFreeRecalculate = onFreeRecalculate,
                 onEndNavigation = onEndNavigation,
+                onDetour = onDetour, onEndDetour = onEndDetour, detourMessage = detourMessage,
                 mapContent = mapContent,
             )
             NavigationLayoutMode.LandscapeThreeColumn -> LandscapeNavigationLayout(
@@ -515,6 +574,7 @@ fun NavigationScreen(
                 onOpenLibrary = onOpenLibrary,
                 onFreeRecalculate = onFreeRecalculate,
                 onEndNavigation = onEndNavigation,
+                onDetour = onDetour, onEndDetour = onEndDetour, detourMessage = detourMessage,
                 mapContent = mapContent,
             )
         }
@@ -532,6 +592,9 @@ private fun PortraitNavigationLayout(
     onOpenLibrary: (() -> Unit)?,
     onFreeRecalculate: () -> Unit,
     onEndNavigation: () -> Unit,
+    onDetour: () -> Unit,
+    onEndDetour: () -> Unit,
+    detourMessage: String?,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     Column(
@@ -539,6 +602,7 @@ private fun PortraitNavigationLayout(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         DeviationBanner(uiState.deviation)
+        DetourNavigationActions(uiState, onDetour, onEndDetour, detourMessage)
         FreeNavigationActions(uiState, onFreeRecalculate, onEndNavigation)
         NavigationGuidanceCard(uiState, Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.35f).dp))
         MapArea(
@@ -557,6 +621,7 @@ private fun PortraitNavigationLayout(
         )
         AuxiliaryControls(
             onEditRoute = onEditRoute,
+            onDetour = onDetour, detourEnabled = uiState.navigationActive && uiState.navigationMode == NavigationMode.PRESCRIBED,
             modifier = Modifier.fillMaxWidth().height(72.dp).testTag(NavigationTestTags.AUXILIARY),
         )
     }
@@ -573,6 +638,9 @@ private fun LandscapeNavigationLayout(
     onOpenLibrary: (() -> Unit)?,
     onFreeRecalculate: () -> Unit,
     onEndNavigation: () -> Unit,
+    onDetour: () -> Unit,
+    onEndDetour: () -> Unit,
+    detourMessage: String?,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     Row(
@@ -584,7 +652,8 @@ private fun LandscapeNavigationLayout(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             DeviationBanner(uiState.deviation)
-            FreeNavigationActions(uiState, onFreeRecalculate, onEndNavigation)
+            DetourNavigationActions(uiState, onDetour, onEndDetour, detourMessage)
+        FreeNavigationActions(uiState, onFreeRecalculate, onEndNavigation)
             NavigationGuidanceCard(uiState, Modifier.fillMaxWidth().weight(2f))
             PlaceholderPanel(
                 title = if (uiState.navigationMode == NavigationMode.FREE) "現在地からナビ" else if (onOpenLibrary != null) "所定経路 • 一覧・保存" else "運行情報",
@@ -603,6 +672,7 @@ private fun LandscapeNavigationLayout(
         )
         AuxiliaryControls(
             onEditRoute = onEditRoute,
+            onDetour = onDetour, detourEnabled = uiState.navigationActive && uiState.navigationMode == NavigationMode.PRESCRIBED,
             vertical = true,
             modifier = Modifier.fillMaxHeight().weight(0.18f).testTag(NavigationTestTags.AUXILIARY),
         )
@@ -706,18 +776,20 @@ internal fun AuxiliaryControls(
     onEditRoute: () -> Unit,
     modifier: Modifier = Modifier,
     vertical: Boolean = false,
+    onDetour: () -> Unit = {},
+    detourEnabled: Boolean = false,
 ) {
     Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         if (vertical) {
             Column(Modifier.fillMaxSize().padding(4.dp), verticalArrangement = Arrangement.SpaceEvenly) {
                 BottomControl("ルート", true, onEditRoute, Modifier.fillMaxWidth())
-                BottomLabelLayout.secondaryLabels.forEach { BottomControl(it, false, {}, Modifier.fillMaxWidth()) }
+                BottomLabelLayout.secondaryLabels.forEach { BottomControl(it, it == "迂回" && detourEnabled, if (it == "迂回") onDetour else ({}), Modifier.fillMaxWidth()) }
             }
         } else {
             Row(Modifier.fillMaxSize().padding(4.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 BottomControl("ルート", true, onEditRoute, Modifier.weight(1.5f))
-                BottomLabelLayout.secondaryLabels.forEach { BottomControl(it, false, {}, Modifier.weight(1f)) }
+                BottomLabelLayout.secondaryLabels.forEach { BottomControl(it, it == "迂回" && detourEnabled, if (it == "迂回") onDetour else ({}), Modifier.weight(1f)) }
             }
         }
     }
@@ -729,8 +801,8 @@ private fun BottomControl(label: String, enabled: Boolean, onClick: () -> Unit, 
         onClick = onClick, enabled = enabled,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 2.dp, vertical = 8.dp),
         modifier = modifier.heightIn(min = 48.dp)
-            .testTag(if (enabled) NavigationTestTags.ROUTE_EDIT else "bottom_$label")
-            .semantics { if (enabled) contentDescription = "ルートメニューを開く" },
+            .testTag(if (label == "ルート") NavigationTestTags.ROUTE_EDIT else "bottom_$label")
+            .semantics { if (label == "ルート") contentDescription = "ルートメニューを開く" },
     ) {
         Text(label, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             maxLines = BottomLabelLayout.maxLines, softWrap = false,
@@ -790,6 +862,24 @@ private fun LandscapePreview() = BusNavTheme {
 private fun PreviewMap(modifier: Modifier) {
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
         Text("MapLibre 地図")
+    }
+}
+
+@Composable
+private fun DetourNavigationActions(state: NavigationUiState, begin: () -> Unit, end: () -> Unit, message: String?) {
+    if (state.navigationMode != NavigationMode.PRESCRIBED || !state.navigationActive) return
+    Column {
+        message?.let { Text(it, Modifier.testTag("detour_message"), style = MaterialTheme.typography.bodySmall) }
+        if (state.activeDetour != null) {
+            Text("迂回案内中・水色：所定経路 / 太い紫線：迂回経路", Modifier.testTag("detour_active"), style = MaterialTheme.typography.bodySmall)
+            if (state.rejoin.state == RejoinState.CANDIDATE) Text("所定経路への復帰を確認中", style = MaterialTheme.typography.bodySmall)
+            Row {
+                TextButton(onClick = begin, modifier = Modifier.testTag("detour_replan")) { Text("迂回を再設定") }
+                TextButton(onClick = end, modifier = Modifier.testTag("detour_end")) { Text("迂回案内を終了") }
+            }
+        } else if (state.deviationSnapshot.state == net.nobu0707.busnav.domain.navigation.RouteDeviationState.OFF_ROUTE) {
+            TextButton(onClick = begin, modifier = Modifier.testTag("detour_off_route")) { Text("迂回を検討") }
+        }
     }
 }
 

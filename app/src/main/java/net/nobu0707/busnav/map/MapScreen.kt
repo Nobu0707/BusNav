@@ -50,6 +50,7 @@ fun MapScreen(
     routeOverviewRequestId: Int,
     modifier: Modifier = Modifier,
     routePlan: RoutePlan? = null,
+    detourOverlay: DetourOverlayData = DetourOverlayData(),
     planOverviewRequestId: Int = 0,
     onMapLongPress: ((GeoPoint) -> Unit)? = null,
     basemapConfig: BasemapConfig = BasemapConfig.fromBuildValue(
@@ -172,6 +173,7 @@ fun MapScreen(
         controller.updateBasemap(basemapConfig)
         controller.update(location, isFollowingLocation, recenterRequestId)
         controller.updateRoute(activeRoute, routeOverviewRequestId)
+        controller.updateDetour(detourOverlay)
         controller.updateRoutePlan(routePlan, planOverviewRequestId)
         controller.updateEditorCamera(editorCameraRequest, editorBottomPadding, onEditorCameraApplied)
     }

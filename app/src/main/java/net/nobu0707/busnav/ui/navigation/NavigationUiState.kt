@@ -29,6 +29,13 @@ data class NavigationUiState(
     val isLoading: Boolean = true,
     val recenterRequestId: Int = 0,
     val activeRoute: ScheduledRoute? = null,
+    val prescribedRouteSnapshot: ScheduledRoute? = null,
+    val prescribedVehicleProfile: net.nobu0707.busnav.domain.routing.VehicleProfile? = null,
+    val prescribedSessionToken: Long = 0,
+    val lastReliablePrescribedProgress: net.nobu0707.busnav.domain.detour.ReliablePrescribedProgress? = null,
+    val activeDetour: net.nobu0707.busnav.domain.detour.ActiveDetour? = null,
+    val rejoin: net.nobu0707.busnav.domain.detour.RejoinSnapshot = net.nobu0707.busnav.domain.detour.RejoinSnapshot(),
+    val rejoinCompletedId: Long = 0,
     val activePrescribedRouteId: String? = null,
     val activePrescribedRouteName: String? = null,
     val navigationMode: net.nobu0707.busnav.domain.prescribed.NavigationMode = net.nobu0707.busnav.domain.prescribed.NavigationMode.PRESCRIBED,
@@ -52,4 +59,8 @@ val NavigationUiState.navigationActive: Boolean
     get() = isNavigationStarted && activeRoute != null
 
 val NavigationUiState.routeLabel: String
-    get() = if (navigationMode == net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE) "案内経路" else "所定経路"
+    get() = if (activeDetour != null) "迂回経路" else if (navigationMode == net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE) "案内経路" else "所定経路"
+
+val NavigationUiState.prescribedSubmode: net.nobu0707.busnav.domain.detour.PrescribedNavigationSubmode
+    get() = if (activeDetour == null) net.nobu0707.busnav.domain.detour.PrescribedNavigationSubmode.NORMAL
+        else net.nobu0707.busnav.domain.detour.PrescribedNavigationSubmode.DETOUR

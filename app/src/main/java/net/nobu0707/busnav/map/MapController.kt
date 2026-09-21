@@ -67,6 +67,7 @@ class MapController(
     private var lastPlanOverviewRequestId = 0
     private val routeOverlay = RouteOverlayController()
     private val routePlanOverlay = RoutePlanOverlayController()
+    private val detourOverlay = DetourOverlayController()
     private val basemapController = BasemapController(
         config = basemapConfig,
         diagnostics = mapDiagnostics,
@@ -212,6 +213,7 @@ class MapController(
         runCatching {
             routeOverlay.setRoute(latestRoute)
             routeOverlay.install(loadedStyle)
+            detourOverlay.install(loadedStyle)
             routePlanOverlay.setRoutePlan(latestRoutePlan)
             routePlanOverlay.install(loadedStyle)
             installVehicleLayer(loadedStyle)
@@ -256,6 +258,12 @@ class MapController(
             }
         }
         fitRouteIfRequested()
+    }
+
+    fun updateDetour(data: DetourOverlayData) {
+        if (detourOverlay.data == data) return
+        detourOverlay.data = data
+        style?.let { detourOverlay.render(it) }
     }
 
     fun updateRoutePlan(routePlan: RoutePlan?, planOverviewRequestId: Int) {

@@ -1,6 +1,8 @@
 package net.nobu0707.busnav.ui.navigation
 
 import net.nobu0707.busnav.domain.navigation.*
+import net.nobu0707.busnav.domain.detour.*
+import net.nobu0707.busnav.domain.prescribed.NavigationMode
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import net.nobu0707.busnav.domain.route.ScheduledRouteRepository
@@ -33,6 +35,10 @@ class NavigationStateHolder(
     private var generation = 0L
     private var routeGeneration = 0L
     private var latestFixTime: Long? = null
+    private var prescribedCalculator: NavigationProgressCalculator? = null
+    private var prescribedMatcher: RouteMatcher? = null
+    private var rejoinMatcherState = RouteMatcherState()
+    private var rejoinDetector = RejoinDetector()
     private var lastDiagnosticQuality: RouteMatchQuality? = null
     private var lastDiagnosticState: RouteDeviationState? = null
 
@@ -128,6 +134,8 @@ class NavigationStateHolder(
     fun previewFreeRoute(plan: FreeNavigationPlan, route: ScheduledRoute): Boolean {
         if (_uiState.value.isNavigationStarted) return false
         update { copy(activeRoute = route, freePlan = plan, activePrescribedRouteId = null,
+            prescribedRouteSnapshot = null, prescribedVehicleProfile = null, activeDetour = null,
+            lastReliablePrescribedProgress = null, rejoin = RejoinSnapshot(), prescribedSessionToken = prescribedSessionToken + 1,
             activePrescribedRouteName = null, navigationMode = net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE,
             isNavigationStarted = false, isFollowingLocation = false, isRouteLoading = false, routeError = null,
             routeOverviewRequestId = routeOverviewRequestId + 1) }
@@ -150,11 +158,23 @@ class NavigationStateHolder(
 
     fun openPrescribedRoute(record: net.nobu0707.busnav.domain.prescribed.PrescribedRouteRecord): Boolean {
         if (_uiState.value.isNavigationStarted) return false
-        update { copy(activeRoute = record.route, freePlan = null, activePrescribedRouteId = record.id, activePrescribedRouteName = record.name,
+        update { copy(activeRoute = record.route, prescribedRouteSnapshot = record.route,
+            prescribedVehicleProfile = record.vehicleProfile, prescribedSessionToken = prescribedSessionToken + 1,
+            lastReliablePrescribedProgress = null, activeDetour = null, rejoin = RejoinSnapshot(), freePlan = null, activePrescribedRouteId = record.id, activePrescribedRouteName = record.name,
             navigationMode = net.nobu0707.busnav.domain.prescribed.NavigationMode.PRESCRIBED,
             isNavigationStarted = false, isFollowingLocation = false, isRouteLoading = false,
             routeError = null, routeOverviewRequestId = routeOverviewRequestId + 1) }
         return true
+    }
+    /** Rename is harmless; changed route content/profile ends the obsolete session defensively. */
+    fun refreshPrescribedRecord(record: net.nobu0707.busnav.domain.prescribed.PrescribedRouteRecord) {
+        val state = _uiState.value
+        if (state.activePrescribedRouteId != record.id) return
+        if (state.prescribedRouteSnapshot != record.route || state.prescribedVehicleProfile != record.vehicleProfile) {
+            clearRoute()
+            return
+        }
+        refreshPrescribedName(record.id, record.name)
     }
     fun refreshPrescribedName(id: String, name: String) {
         if (_uiState.value.activePrescribedRouteId == id) update { copy(activePrescribedRouteName = name) }
@@ -166,8 +186,55 @@ class NavigationStateHolder(
     }
     fun clearRoute() {
         routeGeneration++ // Invalidate even a pending initial load when activeRoute is already null.
-        update { copy(activeRoute = null, freePlan = null, arrival = ArrivalSnapshot(), activePrescribedRouteId = null,
+        update { copy(activeRoute = null, prescribedRouteSnapshot = null, prescribedVehicleProfile = null,
+            prescribedSessionToken = prescribedSessionToken + 1, lastReliablePrescribedProgress = null,
+            activeDetour = null, rejoin = RejoinSnapshot(), freePlan = null, arrival = ArrivalSnapshot(), activePrescribedRouteId = null,
             activePrescribedRouteName = null, isNavigationStarted = false, isRouteLoading = false) }
+    }
+
+    /** The original prepared index is retained once; the detour gets its own normal guidance index. */
+    fun activateDetour(candidate: DetourCandidate, sessionToken: Long, config: RejoinConfig): Boolean {
+        val state = _uiState.value
+        if (!state.navigationActive || state.navigationMode != NavigationMode.PRESCRIBED ||
+            state.prescribedSessionToken != sessionToken || state.activePrescribedRouteId != candidate.draft.prescribedRouteId ||
+            state.prescribedRouteSnapshot == null) return false
+        if (state.activeDetour == null) {
+            prescribedCalculator = calculator ?: return false
+            prescribedMatcher = matcher ?: return false
+        }
+        rejoinMatcherState = RouteMatcherState()
+        rejoinDetector = RejoinDetector(config)
+        update { copy(activeRoute = candidate.route, activeDetour = ActiveDetour(candidate, elapsedMillis()),
+            rejoin = RejoinSnapshot(), isFollowingLocation = true) }
+        diagnostics("detour.activated")
+        return true
+    }
+
+    fun cancelActiveDetour() {
+        if (_uiState.value.activeDetour == null) return
+        restorePrescribed(null)
+        diagnostics("detour.cancelled")
+    }
+
+    private fun restorePrescribed(confirmed: RouteMatcherResult?) {
+        val original = _uiState.value.prescribedRouteSnapshot ?: return
+        generation++
+        routeGeneration++
+        preparationJob?.cancel()
+        guidanceJob?.cancel()
+        calculator = prescribedCalculator
+        matcher = prescribedMatcher
+        prescribedCalculator = null
+        prescribedMatcher = null
+        matcherState = confirmed?.state?.copy(lastTimestampMillis = null) ?: RouteMatcherState()
+        rejoinMatcherState = RouteMatcherState()
+        deviation = RouteDeviationSnapshot()
+        previousHighway = null
+        _uiState.value = _uiState.value.copy(activeRoute = original, activeDetour = null,
+            rejoin = if (confirmed == null) RejoinSnapshot() else _uiState.value.rejoin,
+            rejoinCompletedId = _uiState.value.rejoinCompletedId + if (confirmed != null) 1 else 0)
+        // Reuse this raw fix with the confirmed actual projection as continuity anchor.
+        refreshGuidance()
     }
 
     private fun emitTransitions() {
@@ -184,13 +251,14 @@ class NavigationStateHolder(
     private fun markUnavailable() {
         generation++
         guidanceJob?.cancel()
+        if (_uiState.value.activeDetour != null) _uiState.value = _uiState.value.copy(rejoin = RejoinSnapshot())
         deviation = detector.uncertain(deviation)
         emitTransitions()
         val state = _uiState.value
         _uiState.value = state.copy(
             guidance = if (!state.navigationActive) GuidanceUiState() else GuidanceUiState(GuidanceStatus.WAITING_LOCATION, "位置情報を確認中"),
             highwayGuidance = null,
-            deviation = if (!state.navigationActive) DeviationUiState() else deviationUiState(deviation, state.navigationMode),
+            deviation = if (!state.navigationActive) DeviationUiState() else deviationUiState(deviation, state.navigationMode, state.activeDetour != null),
             deviationSnapshot = deviation,
             arrival = if (state.arrival.state == ArrivalState.ARRIVED) state.arrival else ArrivalSnapshot(),
         )
@@ -212,12 +280,29 @@ class NavigationStateHolder(
         val previous = matcherState
         val priorDeviation = deviation
         val highwayBefore = previousHighway
+        val rejoinMatching = prescribedMatcher.takeIf { state.activeDetour != null }
+        val rejoinBefore = rejoinMatcherState
+        val rejoinEvidence = state.rejoin
+        val rejoinFloor = state.activeDetour?.candidate?.draft?.anchorProgressMeters?.plus(rejoinDetector.config.minimumForwardMeters)
         guidanceJob = scope.launch {
-            val result = withContext(computationDispatcher) {
-                matching.match(location, previous, elapsedMillis())
+            val (result, rejoinResult) = withContext(computationDispatcher) {
+                matching.match(location, previous, elapsedMillis()) to
+                    rejoinMatching?.match(location, rejoinBefore, elapsedMillis(), RouteMatchConstraint(rejoinFloor))
             }
             // Both generation and route identity protect against cancellation-insensitive calculations and ABA changes.
             if (generation != revision || _uiState.value.activeRoute !== route || _uiState.value.location !== location) return@launch
+            if (rejoinResult?.accepted == true && rejoinFloor != null) {
+                rejoinMatcherState = rejoinResult.state
+                val evidence = rejoinDetector.update(rejoinEvidence, rejoinResult.match, location, rejoinFloor, elapsedMillis())
+                _uiState.value = _uiState.value.copy(rejoin = evidence)
+                if (evidence.state != rejoinEvidence.state && evidence.state == RejoinState.CANDIDATE)
+                    diagnostics("detour.rejoin.candidate")
+                if (evidence.state == RejoinState.CONFIRMED) {
+                    diagnostics("detour.rejoin.confirmed")
+                    restorePrescribed(rejoinResult)
+                    return@launch
+                }
+            }
             val timestamp = location.elapsedRealtimeMillis
             if (!result.accepted || timestamp == null || elapsedMillis() - timestamp >= matcherConfig.staleAfterMillis) {
                 markUnavailable()
@@ -226,6 +311,14 @@ class NavigationStateHolder(
             matcherState = result.state
             deviation = detector.update(priorDeviation, result.match, location.accuracyMeters, timestamp)
             val match = requireNotNull(result.match)
+            if (state.navigationMode == NavigationMode.PRESCRIBED && state.activeDetour == null &&
+                match.quality == RouteMatchQuality.MATCHED && deviation.allowsGuidance &&
+                match.projection.distanceFromRouteMeters <= detector.config.onRouteDistanceMeters) {
+                _uiState.value = _uiState.value.copy(lastReliablePrescribedProgress =
+                    ReliablePrescribedProgress(match.projection.distanceAlongRouteMeters, timestamp))
+            }
+            if (state.activeDetour != null && deviation.state == RouteDeviationState.OFF_ROUTE &&
+                priorDeviation.state != RouteDeviationState.OFF_ROUTE) diagnostics("detour.deviation.off_route")
             val reliability = when {
                 match.quality == RouteMatchQuality.UNRELIABLE -> ProjectionReliability.UNRELIABLE
                 !deviation.allowsGuidance -> ProjectionReliability.UNCERTAIN
@@ -243,7 +336,7 @@ class NavigationStateHolder(
             } ?: ArrivalSnapshot()
             emitTransitions()
             _uiState.value = _uiState.value.copy(guidance = display, highwayGuidance = HighwayInstructionFormatter.format(highway),
-                deviation = deviationUiState(deviation, state.navigationMode), deviationSnapshot = deviation, arrival = arrival)
+                deviation = deviationUiState(deviation, state.navigationMode, state.activeDetour != null), deviationSnapshot = deviation, arrival = arrival)
         }
     }
 
@@ -251,6 +344,11 @@ class NavigationStateHolder(
         val before = _uiState.value
         val after = before.transform()
         _uiState.value = after
+        if (before.prescribedSessionToken != after.prescribedSessionToken) {
+            prescribedCalculator = null
+            prescribedMatcher = null
+            rejoinMatcherState = RouteMatcherState()
+        }
         if (before.activeRoute !== after.activeRoute) {
             _uiState.value = _uiState.value.copy(arrival = ArrivalSnapshot())
             routeGeneration++

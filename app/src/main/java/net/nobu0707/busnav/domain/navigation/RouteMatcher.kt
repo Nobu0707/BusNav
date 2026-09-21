@@ -74,11 +74,21 @@ data class RouteMatcherState(
 
 data class RouteMatcherResult(val match: RouteMatch?, val state: RouteMatcherState, val accepted: Boolean)
 
+data class RouteMatchConstraint(val minProgressMeters: Double? = null, val maxProgressMeters: Double? = null) {
+    init {
+        require(listOfNotNull(minProgressMeters, maxProgressMeters).all { it.isFinite() && it >= 0 })
+        require(minProgressMeters == null || maxProgressMeters == null || minProgressMeters <= maxProgressMeters)
+    }
+    fun permits(progress: Double) = (minProgressMeters == null || progress >= minProgressMeters) &&
+        (maxProgressMeters == null || progress <= maxProgressMeters)
+}
+
 fun headingDifferenceDegrees(a: Double, b: Double): Double = abs(longitudeDelta(a - b))
 
 /** Pure transition: canceled computations cannot mutate the committed tracker state. No I/O. */
 class RouteMatcher(val index: RouteMatchIndex, val config: RouteMatcherConfig = RouteMatcherConfig()) {
-    fun match(fix: LocationState, previous: RouteMatcherState, nowElapsedMillis: Long): RouteMatcherResult {
+    fun match(fix: LocationState, previous: RouteMatcherState, nowElapsedMillis: Long,
+        constraint: RouteMatchConstraint = RouteMatchConstraint()): RouteMatcherResult {
         val timestamp = fix.elapsedRealtimeMillis
         if (timestamp == null || timestamp < 0 || timestamp > nowElapsedMillis ||
             nowElapsedMillis - timestamp >= config.staleAfterMillis ||
@@ -87,11 +97,15 @@ class RouteMatcher(val index: RouteMatchIndex, val config: RouteMatcherConfig = 
         }
         val anchor = previous.anchor.takeUnless { previous.lostFixes >= config.reacquireAfterFixes }
         val ids = index.candidates(fix.point, anchor?.segmentIndex)
-        var candidates = ids.map { score(fix, it, anchor, previous.anchorTimestampMillis) }.sortedBy { it.totalScore }
+        fun eligible(ids: Iterable<Int>) = ids.map { score(fix, it, anchor, previous.anchorTimestampMillis) }
+            .filter { constraint.permits(it.projection.distanceAlongRouteMeters) }.sortedBy { it.totalScore }
+        var candidates = eligible(ids)
         // A local window must never prevent reacquisition of the original route elsewhere.
-        if (candidates.first().projection.distanceFromRouteMeters > config.searchRadiusMeters && ids.size < index.segments.size) {
-            candidates = index.segments.indices.map { score(fix, it, anchor, previous.anchorTimestampMillis) }.sortedBy { it.totalScore }
+        if ((candidates.isEmpty() || candidates.first().projection.distanceFromRouteMeters > config.searchRadiusMeters) && ids.size < index.segments.size) {
+            candidates = eligible(index.segments.indices)
         }
+        if (candidates.isEmpty()) return RouteMatcherResult(null,
+            previous.copy(lastTimestampMillis = timestamp, lostFixes = previous.lostFixes + 1), true)
         val best = candidates.first()
         // Adjacent projections at the same route position are one hypothesis, not a false ambiguity.
         val second = candidates.drop(1).firstOrNull {

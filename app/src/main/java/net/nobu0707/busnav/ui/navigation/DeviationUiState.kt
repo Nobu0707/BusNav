@@ -8,8 +8,9 @@ data class DeviationUiState(val message: String? = null, val isProminent: Boolea
 
 fun deviationUiState(snapshot: RouteDeviationSnapshot,
     mode: net.nobu0707.busnav.domain.prescribed.NavigationMode = net.nobu0707.busnav.domain.prescribed.NavigationMode.PRESCRIBED,
+    detourActive: Boolean = false,
 ): DeviationUiState {
-    val route = if (mode == net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE) "案内経路" else "所定経路"
+    val route = if (detourActive) "迂回経路" else if (mode == net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE) "案内経路" else "所定経路"
     return when {
     snapshot.matchQuality == RouteMatchQuality.UNRELIABLE && snapshot.state == RouteDeviationState.OFF_ROUTE ->
         DeviationUiState("${route}から外れている可能性があります・位置情報を確認中", true)
