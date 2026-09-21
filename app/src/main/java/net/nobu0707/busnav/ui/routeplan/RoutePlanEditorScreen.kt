@@ -97,6 +97,7 @@ fun RoutePlanEditorScreen(
     onComplete: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenConnections: (() -> Unit)? = null,
+    libraryActions: (@Composable () -> Unit)? = null,
     calculationState: RouteCalculationState = RouteCalculationState.Idle,
     onCalculate: () -> Unit = {},
     onApplyCalculatedRoute: () -> Unit = {},
@@ -214,6 +215,7 @@ fun RoutePlanEditorScreen(
                                     style = MaterialTheme.typography.bodySmall)
                                 Text("開発用車両条件（実車の業務運行には使用しないでください）", style = MaterialTheme.typography.labelSmall)
                             }
+                            if (libraryActions != null) item(key = "library") { libraryActions() }
                             item(key = "calculation") {
                                 RouteCalculationPanel(calculationState, uiState.revision, onApplyCalculatedRoute)
                             }

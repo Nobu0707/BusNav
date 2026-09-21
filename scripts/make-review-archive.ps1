@@ -115,6 +115,10 @@ try {
     $untrackedFiles = @($untrackedText -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     $workingFiles = @($workingTracked + $untrackedFiles | Sort-Object -Unique)
     foreach ($workingFile in $workingFiles) {
+        if (Test-ProhibitedReviewPath -RelativePath $workingFile) {
+            $excludedFiles.Add("working-files/$workingFile - prohibited path")
+            continue
+        }
         $source = Join-Path $repositoryRoot $workingFile.Replace('/', '\')
         $safeRelative = $workingFile.Replace(':', '_')
         $workingDiffPath = Join-Path $workingDiffsDirectory ($safeRelative.Replace('/', '\') + ".diff.txt")

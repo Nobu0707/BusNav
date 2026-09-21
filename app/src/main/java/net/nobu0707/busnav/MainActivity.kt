@@ -26,11 +26,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val locationProvider = AndroidLocationProvider(applicationContext)
         val routeRepository: ScheduledRouteRepository = InMemoryScheduledRouteRepository(
-            activeRoute = if (BuildConfig.DEBUG) {
-                net.nobu0707.busnav.data.route.createDevelopmentSampleRoute()
-            } else {
-                null
-            },
+            activeRoute = null,
         )
         val diagnostics = if (BuildConfig.DEBUG) {
             AndroidLogRoutingDiagnostics()
@@ -50,6 +46,7 @@ class MainActivity : ComponentActivity() {
                 NavigationRoute(
                     locationProvider = locationProvider,
                     routeRepository = routeRepository,
+                    prescribedRouteRepository = BusNavContainer.get(applicationContext).prescribedRoutes,
                     routingEngine = routingEngine,
                     connectionRepository = connections,
                     basemapConfig = effective.basemapConfig(BuildConfig.DEBUG),

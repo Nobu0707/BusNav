@@ -37,6 +37,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.DisposableEffect
@@ -83,13 +85,14 @@ object NavigationTestTags {
     const val ROUTE_EDIT = "route_edit"
 }
 
-private enum class BusNavScreen { NAVIGATION, ROUTE_EDIT }
+private enum class BusNavScreen { NAVIGATION, ROUTE_EDIT, LIBRARY }
 
 @Composable
 fun NavigationRoute(
     locationProvider: LocationProvider,
     routeRepository: ScheduledRouteRepository,
     routingEngine: RoutingEngine,
+    prescribedRouteRepository: net.nobu0707.busnav.domain.prescribed.PrescribedRouteRepository? = null,
     connectionRepository: DeveloperConnectionRepository? = null,
     presentationClock: java.time.Clock? = null,
     basemapConfig: BasemapConfig = BasemapConfig.fromBuildValue(BuildConfig.BASEMAP_STYLE_URL, BuildConfig.DEBUG),
@@ -102,6 +105,17 @@ fun NavigationRoute(
     val routePlanUiState by routePlanHolder.uiState.collectAsState()
     val calculationHolder = viewModel { RouteCalculationViewModel(routingEngine) }.stateHolder
     val calculationState by calculationHolder.state.collectAsState()
+    val library = prescribedRouteRepository?.let { repository ->
+        viewModel { net.nobu0707.busnav.ui.prescribed.PrescribedRouteLibraryViewModel(repository) {
+            stateHolder.uiState.value.activePrescribedRouteId
+        } }.holder
+    }
+    val libraryState = library?.state?.collectAsState()?.value
+    LaunchedEffect(libraryState?.current?.name) {
+        libraryState?.current?.let { stateHolder.refreshPrescribedName(it.id, it.name) }
+    }
+    var saveDialog by rememberSaveable { mutableStateOf(false) }
+    var saveAsNew by rememberSaveable { mutableStateOf(false) }
     val candidateRoute = calculationHolder.currentCandidate(routePlanUiState.revision)
     var editorViewport by remember { mutableStateOf<Pair<EditorSheetState, Int>?>(null) }
     var cursorReader by remember { mutableStateOf<(() -> GeoPoint?)?>(null) }
@@ -151,13 +165,17 @@ fun NavigationRoute(
         }
     }
 
-    BackHandler(enabled = screen == BusNavScreen.ROUTE_EDIT) {
+    fun cancelEditing() {
         calculationHolder.cancel()
+        libraryState?.draft?.let { routePlanHolder.replacePlan(libraryState.current?.routePlan ?: it.routePlan) }
+        library?.cancelDraft()
         screen = BusNavScreen.NAVIGATION
     }
+    BackHandler(enabled = screen != BusNavScreen.NAVIGATION) { cancelEditing() }
 
     // Guidance starts when an applicable route is adopted; viewing/editing a plan is inactive.
     val navigationActive = screen == BusNavScreen.NAVIGATION && !showConnections &&
+        (uiState.activePrescribedRouteId == null || uiState.isNavigationStarted) &&
         !uiState.activeRoute?.guidance?.maneuvers.isNullOrEmpty()
     val isNight = net.nobu0707.busnav.ui.theme.rememberIsNight(uiState.location?.point, presentationClock)
     var isTunnel by remember { mutableStateOf(false) }
@@ -178,6 +196,7 @@ fun NavigationRoute(
             BusNavScreen.NAVIGATION -> NavigationScreen(
                 uiState = uiState,
                 hasRoutePlan = routePlanUiState.currentPlan.points.isNotEmpty(),
+                onOpenLibrary = library?.let { { screen = BusNavScreen.LIBRARY } },
                 onLayoutModeChanged = stateHolder::setLayoutMode,
                 onRequestPermission = {
                     permissionLauncher.launch(
@@ -190,9 +209,20 @@ fun NavigationRoute(
                 onCurrentLocation = stateHolder::onCurrentLocationRequested,
                 onRouteOverview = stateHolder::onRouteOverviewRequested,
                 onEditRoute = {
-                    routePlanHolder.enterEditor(uiState.activeRoute, candidateRoute)
-                    editorViewport = null
-                    screen = BusNavScreen.ROUTE_EDIT
+                    val id = uiState.activePrescribedRouteId
+                    if (id != null && library != null) {
+                        library.edit(id) {
+                            calculationHolder.cancel()
+                            routePlanHolder.replacePlan(it.routePlan)
+                            routePlanHolder.enterEditor(it.route, null)
+                            editorViewport = null
+                            screen = BusNavScreen.ROUTE_EDIT
+                        }
+                    } else {
+                        routePlanHolder.enterEditor(uiState.activeRoute, candidateRoute)
+                        editorViewport = null
+                        screen = BusNavScreen.ROUTE_EDIT
+                    }
                 },
                 mapContent = { modifier ->
                     MapScreen(
@@ -213,13 +243,45 @@ fun NavigationRoute(
                     )
                 },
             )
+            BusNavScreen.LIBRARY -> libraryState?.let { ls ->
+                net.nobu0707.busnav.ui.prescribed.PrescribedRouteLibraryScreen(
+                    ls, uiState.activePrescribedRouteId,
+                    onBack = { screen = BusNavScreen.NAVIGATION },
+                    onCreate = {
+                        library.cancelDraft()
+                        calculationHolder.cancel()
+                        routePlanHolder.replacePlan(net.nobu0707.busnav.domain.routeplan.RoutePlan(java.util.UUID.randomUUID().toString()))
+                        routePlanHolder.enterEditor(null, null)
+                        editorViewport = null
+                        screen = BusNavScreen.ROUTE_EDIT
+                    },
+                    onSaveCurrent = { asNew -> library.cancelDraft(); saveAsNew = asNew; saveDialog = true },
+                    onEndUse = { stateHolder.clearRoute(); library.clearCurrent() },
+                    onOpen = { id -> library.open(id) {
+                        stateHolder.openPrescribedRoute(it)
+                        routePlanHolder.replacePlan(it.routePlan)
+                        screen = BusNavScreen.NAVIGATION
+                    } },
+                    onNavigate = { id -> library.open(id) {
+                        stateHolder.openPrescribedRoute(it)
+                        stateHolder.startNavigation()
+                        routePlanHolder.replacePlan(it.routePlan)
+                        screen = BusNavScreen.NAVIGATION
+                    } },
+                    onEdit = { id -> library.edit(id) {
+                        calculationHolder.cancel()
+                        routePlanHolder.replacePlan(it.routePlan)
+                        routePlanHolder.enterEditor(it.route, null)
+                        editorViewport = null
+                        screen = BusNavScreen.ROUTE_EDIT
+                    } },
+                    onDuplicate = library::duplicate, onRename = library::rename, onDelete = library::delete,
+                )
+            }
             BusNavScreen.ROUTE_EDIT -> RoutePlanEditorScreen(
                 uiState = routePlanUiState,
                 onOpenConnections = if (BuildConfig.DEBUG && connectionRepository != null) ({ showConnections = true }) else null,
-                onBack = {
-                    calculationHolder.cancel()
-                    screen = BusNavScreen.NAVIGATION
-                },
+                onBack = { cancelEditing() },
                 onRegisterCursor = { cursorReader?.invoke()?.let(routePlanHolder::registerCursor) },
                 onSheetStateChanged = routePlanHolder::setSheetState,
                 onSheetHeightChanged = { state, height -> editorViewport = state to height },
@@ -230,19 +292,46 @@ fun NavigationRoute(
                 onTogglePointType = routePlanHolder::toggleIntermediateType,
                 onPlanOverview = routePlanHolder::requestPlanOverview,
                 onComplete = {
-                    calculationHolder.cancel()
-                    routePlanHolder.completeEditing()
-                    screen = BusNavScreen.NAVIGATION
+                    if (libraryState?.draft != null) {
+                        saveAsNew = false
+                        saveDialog = true
+                    } else {
+                        calculationHolder.cancel()
+                        routePlanHolder.completeEditing()
+                        screen = BusNavScreen.NAVIGATION
+                    }
                 },
+                libraryActions = library?.let { {
+                    Row {
+                        TextButton(onClick = { screen = BusNavScreen.LIBRARY }) { Text("所定経路一覧") }
+                        if (libraryState?.draft != null) {
+                            TextButton(onClick = { saveAsNew = false; saveDialog = true },
+                                enabled = library.canSaveDraft(routePlanUiState.currentPlan)) { Text("上書き保存") }
+                            TextButton(onClick = { saveAsNew = true; saveDialog = true },
+                                enabled = library.canSaveDraft(routePlanUiState.currentPlan)) { Text("別名保存") }
+                        }
+                    }
+                    libraryState?.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    if (libraryState?.draft != null && !library.canSaveDraft(routePlanUiState.currentPlan))
+                        Text("地点変更後は経路を再計算し、候補を適用してください")
+                } },
                 calculationState = calculationState,
                 onCalculate = {
-                    calculationHolder.calculate(routePlanUiState.currentPlan, routePlanUiState.revision)
+                    calculationHolder.calculate(routePlanUiState.currentPlan, routePlanUiState.revision,
+                        libraryState?.draft?.vehicleProfile ?: libraryState?.current?.vehicleProfile ?: net.nobu0707.busnav.domain.routing.VehicleProfile.DEVELOPMENT_LARGE_BUS)
                 },
                 onApplyCalculatedRoute = {
                     calculationHolder.currentCandidate(routePlanUiState.revision)?.let { route ->
-                        stateHolder.applyCalculatedRoute(route)
-                        routePlanHolder.completeEditing()
-                        screen = BusNavScreen.NAVIGATION
+                        if (library != null && !library.acceptCandidate(routePlanUiState.currentPlan, route,
+                            libraryState?.draft?.vehicleProfile ?: libraryState?.current?.vehicleProfile ?: net.nobu0707.busnav.domain.routing.VehicleProfile.DEVELOPMENT_LARGE_BUS)) return@let
+                        if (libraryState?.draft != null) {
+                            saveAsNew = false
+                            saveDialog = true
+                        } else {
+                            stateHolder.applyCalculatedRoute(route)
+                            routePlanHolder.completeEditing()
+                            screen = BusNavScreen.NAVIGATION
+                        }
                     }
                 },
                 mapContent = { modifier ->
@@ -253,7 +342,7 @@ fun NavigationRoute(
                         location = uiState.location,
                         isFollowingLocation = false,
                         recenterRequestId = 0,
-                        activeRoute = candidateRoute ?: uiState.activeRoute,
+                        activeRoute = candidateRoute ?: libraryState?.draft?.route ?: uiState.activeRoute,
                         routeOverviewRequestId = 0,
                         editorCameraRequest = routePlanUiState.cameraRequest.takeIf { editorViewport?.first == routePlanUiState.sheetState },
                         editorBottomPadding = editorViewport?.second?.plus(with(androidx.compose.ui.platform.LocalDensity.current) { 60.dp.roundToPx() }),
@@ -268,6 +357,20 @@ fun NavigationRoute(
                         modifier = modifier,
                     )
                 },
+            )
+        }
+        if (saveDialog && library != null && libraryState != null) {
+            val source = libraryState.draft ?: libraryState.current
+            net.nobu0707.busnav.ui.prescribed.RouteNameDialog(
+                if (saveAsNew) "別名で保存" else "上書き保存", source?.name.orEmpty(), source?.description.orEmpty(),
+                libraryState.busy, libraryState.error,
+                onDismiss = { saveDialog = false; library.dismissError() },
+                onSave = { name, description -> library.save(name, description, saveAsNew, routePlanUiState.currentPlan) {
+                    stateHolder.openPrescribedRoute(it)
+                    routePlanHolder.replacePlan(it.routePlan)
+                    saveDialog = false
+                    screen = BusNavScreen.NAVIGATION
+                } },
             )
         }
         if (BuildConfig.DEBUG && showConnections && connectionRepository != null) {
@@ -289,6 +392,7 @@ fun NavigationScreen(
     modifier: Modifier = Modifier,
     onEditRoute: () -> Unit = {},
     hasRoutePlan: Boolean = false,
+    onOpenLibrary: (() -> Unit)? = null,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     BoxWithConstraints(
@@ -308,6 +412,7 @@ fun NavigationScreen(
                 onRouteOverview = onRouteOverview,
                 onEditRoute = onEditRoute,
                 hasRoutePlan = hasRoutePlan,
+                onOpenLibrary = onOpenLibrary,
                 mapContent = mapContent,
             )
             NavigationLayoutMode.LandscapeThreeColumn -> LandscapeNavigationLayout(
@@ -317,6 +422,7 @@ fun NavigationScreen(
                 onRouteOverview = onRouteOverview,
                 onEditRoute = onEditRoute,
                 hasRoutePlan = hasRoutePlan,
+                onOpenLibrary = onOpenLibrary,
                 mapContent = mapContent,
             )
         }
@@ -331,6 +437,7 @@ private fun PortraitNavigationLayout(
     onRouteOverview: () -> Unit,
     onEditRoute: () -> Unit,
     hasRoutePlan: Boolean,
+    onOpenLibrary: (() -> Unit)?,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     Column(
@@ -348,9 +455,10 @@ private fun PortraitNavigationLayout(
             mapContent = mapContent,
         )
         PlaceholderPanel(
-            title = "運行情報",
+            title = if (onOpenLibrary != null) "所定経路 • 一覧・保存" else "運行情報",
             detail = operationsSummary(uiState, hasRoutePlan),
-            modifier = Modifier.fillMaxWidth().height(70.dp).testTag(NavigationTestTags.OPERATIONS),
+            modifier = Modifier.fillMaxWidth().height(70.dp).testTag(NavigationTestTags.OPERATIONS)
+                .then(if (onOpenLibrary != null) Modifier.clickable(onClick = onOpenLibrary).semantics { contentDescription = "所定経路一覧を開く" } else Modifier),
         )
         AuxiliaryControls(
             onEditRoute = onEditRoute,
@@ -367,6 +475,7 @@ private fun LandscapeNavigationLayout(
     onRouteOverview: () -> Unit,
     onEditRoute: () -> Unit,
     hasRoutePlan: Boolean,
+    onOpenLibrary: (() -> Unit)?,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     Row(
@@ -380,9 +489,10 @@ private fun LandscapeNavigationLayout(
             DeviationBanner(uiState.deviation)
             NavigationGuidanceCard(uiState, Modifier.fillMaxWidth().weight(2f))
             PlaceholderPanel(
-                title = "運行情報",
+                title = if (onOpenLibrary != null) "所定経路 • 一覧・保存" else "運行情報",
                 detail = operationsSummary(uiState, hasRoutePlan),
-                modifier = Modifier.fillMaxWidth().weight(1f).testTag(NavigationTestTags.OPERATIONS),
+                modifier = Modifier.fillMaxWidth().weight(1f).testTag(NavigationTestTags.OPERATIONS)
+                .then(if (onOpenLibrary != null) Modifier.clickable(onClick = onOpenLibrary).semantics { contentDescription = "所定経路一覧を開く" } else Modifier),
             )
         }
         MapArea(
@@ -540,7 +650,7 @@ private fun operationsSummary(state: NavigationUiState, hasRoutePlan: Boolean = 
     val route = when {
         state.isRouteLoading -> "所定経路：読み込み中"
         state.routeError != null -> "所定経路：読込失敗"
-        state.activeRoute != null -> "所定経路：${state.activeRoute.name}"
+        state.activeRoute != null -> "所定経路：${state.activePrescribedRouteName ?: state.activeRoute.name}"
         else -> "所定経路：未選択"
     }
     val location = state.locationError ?: locationSummary(state)

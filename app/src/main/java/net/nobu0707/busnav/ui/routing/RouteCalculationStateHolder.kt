@@ -25,8 +25,8 @@ class RouteCalculationStateHolder(
     val state: StateFlow<RouteCalculationState> = _state.asStateFlow()
     private var calculationJob: Job? = null
 
-    fun calculate(plan: RoutePlan, planRevision: Long): Boolean {
-        val request = when (val result = plan.toRoutingRequest(vehicleProfile)) {
+    fun calculate(plan: RoutePlan, planRevision: Long, profile: VehicleProfile = vehicleProfile): Boolean {
+        val request = when (val result = plan.toRoutingRequest(profile)) {
             is RoutingRequestResult.Invalid -> return false
             is RoutingRequestResult.Ready -> result.request
         }

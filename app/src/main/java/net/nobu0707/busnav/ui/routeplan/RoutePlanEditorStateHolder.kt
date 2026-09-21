@@ -94,6 +94,12 @@ class RoutePlanEditorStateHolder(
         requestCamera(_uiState.value.currentPlan.points.map { it.position })
     }
 
+    fun replacePlan(plan: net.nobu0707.busnav.domain.routeplan.RoutePlan) {
+        fittedCandidate = null
+        update { copy(currentPlan = plan, validation = plan.validateForRouting(), selectedPointId = null,
+            hasUnsavedChanges = false, revision = revision + 1, errorMessage = null) }
+    }
+
     fun completeEditing() = update { copy(hasUnsavedChanges = false, errorMessage = null) }
 
     private fun updatePlan(transform: (net.nobu0707.busnav.domain.routeplan.RoutePlan) -> net.nobu0707.busnav.domain.routeplan.RoutePlan) {

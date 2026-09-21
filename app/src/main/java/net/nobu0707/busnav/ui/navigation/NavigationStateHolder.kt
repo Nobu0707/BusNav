@@ -102,8 +102,20 @@ class NavigationStateHolder(
     }
 
     fun applyCalculatedRoute(route: ScheduledRoute) {
-        update { copy(activeRoute = route, isRouteLoading = false, routeError = null, routeOverviewRequestId = routeOverviewRequestId + 1) }
+        update { copy(activeRoute = route, activePrescribedRouteId = null, activePrescribedRouteName = null, isNavigationStarted = true, isRouteLoading = false, routeError = null, routeOverviewRequestId = routeOverviewRequestId + 1) }
     }
+
+    fun openPrescribedRoute(record: net.nobu0707.busnav.domain.prescribed.PrescribedRouteRecord) {
+        update { copy(activeRoute = record.route, activePrescribedRouteId = record.id, activePrescribedRouteName = record.name,
+            navigationMode = net.nobu0707.busnav.domain.prescribed.NavigationMode.PRESCRIBED,
+            isNavigationStarted = false, isFollowingLocation = false, isRouteLoading = false,
+            routeError = null, routeOverviewRequestId = routeOverviewRequestId + 1) }
+    }
+    fun refreshPrescribedName(id: String, name: String) {
+        if (_uiState.value.activePrescribedRouteId == id) update { copy(activePrescribedRouteName = name) }
+    }
+    fun startNavigation() { if (_uiState.value.activeRoute != null) update { copy(isNavigationStarted = true) } }
+    fun clearRoute() = update { copy(activeRoute = null, activePrescribedRouteId = null, activePrescribedRouteName = null, isNavigationStarted = false) }
 
     private fun emitTransitions() {
         if (lastDiagnosticQuality != deviation.matchQuality) {

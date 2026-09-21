@@ -29,3 +29,12 @@ tools/routing/runtime/
 tools/routing/.env
 valhalla_tiles/
 valhalla_tiles.tar
+
+# Prescribed route runtime databases
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

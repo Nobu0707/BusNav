@@ -9,7 +9,7 @@ import net.nobu0707.busnav.domain.route.ScheduledRoute
 import net.nobu0707.busnav.domain.route.ScheduledRouteRepository
 
 class InMemoryScheduledRouteRepository(
-    private val activeRoute: ScheduledRoute? = createDevelopmentSampleRoute(),
+    private val activeRoute: ScheduledRoute? = null,
 ) : ScheduledRouteRepository {
     override suspend fun getActiveRoute(): ScheduledRoute? = activeRoute
 }
