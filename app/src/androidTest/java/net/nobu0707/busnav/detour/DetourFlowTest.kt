@@ -110,6 +110,12 @@ class DetourFlowTest {
             }
         }
         fun screenshot(label:String) {
+            if (label.startsWith("preview")) {
+                waitTag("detour_activate")
+                rule.onNodeWithTag("detour_activate").assertIsDisplayed()
+                rule.waitUntil(20000) { detour().state.value.cameraRequest == null }
+            }
+            rule.waitForIdle()
             rule.waitUntil(20000) {
                 var ready=false
                 rule.runOnUiThread { findMap(rule.activity.window.decorView)?.getMapAsync { native ->
@@ -140,9 +146,9 @@ class DetourFlowTest {
             val start=if(live) original.route.geometry.first else point(100.0)
             position(start)
             rule.waitUntil(20000) {nav().uiState.value.lastReliablePrescribedProgress!=null}
-            val rawStart=if(proactive) start else GeoPoint(start.latitude+0.0009,start.longitude)
+            val rawStart=if(proactive) start else if(live) offRoutePoint(original.route,start) else GeoPoint(start.latitude+0.0009,start.longitude)
             position(rawStart)
-            if (!proactive && !live) {
+            if (!proactive) {
                 rule.waitUntil(20000){nav().uiState.value.deviationSnapshot.state==RouteDeviationState.OFF_ROUTE}
                 rule.onNodeWithTag("detour_off_route").performClick()
             } else rule.onNodeWithTag("bottom_迂回").performClick()
@@ -229,6 +235,19 @@ class DetourFlowTest {
             }
         } finally {rule.runOnUiThread{rule.activity.finish()};db.close()}
     }
+    private fun offRoutePoint(route: ScheduledRoute, start: GeoPoint): GeoPoint {
+        val matcher=RouteMatcher(RouteMatchIndex(RouteDistanceIndex(route.geometry),RouteMatcherConfig()))
+        for (radius in listOf(90.0,130.0,180.0)) for (degrees in 0 until 360 step 45) {
+            val angle=Math.toRadians(degrees.toDouble())
+            val p=GeoPoint(start.latitude+kotlin.math.sin(angle)*radius/111195.0,
+                start.longitude+kotlin.math.cos(angle)*radius/(111195.0*kotlin.math.cos(Math.toRadians(start.latitude))))
+            val fix=LocationState(p,5f,null,0f,0,1000)
+            val match=matcher.match(fix,RouteMatcherState(),1000).match
+            if(match?.quality==RouteMatchQuality.MATCHED && match.projection.distanceFromRouteMeters in 70.0..250.0) return p
+        }
+        error("Public test route has no unambiguous synthetic off-route point")
+    }
+
     private fun findMap(view:View):MapView? {
         if(view is MapView)return view
         if(view is ViewGroup)for(i in 0 until view.childCount)findMap(view.getChildAt(i))?.let{return it}
