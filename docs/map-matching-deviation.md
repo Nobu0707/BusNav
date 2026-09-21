@@ -1,5 +1,14 @@
 # Phase008: Route-constrained Map Matching / 所定経路逸脱検知
 
+## Phase009の前方制約
+
+RouteMatcher.matchへ任意のRouteMatchConstraintを追加した。通常呼出しは無制約で既存挙動を維持する。
+迂回中の所定経路照合だけ、anchor + 500m以上のprojectionをscore候補から選ぶ。
+候補なしはnull matchで、不適格な過去区間へfallbackしない。
+Detour用の逸脱判定と所定経路復帰判定は独立し、復帰確定を優先する。
+復帰はMATCHED・25m/精度30m・連続3fix/2秒、方向利用可能時45度以内。
+[Detour/Rejoin](detour-rejoin.md)に閾値・early rejoin・保持indexの詳細を記載。
+
 ## 境界
 
 Projection は geometry への幾何学的投影。RouteProjector は従来どおり全 segment の最近傍を返し、

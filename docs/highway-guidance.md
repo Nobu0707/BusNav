@@ -1,5 +1,10 @@
 # Phase 006: 高速道路・分岐案内
 
+Phase009の迂回ACTIVEでは迂回routeのHighwayGuidanceCalculatorを使用する。
+元所定経路へ復帰すると、実際の復帰progressから高速判断点を選び直す。
+候補生成時はEXIT/RAMP/KEEP/MERGEに加え、sign付きCONTINUEを含むHighwayDecisionの前後200mを除外する。
+[迂回・復帰の設計](detour-rejoin.md)。
+
 `HighwayDecisionExtractor` は `RouteGuidance` の ramp / exit / keep / merge と、空でない標識を持つ continue を抽出します。通常の右左折、未対応 maneuver は対象外です。一般道にも存在し得るランプを、高速入口と断定しません。trip 全体の highway flag は UI の切替に使用しません。
 
 ## モデルと標識

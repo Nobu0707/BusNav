@@ -1,10 +1,17 @@
 # BusNav
 
-BusNav は、高速バス・夜行バスの実運用を想定した業務用ナビゲーションアプリです。通常は登録済みの所定経路を案内し、通行止めや運行管理上の指示がある場合だけ安全な迂回と所定経路への復帰を行うことを将来目標としています。
+BusNav は、高速バス・夜行バスの実運用を想定した業務用ナビゲーションアプリです。通常は登録済みの所定経路を案内し、運転者が明示的に設定・採用した迂回経路を案内し、前方の所定経路への復帰を確認します。
 
 Phase 006 は、高速道路・ランプ・出口・分岐に専用カード、模式図、路線 badge、次の分岐を表示します。詳細は [高速案内](docs/highway-guidance.md) を参照してください。詳細 vector basemap 上で Valhalla maneuver による走行案内を表示します。現在位置から次の操作・距離・道路/方面・その次の案内を算出し、位置が不確実な場合は案内を抑制します。自動リルートは行いません。
 
 Phase 004.5.1 の [全国routing・関東/中部basemap環境](docs/development/japan-routing-and-regional-basemaps.md) は、全国Valhallaと地域別地図を独立して利用します。Debugの開発接続設定でKanto/Chubuを保存・切替できます。
+
+## Phase009: 明示的な迂回・所定経路復帰
+
+保存済み所定経路の案内中に「迂回」から復帰地点と経由地／通過指定を設定できます。
+計算結果をプレビューして「この迂回経路を使用」で採用します。元の所定経路と保存車両条件を保持し、安定した前方一致で通信せず復帰します。
+FREEは既存の手動再計算を維持し、自動rerouteは行いません。
+[仕様・操作](docs/detour-rejoin.md)・[Review012](docs/reviews/012-detour-rejoin.md)。
 
 ## 現在の実装範囲
 
@@ -103,7 +110,7 @@ Host の style URL は `http://localhost:8080/styles/busnav/style.json`、Androi
 
 ## 次フェーズ候補
 
-Phase 005 では Valhalla maneuver を使う案内、route 上の進捗、次の右左折と道路名を追加する予定です。その後、VICS、所定経路復帰、JCT 案内、運行管理指示を段階的に追加します。接続点は [アーキテクチャ文書](docs/architecture.md)、[RoutingEngine](docs/routing/routing-engine.md)、[Valhalla 接続](docs/routing/valhalla.md) を参照してください。
+Phase010ではVICS・交通情報・道路規制sourceをDetourReason / DetourDraftへ接続します。明示採用と所定経路保持を維持します。接続点は [アーキテクチャ文書](docs/architecture.md)、[RoutingEngine](docs/routing/routing-engine.md)、[Valhalla 接続](docs/routing/valhalla.md) を参照してください。
 
 
 ## 走行案内
@@ -117,14 +124,14 @@ Phase 005 では Valhalla maneuver を使う案内、route 上の進捗、次の
 ## Phase008.5B: Route Editor UX Refresh
 
 編集開始時のroute fitとcamera保持、中央カーソル登録、経由地／通過指定の表示、共通スクロールと固定footerを実装。
-[UI仕様](docs/ui/route-plan-editor.md)・[レビュー](docs/reviews/011b-route-editor-ux.md)。Phase009は未着手。
+[UI仕様](docs/ui/route-plan-editor.md)・[レビュー](docs/reviews/011b-route-editor-ux.md)。迂回専用編集はPhase009で追加しました。
 
 ## Phase008.5C: 所定経路ライブラリ
 
 ナビ画面の「所定経路 • 一覧・保存」から新規作成、保存、呼び出し、編集、上書き・別名保存、名前変更、複製、削除を行えます。保存済み経路は Valhalla へ再問い合わせせず、そのまま復元します。
-[仕様と操作](docs/prescribed-route-library.md)・[Review011c](docs/reviews/011c-prescribed-route-library.md)。Phase009 は未実装です。
+[仕様と操作](docs/prescribed-route-library.md)・[Review011c](docs/reviews/011c-prescribed-route-library.md)。Phase009は保存identityと車両条件を使います。
 ## Phase008.5D: 現在地からナビ
 
 「ルート」→「現在地からナビ」で地図中央から目的地を選び、大型車条件で計算・プレビュー後に「案内開始」できます。一般道・高速案内、手動再計算、到着確認と明示終了に対応します。FREE は保存経路と分離し、OFF_ROUTE で自動再計算しません。
 
-設計・操作: [Free Navigation](docs/free-navigation.md)。検証: [Review011d](docs/reviews/011d-free-navigation.md)。Phase009 detour/rejoin は未実装です。
+設計・操作: [Free Navigation](docs/free-navigation.md)。検証: [Review011d](docs/reviews/011d-free-navigation.md)。PRESCRIBED専用detour/rejoinとは分離しています。

@@ -1,4 +1,13 @@
-# BusNav Phase008.5D アーキテクチャ
+# BusNav Phase009 アーキテクチャ
+
+## Detour / Rejoinの境界
+
+PRESCRIBED sessionはprescribedRouteSnapshot / prescribedVehicleProfile / prescribedSessionTokenを保持する。
+activeRouteは現在案内する経路で、明示採用時だけ迂回へ置換する。FREEはsnapshotを保持しない。
+domain/detourはI/Oのない候補生成と復帰判定、ui/detourは計画・preview・明示採用を担当する。
+NavigationStateHolderは2系統matcherを所有し、前方制約のある所定matcherで復帰した実progressを案内へ渡す。
+元経路のindexを保持し、迂回indexはDefault上で構築する。計算と状態更新には世代guardを適用する。
+[設計詳細](detour-rejoin.md)。
 
 ## 方針
 

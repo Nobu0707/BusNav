@@ -1,4 +1,9 @@
-# Navigation guidance (Phase005 / Phase008 integration)
+# Navigation guidance (Phase005 / Phase008 / Phase009 integration)
+
+Phase009ではactiveRouteが通常の所定経路または明示採用済み迂回経路を表す。
+元のprescribedRouteSnapshotは別保持し、preview中は案内対象を変更しない。
+復帰確定時は実projectionとmatcher stateを元のcalculatorへ引継ぎ、その場所の次maneuverを選ぶ。
+先頭や予定復帰点へprogressを戻さず、HTTPも呼ばない。[詳細](detour-rejoin.md)。
 
 ## Route snapshot and parsing
 

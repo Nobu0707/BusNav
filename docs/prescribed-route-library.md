@@ -82,8 +82,8 @@ Debug / Release とも自動 sample load はありません。`createDevelopment
 保存済みライブラリはプロセス再起動後も残ります。最後に選択した経路・未保存 draft はプロセス終了時に自動復元しません。Activity recreation は ViewModel で保持します。
 新規作成の車両設定 UI は既存の開発用車両条件を使用します。保存した条件は編集再計算で引き継ぎます。
 地図背景のオフライン配布は対象外。保存経路線と案内の復元は通信不要です。
-export/import、検索、FREE navigation は今回未実装で UI にダミー項目を出しません。
-Phase008.5D は session UI と FREE navigation、Phase009 は stable prescribedRouteId を参照する detour/rejoin を担当します。迂回処理は未実装です。
+export/import、検索は未実装でUIにダミー項目を出しません。FREE navigationはPhase008.5Dで追加済みです。
+Phase009の[Detour/Rejoin](detour-rejoin.md)はstable prescribedRouteId、元route snapshot、保存VehicleProfileを保持します。迂回をrecordに保存しません。renameはsessionを維持し、route内容/profile変更通知は旧sessionを無効化します。案内中編集・削除禁止の既存policyも維持します。
 ## Phase008.5D FREE との関係
 
 NavigationMode.FREE が通常ナビとして有効になりました。保存済みレコードは PRESCRIBED と stable UUID を維持し、FREE 計算/開始/終了は repository に書き込みません。activePrescribedRouteId から mode を推測しません。

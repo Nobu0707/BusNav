@@ -87,6 +87,6 @@ View/Activity/MapLibre listener を ViewModel に保持しません。process de
 端末テスト: 中央カーソル、選択/目的地/preview/active の Activity recreation、一般道/高速、逸脱、再計算失敗/採用、到着、終了、Room レコード不変、保存経路への復帰。
 live 関東試験は東京駅付近→上野駅付近の公共地点を使用します。未稼働サービスは既存 Assumption utility で formal skip します。
 
-Phase009 の detour/rejoin・speed lock は未実装です。「迂回」は placeholder のままです。
+Phase009のdetour/rejoinとspeed lockはPRESCRIBED専用です。FREEでは「迂回」は無効で、既存の明示的な再計算・preview/start/arrival/endを維持します。FREE開始時にはprescribedRouteSnapshot / prescribedVehicleProfile / activePrescribedRouteIdを消去します。[境界の詳細](detour-rejoin.md)。
 FREE 自動 reroute、VIA 編集、FREE の自動保存、process-death 自動復元は対象外です。
 将来の FREE 自動 reroute は専用 lifecycle・頻度制限・品質/応答世代検証と利用者への通知を設計し、PRESCRIBED detour policy と分離します。

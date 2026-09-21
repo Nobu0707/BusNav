@@ -54,7 +54,7 @@ RouteCalculationViewModel は計算と candidate を Activity再生成をまた�
 ScheduledRoute／candidate と RoutePlan preview は既存の別source/layerを使います。
 探索前の直線previewは「仮ルート（経路探索前プレビュー）」と表示し、探索成功時は道路沿いcandidateへ
 切り替えます。route matching／guidance／deviation／テーマ切り替えのロジックは変更しません。
-Phase009 の Detour/Rejoin や自動再探索は未実装です。
+Phase009の[Detour/Rejoin](../detour-rejoin.md)は独立したdraftと専用画面を使い、中央カーソルを共用します。通常RoutePlan編集とは状態を分離し、所定RoutePlanを迂回で更新しません。自動再探索は行いません。
 
 ## Phase008.5C 保存・編集
 
