@@ -59,7 +59,7 @@ placed above them. Actual visible density depends on geometry, tile boundaries a
 other labels, not a promised number of signs per screen or meters between signs.
 
 Casing and increasing road widths remain intact. Tunnel dashes and bridge center
-strokes use the classified color, retaining the category through structures.
+strokes use a lighter tint of the classified color, retaining both the category and a visible structural stroke over the road fill.
 Active route cyan and its dark casing are drawn above basemap shields. Existing
 detour, traffic, route-point and vehicle ordering is unchanged.
 

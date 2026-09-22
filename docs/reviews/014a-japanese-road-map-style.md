@@ -53,7 +53,7 @@ four vector backgrounds total. Text and icon share one feature and collision box
 Expressway/national/prefectural spacing is 420/550/680px, minimum zoom 7/8/13;
 only one-/two-digit national refs at zoom 8–9. Road names are retained below shields.
 Road colors are blue/red/green with theme-specific brightness; shields keep their colors.
-Road casing, tunnel/bridge category colors and neutral fallback remain distinct.
+Road casing and neutral fallback remain distinct. Tunnel/bridge strokes use a lighter category tint: identical stroke/fill colors would make the structural cue disappear. A static regression requires the stroke tint to differ from the base fill.
 Navigation route casing and the existing OverlayLayerOrder are preserved.
 
 ## Tests and evidence

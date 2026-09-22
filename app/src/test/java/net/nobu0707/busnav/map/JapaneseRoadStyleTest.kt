@@ -43,7 +43,11 @@ class JapaneseRoadStyleTest {
             roads.forEach {
                 val color = it.getValue("paint").jsonObject.getValue("line-color").jsonArray
                 assertEquals("[\"get\",\"route_network\"]", color[1].toString())
-                assertEquals(colors, listOf(3, 5, 7).map { index -> color[index].jsonPrimitive.content })
+                val structure = it.getValue("id").jsonPrimitive.content in listOf("road-tunnels", "road-bridges")
+                val expected = if (!structure) colors else if (theme == "busnav-light")
+                    listOf("#84AED1", "#E3ADA5", "#91BEA2") else listOf("#99BDDF", "#E3B0AA", "#A3C9B0")
+                assertEquals(expected, listOf(3, 5, 7).map { index -> color[index].jsonPrimitive.content })
+                if (structure) assertTrue(expected.zip(colors).all { (stroke, fill) -> stroke != fill })
                 assertNotNull(color[8])
             }
         }

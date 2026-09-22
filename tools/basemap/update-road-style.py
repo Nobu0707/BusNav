@@ -30,8 +30,12 @@ def update(path, palette):
             # Unknown motorway/major roads retain a neutral width hierarchy, never a category color.
             if layer['id'] == 'roads-motorway':
                 old = '#d3c7ae' if 'light' in path.name else '#777c82'
+            colors = palette
+            if layer['id'] in ('road-tunnels', 'road-bridges'):
+                # A distinct tint keeps the structural stroke visible over the classified fill.
+                colors = ('#84AED1', '#E3ADA5', '#91BEA2') if 'light' in path.name else ('#99BDDF', '#E3B0AA', '#A3C9B0')
             layer['paint']['line-color'] = ['match', ['get', 'route_network'],
-                'expressway', palette[0], 'national', palette[1], 'prefectural', palette[2], old]
+                'expressway', colors[0], 'national', colors[1], 'prefectural', colors[2], old]
         if layer['id'] == 'road-labels':
             layer['filter'] = ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor', 'service']]]
             layer['layout']['text-field'] = ['coalesce', ['get', 'name:ja'], ['get', 'name'], '']

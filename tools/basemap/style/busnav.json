@@ -255,7 +255,7 @@
       "minzoom": 9,
       "filter": ["==", ["get", "brunnel"], "tunnel"],
       "paint": {
-        "line-color": ["match", ["get", "route_network"], "expressway", "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", "#69747d"],
+        "line-color": ["match", ["get", "route_network"], "expressway", "#99BDDF", "national", "#E3B0AA", "prefectural", "#A3C9B0", "#69747d"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 9, 1, 16, 3, 20, 7, 22, 10],
         "line-dasharray": [2, 2],
         "line-opacity": 0.75
@@ -269,7 +269,7 @@
       "minzoom": 9,
       "filter": ["==", ["get", "brunnel"], "bridge"],
       "paint": {
-        "line-color": ["match", ["get", "route_network"], "expressway", "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", "#d9c189"],
+        "line-color": ["match", ["get", "route_network"], "expressway", "#99BDDF", "national", "#E3B0AA", "prefectural", "#A3C9B0", "#d9c189"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 9, 1, 16, 3, 20, 7, 22, 10],
         "line-opacity": 0.85
       }
