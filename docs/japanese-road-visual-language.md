@@ -95,3 +95,7 @@ The exact audited networks `首都高速道路` and `名古屋高速道路` clas
 Urban relation refs take precedence over concurrent national numbering. Normalize the first semicolon token only; `6;455` becomes urban `6`. Urban refs accept C1/C2, numeric, B/Y, K/S and R; E refs in an urban relation are suppressed rather than converted into an urban mark. Unknown networks remain neutral unless the documented national E/C fallback applies.
 
 See [facility, intersection, span and layering policy](map-road-facilities.md). This section supersedes the original Phase010.5A overview shield visibility and route-above-shield policy.
+
+## Phase010.5B navigation camera
+
+Phase010.5B rotates the navigation camera while keeping shield/facility/intersection text upright through the existing viewport alignments. Route-below-shield and traffic-above-shield ordering and 2.2/2.6km hysteresis are unchanged; no styles or tiles were regenerated. The original 56dp ring/arrow vehicle artwork has a white halo and arrow tip at the raw GPS anchor. See [navigation map orientation](navigation-map-orientation.md).

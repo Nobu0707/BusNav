@@ -2,6 +2,7 @@
 
 package net.nobu0707.busnav.map
 
+import net.nobu0707.busnav.domain.navigation.*
 import android.graphics.PointF
 import net.nobu0707.busnav.ui.routeplan.EditorCamera
 import net.nobu0707.busnav.ui.routeplan.EditorCameraRequest
@@ -56,6 +57,18 @@ class MapController(
     private var mapView: MapView? = null
     private var style: Style? = null
     private var latestLocation: LocationState? = null
+    private var navigationCamera = NavigationCameraState()
+    private val headingConfig = NavigationHeadingConfig()
+    private val headingFreshness = NavigationHeadingResolver(headingConfig)
+    private var gestureSuspended = false
+    private var lastFollowedElapsedMillis: Long? = null
+    private val cameraStartedListener = MapLibreMap.OnCameraMoveStartedListener { reason ->
+        if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
+            gestureSuspended = true
+            map?.cancelTransitions()
+            onGesture()
+        }
+    }
     private var hasCenteredOnFirstLocation = false
     private var lastRecenterRequestId = 0
     private var lastFollowedTimestampMillis: Long? = null
@@ -98,6 +111,7 @@ class MapController(
     private fun saveCamera() {
         val camera = map?.cameraPosition ?: return
         val target = camera.target ?: return
+        latestLocation?.let(::renderVehicleRotation)
         onCameraChanged(EditorCamera(GeoPoint(target.latitude, target.longitude), camera.zoom, camera.bearing, camera.tilt))
     }
 
@@ -212,7 +226,11 @@ class MapController(
     }
 
     private val moveListener = object : MapLibreMap.OnMoveListener {
-        override fun onMoveBegin(detector: MoveGestureDetector) = onGesture()
+        override fun onMoveBegin(detector: MoveGestureDetector) {
+            gestureSuspended = true
+            map?.cancelTransitions()
+            onGesture()
+        }
         override fun onMove(detector: MoveGestureDetector) = Unit
         override fun onMoveEnd(detector: MoveGestureDetector) = Unit
     }
@@ -231,7 +249,10 @@ class MapController(
         mapView.addOnDidFailLoadingMapListener(mapLoadFailedListener)
         mapView.getMapAsync { mapLibreMap ->
             map = mapLibreMap
+            mapLibreMap.uiSettings.isCompassEnabled = false
+            mapLibreMap.uiSettings.isTiltGesturesEnabled = false
             mapLibreMap.addOnMoveListener(moveListener)
+            mapLibreMap.addOnCameraMoveStartedListener(cameraStartedListener)
             mapLibreMap.addOnCameraMoveListener(cameraListener)
             if (onLongPress != null) mapLibreMap.addOnMapLongClickListener(longClickListener)
             mapLibreMap.moveCamera(
@@ -274,23 +295,40 @@ class MapController(
         }
     }
 
-    fun update(location: LocationState?, isFollowing: Boolean, recenterRequestId: Int) {
+    fun update(location: LocationState?, isFollowing: Boolean, recenterRequestId: Int,
+        cameraState: NavigationCameraState = NavigationCameraState()) {
+        val previous = navigationCamera
+        navigationCamera = cameraState.copy(following = isFollowing)
+        val recenter = recenterRequestId != lastRecenterRequestId
+        if (recenter || (!previous.following && isFollowing)) gestureSuspended = false
+        val fresh = !cameraState.active || headingFreshness.isFresh(location, android.os.SystemClock.elapsedRealtime())
+        if (location == null || !fresh) {
+            map?.cancelTransitions()
+            return
+        }
         latestLocation = location
-        location?.let(::renderLocation)
-
-        if (location != null && isFollowing && (!hasCenteredOnFirstLocation || recenterRequestId != lastRecenterRequestId)) {
-            centerOn(location)
+        renderLocation(location)
+        val native = map ?: return
+        if (!isFollowing || gestureSuspended) return
+        val changed = location.timestampMillis != lastFollowedTimestampMillis ||
+            location.elapsedRealtimeMillis != lastFollowedElapsedMillis
+        if (!hasCenteredOnFirstLocation || recenter || changed || previous != navigationCamera) {
+            val camera = native.cameraPosition
+            val next = CameraPosition.Builder(camera)
+                .target(location.point.toLatLng())
+                .bearing(if (previous.active && !navigationCamera.active) 0.0 else navigationCamera.targetBearing(camera.bearing))
+                .tilt(0.0)
+                .zoom(if (!hasCenteredOnFirstLocation && initialCamera == null) FOLLOW_ZOOM else camera.zoom)
+                .build()
+            val interval = location.elapsedRealtimeMillis?.let { time -> lastFollowedElapsedMillis?.let { time - it } }
+            val duration = interval?.takeIf { it > 0 }?.coerceIn(80, headingConfig.animationDurationMillis.toLong())?.toInt()
+                ?: headingConfig.animationDurationMillis
+            native.cancelTransitions()
+            native.easeCamera(CameraUpdateFactory.newCameraPosition(next), duration)
             hasCenteredOnFirstLocation = true
             lastRecenterRequestId = recenterRequestId
             lastFollowedTimestampMillis = location.timestampMillis
-        } else if (
-            location != null &&
-            isFollowing &&
-            hasCenteredOnFirstLocation &&
-            location.timestampMillis != lastFollowedTimestampMillis
-        ) {
-            map?.easeCamera(CameraUpdateFactory.newLatLng(location.point.toLatLng()), FOLLOW_ANIMATION_MILLIS)
-            lastFollowedTimestampMillis = location.timestampMillis
+            lastFollowedElapsedMillis = location.elapsedRealtimeMillis
         }
     }
 
@@ -298,6 +336,8 @@ class MapController(
         val routeChanged = route != latestRoute
         latestRoute = route
         latestRouteOverviewRequestId = routeOverviewRequestId
+        // Preview requests are already consumed when navigation starts; do not refit over follow.
+        if (navigationCamera.active && navigationCamera.following) lastRouteOverviewRequestId = routeOverviewRequestId
         routeOverlay.setRoute(route)
         if (routeChanged) {
             style?.let { loadedStyle ->
@@ -349,6 +389,7 @@ class MapController(
         mapView?.removeOnDidFinishLoadingStyleListener(styleLoadedListener)
         mapView?.removeOnDidFailLoadingMapListener(mapLoadFailedListener)
         map?.removeOnMoveListener(moveListener)
+        map?.removeOnCameraMoveStartedListener(cameraStartedListener)
         if (onLongPress != null) map?.removeOnMapLongClickListener(longClickListener)
         mapView = null
         map = null
@@ -369,10 +410,11 @@ class MapController(
             loadedStyle.addLayer(
                 SymbolLayer(VEHICLE_LAYER_ID, VEHICLE_SOURCE_ID).withProperties(
                     iconImage(VEHICLE_ICON_ID),
-                    org.maplibre.android.style.layers.PropertyFactory.iconSize(2f),
+                    org.maplibre.android.style.layers.PropertyFactory.iconSize(1f),
+                    org.maplibre.android.style.layers.PropertyFactory.iconAnchor(Property.ICON_ANCHOR_CENTER),
                     iconAllowOverlap(true),
                     iconIgnorePlacement(true),
-                    iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),
+                    iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_VIEWPORT),
                 ),
             )
         }
@@ -383,17 +425,17 @@ class MapController(
         (loadedStyle.getSource(VEHICLE_SOURCE_ID) as? GeoJsonSource)?.setGeoJson(
             Feature.fromGeometry(Point.fromLngLat(location.point.longitude, location.point.latitude)),
         )
-        loadedStyle.getLayer(VEHICLE_LAYER_ID)?.setProperties(
-            iconRotate(location.normalizedBearingDegrees ?: 0f),
+        renderVehicleRotation(location)
+    }
+
+    private fun renderVehicleRotation(location: LocationState) {
+        val camera = map?.cameraPosition ?: return
+        style?.getLayer(VEHICLE_LAYER_ID)?.setProperties(
+            iconRotate(navigationCamera.copy(following = navigationCamera.following && !gestureSuspended)
+                .vehicleScreenRotation(camera.bearing, location.normalizedBearingDegrees?.toDouble()).toFloat()),
         )
     }
 
-    private fun centerOn(location: LocationState) {
-        map?.easeCamera(
-            CameraUpdateFactory.newLatLngZoom(location.point.toLatLng(), FOLLOW_ZOOM),
-            RECENTER_ANIMATION_MILLIS,
-        )
-    }
 
     private fun fitRoute(route: ScheduledRoute) {
         val bounds = LatLngBounds.Builder().apply {
@@ -449,33 +491,36 @@ class MapController(
     private fun net.nobu0707.busnav.domain.model.GeoPoint.toLatLng() = LatLng(latitude, longitude)
 
     private fun createVehicleIcon(): Bitmap {
-        val size = 72
-        val bitmap = createBitmap(size, size)
+        val geometry = VehicleMarkerGeometry()
+        val density = mapView?.resources?.displayMetrics?.density ?: 1f
+        val pixels = (geometry.size * density).toInt().coerceAtLeast(1)
+        val bitmap = createBitmap(pixels, pixels).apply { this.density = (density * 160).toInt() }
         val canvas = Canvas(bitmap)
-        val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(210, 11, 25, 35)
-            style = Paint.Style.FILL
-        }
-        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(121, 184, 209)
-            style = Paint.Style.FILL
-        }
-        val path = Path().apply {
-            moveTo(size / 2f, 5f)
-            lineTo(size - 9f, size - 8f)
-            lineTo(size / 2f, size - 22f)
-            lineTo(9f, size - 8f)
+        canvas.scale(pixels / geometry.size, pixels / geometry.size)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val center = geometry.center
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 7f
+        paint.color = Color.rgb(20, 35, 50)
+        canvas.drawCircle(center.x, center.y, geometry.radius, paint)
+        paint.strokeWidth = 5f
+        paint.color = Color.WHITE
+        canvas.drawCircle(center.x, center.y, geometry.radius, paint)
+        paint.strokeWidth = 2.5f
+        paint.color = Color.rgb(190, 25, 58)
+        canvas.drawCircle(center.x, center.y, geometry.radius, paint)
+        val arrow = Path().apply {
+            moveTo(geometry.arrow.first().x, geometry.arrow.first().y)
+            geometry.arrow.drop(1).forEach { lineTo(it.x, it.y) }
             close()
         }
-        canvas.drawPath(path, halo)
-        val inner = Path().apply {
-            moveTo(size / 2f, 15f)
-            lineTo(size - 20f, size - 20f)
-            lineTo(size / 2f, size - 31f)
-            lineTo(20f, size - 20f)
-            close()
-        }
-        canvas.drawPath(inner, fill)
+        paint.strokeJoin = Paint.Join.ROUND
+        paint.strokeWidth = 3f
+        paint.color = Color.WHITE
+        canvas.drawPath(arrow, paint)
+        paint.style = Paint.Style.FILL
+        paint.color = Color.rgb(190, 25, 58)
+        canvas.drawPath(arrow, paint)
         return bitmap
     }
 
@@ -486,7 +531,7 @@ class MapController(
         const val DEFAULT_ZOOM = 4.5
         const val FOLLOW_ZOOM = 16.5
         const val PLAN_POINT_ZOOM = 15.0
-        const val FOLLOW_ANIMATION_MILLIS = 450
+
         const val RECENTER_ANIMATION_MILLIS = 750
         const val TAG = "BusNavMapController"
         val DEFAULT_LOCATION = LatLng(36.2048, 138.2529)

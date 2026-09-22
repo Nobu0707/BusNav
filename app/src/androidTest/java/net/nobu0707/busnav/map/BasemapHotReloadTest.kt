@@ -85,7 +85,7 @@ class BasemapHotReloadTest {
                 RouteOverlayController.LINE_LAYER_ID).forEach { assertNotNull(style.getLayer(it)) }
             assertNotNull(style.getSource(RouteOverlayController.GEOMETRY_SOURCE_ID))
             val vehicle=style.getLayer(OverlayLayerOrder.VEHICLE) as org.maplibre.android.style.layers.SymbolLayer
-            assertEquals(2f,vehicle.iconSize.value!!,0f)
+            assertEquals(1f,vehicle.iconSize.value!!,0f)
             assertEquals(73f,vehicle.iconRotate.value!!,0f)
             assertNotNull(style.getSource("busnav-vehicle-source"))
             assertEquals(camera, nativeMap.cameraPosition.toString())

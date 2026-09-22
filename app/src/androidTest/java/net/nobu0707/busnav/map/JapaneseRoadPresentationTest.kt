@@ -52,7 +52,7 @@ class JapaneseRoadPresentationTest {
         var ready = false
         restoreContent = { rule.activity.setContent {
             MapScreen(null, false, 0, detourFixture(13).route, 0, trafficEvents = events,
-                basemapConfig = config.value, initialCamera = EditorCamera(GeoPoint(35.658,139.701),14.0,0.0,0.0),
+                basemapConfig = config.value, initialCamera = EditorCamera(GeoPoint(35.658,139.701),14.0,90.0,0.0),
                 onMapReady = { ready = true }, onMapGesture = {}, onMapError = {})
         } }
         rule.runOnUiThread { restoreContent() }

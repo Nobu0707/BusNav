@@ -94,3 +94,7 @@ FREE 自動 reroute、VIA 編集、FREE の自動保存、process-death 自動�
 ## Phase010 traffic display
 
 FREE も規制パネル・地図 overlay・経路警告を表示します。受信だけで再計算せず、PRESCRIBED 専用の交通迂回開始を提供しません。既存の手動再計算は維持しますが、交通規制の回避や渋滞を考慮した最速経路を保証しません。交通情報で route duration / Valhalla cost を変更しません。[交通情報基盤](traffic-road-restrictions.md)。
+
+## Phase010.5B navigation camera
+
+FREE navigation uses the default HEADING_UP camera and persisted NORTH_UP toggle after explicit start. Destination selection and route preview do not rotate automatically or show the compass. Ending navigation returns to ordinary map behavior. See [navigation map orientation](navigation-map-orientation.md).

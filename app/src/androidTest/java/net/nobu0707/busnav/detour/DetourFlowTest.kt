@@ -153,6 +153,7 @@ class DetourFlowTest {
                 rule.onNodeWithTag("detour_off_route").performClick()
             } else rule.onNodeWithTag("bottom_迂回").performClick()
             waitTag("detour_screen")
+            rule.onNodeWithTag("navigation_compass").assertDoesNotExist()
             rule.waitUntil(20000){!detour().state.value.preparing}
             assertEquals(0,calls.get())
             assertTrue("Public route must offer a safe forward candidate",detour().state.value.candidates.isNotEmpty())
@@ -200,6 +201,8 @@ class DetourFlowTest {
                 attach();waitTag("detour_activate")
             }
             rule.onNodeWithTag("detour_activate").assertIsDisplayed().performClick();waitTag("detour_active")
+            waitTag("navigation_compass")
+            rule.onNodeWithTag("navigation_compass").assertIsDisplayed()
             assertEquals(NavigationMode.PRESCRIBED,nav().uiState.value.navigationMode)
             assertEquals(saved.id,nav().uiState.value.activePrescribedRouteId)
             assertSame(original.route,nav().uiState.value.prescribedRouteSnapshot)

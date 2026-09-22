@@ -127,3 +127,7 @@ Phase010はDetourReason / DetourDraft / RejoinTargetを入口にVICS・交通規
 ## Phase010 traffic context and candidate validation
 
 「規制」または前方規制警告の「迂回を検討」は ROAD_CLOSURE / TRAFFIC_INCIDENT / ROADWORK と TrafficDetourContext を渡します。既知の規制終端 + 250m を automatic/manual target と実際の復帰 matcher の下限へ適用します。終端不明は推測しません。Valhalla は動的規制を知らないため、計算候補を TrafficDetourValidator で検証し、高信頼な閉鎖重複は UI と state holder の両方で適用を拒否します。曖昧・未接続は警告し、VIA/SHAPING を手動追加して再計算できます。受信・パネル・検討・選択は HTTP 0、計算だけ +1。詳細は [交通情報基盤](traffic-road-restrictions.md)。
+
+## Phase010.5B navigation camera
+
+Active DETOUR on the navigation screen shares the persisted orientation and heading resolver with normal PRESCRIBED navigation. Planning/edit/preview screens do not enable navigation rotation or compass. Rejoin preserves orientation and follow intent. See [navigation map orientation](navigation-map-orientation.md).

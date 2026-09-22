@@ -1,5 +1,8 @@
 package net.nobu0707.busnav.ui.navigation
 
+import net.nobu0707.busnav.domain.navigation.NavigationCameraState
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
 import net.nobu0707.busnav.ui.free.*
 import net.nobu0707.busnav.ui.traffic.*
 import net.nobu0707.busnav.domain.traffic.*
@@ -108,7 +111,14 @@ fun NavigationRoute(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val stateHolder = viewModel { NavigationViewModel(locationProvider, routeRepository) }.stateHolder
+    val navigationViewModel = viewModel { NavigationViewModel(locationProvider, routeRepository) }
+    val stateHolder = navigationViewModel.stateHolder
+    val mapPreferences = remember(context) { net.nobu0707.busnav.data.navigationMapPreferenceRepository(context) }
+    val orientationFlow = remember(mapPreferences) {
+        mapPreferences.orientation.map { it as net.nobu0707.busnav.domain.navigation.NavigationMapOrientation? }
+    }
+    val orientation by orientationFlow.collectAsState(null)
+    val preferenceScope = androidx.compose.runtime.rememberCoroutineScope()
     val uiState by stateHolder.uiState.collectAsState()
     val freeHolder = viewModel { FreeNavigationViewModel(routingEngine, stateHolder) }.holder
     val freeState by freeHolder.state.collectAsState()
@@ -319,13 +329,23 @@ fun NavigationRoute(
                 mapContent = { modifier ->
                     MapScreen(
                         trafficEvents = trafficState.activeEvents,
-                        initialCamera = routePlanHolder.camera,
-                        onCameraChanged = routePlanHolder::saveCamera,
+                        navigationCamera = NavigationCameraState(
+                            active = screen == BusNavScreen.NAVIGATION && uiState.isNavigationStarted,
+                            following = uiState.isFollowingLocation,
+                            orientation = orientation ?: net.nobu0707.busnav.domain.navigation.NavigationMapOrientation.HEADING_UP,
+                            headingDegrees = uiState.navigationHeading.degrees,
+                        ),
+                        onToggleOrientation = if (orientation == null || showTraffic || showConnections) null else ({ preferenceScope.launch { mapPreferences.toggleOrientation() }; Unit }),
+                        initialCamera = if (uiState.isNavigationStarted) navigationViewModel.camera else routePlanHolder.camera?.copy(bearing = 0.0, tilt = 0.0),
+                        onCameraChanged = {
+                            if (uiState.isNavigationStarted) navigationViewModel.camera = it
+                            else routePlanHolder.saveCamera(it.copy(bearing = 0.0, tilt = 0.0))
+                        },
                         basemapConfig = basemapConfig.withTheme(dark),
-                        location = uiState.location,
+                        location = uiState.location.takeUnless { uiState.isNavigationStarted && orientation == null },
                         monitorTunnel = navigationActive,
                         onTunnelChanged = { isTunnel = it },
-                        isFollowingLocation = uiState.isFollowingLocation,
+                        isFollowingLocation = uiState.isFollowingLocation && !showTraffic && !showConnections,
                         recenterRequestId = uiState.recenterRequestId,
                         activeRoute = uiState.prescribedRouteSnapshot ?: uiState.activeRoute,
                         detourOverlay = uiState.activeDetour?.candidate?.let {

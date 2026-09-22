@@ -22,6 +22,7 @@ class NavigationStateHolder(
     private val _uiState = MutableStateFlow(NavigationUiState())
     val uiState: StateFlow<NavigationUiState> = _uiState.asStateFlow()
     private var locationJob: Job? = null
+    private val headingResolver = NavigationHeadingResolver()
     private var preparationJob: Job? = null
     private var guidanceJob: Job? = null
     private var freshnessJob: Job? = null
@@ -86,7 +87,8 @@ class NavigationStateHolder(
                         // Reject old/duplicate fixes before changing either the raw marker or navigation state.
                         if (time != null && latestFixTime != null && time <= requireNotNull(latestFixTime)) return@collect
                         if (time != null && time in 0..elapsedMillis()) latestFixTime = time
-                        update { copy(location = incoming.location, locationError = null, isLoading = false) }
+                        update { copy(location = incoming.location, locationError = null, isLoading = false,
+                            navigationHeading = headingResolver.resolve(incoming.location, navigationHeading, elapsedMillis())) }
                         freshnessJob?.cancel()
                         freshnessJob = scope.launch {
                             val remaining = time?.let { matcherConfig.staleAfterMillis - (elapsedMillis() - it) } ?: 0
@@ -182,7 +184,7 @@ class NavigationStateHolder(
     fun startNavigation() {
         if (_uiState.value.navigationMode == net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE) startFreeNavigation()
         else if (_uiState.value.activeRoute != null && _uiState.value.activePrescribedRouteId != null)
-            update { copy(isNavigationStarted = true) }
+            update { copy(isNavigationStarted = true, isFollowingLocation = true) }
     }
     fun clearRoute() {
         routeGeneration++ // Invalidate even a pending initial load when activeRoute is already null.
@@ -339,7 +341,11 @@ class NavigationStateHolder(
                     progress.isProjectionReliable, elapsedMillis())
             } ?: ArrivalSnapshot()
             emitTransitions()
-            _uiState.value = _uiState.value.copy(trafficHighwayDecisionProgressMeters = highway.currentDecision?.distanceAlongRouteMeters.takeIf { highway.isReliable },
+            _uiState.value = _uiState.value.copy(
+                navigationHeading = headingResolver.resolve(location, _uiState.value.navigationHeading, elapsedMillis(),
+                    ReliableRouteHeading(matching.index.segments.getOrNull(match.projection.segmentIndex)?.bearingDegrees,
+                        match.quality, progress.isProjectionReliable)),
+                trafficHighwayDecisionProgressMeters = highway.currentDecision?.distanceAlongRouteMeters.takeIf { highway.isReliable },
                 trafficProgressMeters = progress.distanceAlongRouteMeters.takeIf { progress.isProjectionReliable && match.quality == RouteMatchQuality.MATCHED }, guidance = display, highwayGuidance = HighwayInstructionFormatter.format(highway),
                 deviation = deviationUiState(deviation, state.navigationMode, state.activeDetour != null), deviationSnapshot = deviation, arrival = arrival)
         }

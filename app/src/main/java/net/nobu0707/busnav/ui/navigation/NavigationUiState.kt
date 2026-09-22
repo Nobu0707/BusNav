@@ -16,6 +16,7 @@ enum class NavigationLayoutMode {
 }
 
 data class NavigationUiState(
+    val navigationHeading: net.nobu0707.busnav.domain.navigation.NavigationHeading = net.nobu0707.busnav.domain.navigation.NavigationHeading(),
     val trafficProgressMeters: Double? = null,
     val trafficHighwayDecisionProgressMeters: Double? = null,
     val deviation: DeviationUiState = DeviationUiState(),

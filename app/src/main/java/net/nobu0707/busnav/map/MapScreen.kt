@@ -58,6 +58,8 @@ fun MapScreen(
         styleUrl = BuildConfig.BASEMAP_STYLE_URL,
         isDebug = BuildConfig.DEBUG,
     ),
+    navigationCamera: net.nobu0707.busnav.domain.navigation.NavigationCameraState = net.nobu0707.busnav.domain.navigation.NavigationCameraState(),
+    onToggleOrientation: (() -> Unit)? = null,
     initialCamera: EditorCamera? = null,
     onCameraChanged: (EditorCamera) -> Unit = {},
     editorCameraRequest: EditorCameraRequest? = null,
@@ -89,10 +91,12 @@ fun MapScreen(
     val mapView = remember(context) {
         MapView(context).also { it.onCreate(null) }
     }
+    var cameraBearing by remember { mutableStateOf(initialCamera?.bearing ?: 0.0) }
+    val cameraCallback by androidx.compose.runtime.rememberUpdatedState(onCameraChanged)
     val controller = remember(mapView, routePaddingPx) {
         MapController(
             initialCamera = initialCamera,
-            onCameraChanged = onCameraChanged,
+            onCameraChanged = { camera -> cameraBearing = camera.bearing; cameraCallback(camera) },
             onReady = onMapReady,
             onGesture = onMapGesture,
             onError = onMapError,
@@ -172,7 +176,7 @@ fun MapScreen(
 
     SideEffect {
         controller.updateBasemap(basemapConfig)
-        controller.update(location, isFollowingLocation, recenterRequestId)
+        controller.update(location, isFollowingLocation, recenterRequestId, navigationCamera)
         controller.updateRoute(activeRoute, routeOverviewRequestId)
         controller.updateDetour(detourOverlay)
         controller.updateTraffic(trafficEvents)
@@ -189,6 +193,10 @@ fun MapScreen(
             factory = { mapView },
             modifier = Modifier.fillMaxSize(),
         )
+        if (navigationCamera.active && onToggleOrientation != null) {
+            NavigationCompass(navigationCamera.orientation, cameraBearing, onToggleOrientation,
+                Modifier.align(Alignment.TopEnd).padding(8.dp))
+        }
         BasemapStatusOverlay(
             state = basemapState,
             modifier = Modifier.align(Alignment.TopCenter).padding(8.dp),
