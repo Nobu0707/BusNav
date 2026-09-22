@@ -85,6 +85,14 @@ class TrafficFlowTest {
             assertEquals(0,calls.get());assertSame(saved.route,nav().uiState.value.activeRoute)
             capture("free-warning");return
         }
+        rule.runOnUiThread { rule.activity.requestedOrientation=android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+        rule.waitUntil(15000) { rule.activity.resources.configuration.orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE }
+        attach();tag("traffic_alert")
+        rule.onNodeWithTag("traffic_alert").assertIsDisplayed()
+        capture("closure-landscape")
+        rule.runOnUiThread { rule.activity.requestedOrientation=android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+        rule.waitUntil(15000) { rule.activity.resources.configuration.orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT }
+        attach();tag("traffic_alert")
         capture("closure-warning")
         rule.onNodeWithTag("traffic_consider_detour").performClick();tag("detour_screen")
         rule.waitUntil(20000){!detour().state.value.preparing}

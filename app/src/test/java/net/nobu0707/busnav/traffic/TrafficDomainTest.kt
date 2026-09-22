@@ -165,6 +165,15 @@ class TrafficDomainTest {
         val delay = near.copy(id = "delay", kind = TrafficEventKind.CONGESTION)
         assertEquals(listOf("near","far","delay"),TrafficRouteImpactAnalyzer(route).analyze(snapshot(delay,far,near),2000,0.0).map { it.event.id })
     }
+    @Test fun nearerClosurePrecedesFartherHighwayClosureAtSameLevel() {
+        val highway = route.copy(guidance = RouteGuidance(listOf(
+            RouteManeuver(0, ManeuverType.CONTINUE, "", 0, 3, streetNames = listOf("E1")),
+            RouteManeuver(1, ManeuverType.RAMP_RIGHT, "", 3, 12, streetNames = listOf("E1")))))
+        val far = event(TrafficGeometry.Polyline(listOf(point(3000.0), point(3400.0))), TrafficEventKind.ENTRY_CLOSURE).copy(id = "far")
+        val impacts = TrafficRouteImpactAnalyzer(highway).analyze(snapshot(far, event()), 2000, 0.0)
+        assertNotNull(impacts.single { it.event.id == "far" }.highwayDecisionLabel)
+        assertEquals(listOf("e", "far"), impacts.map { it.event.id })
+    }
     @Test fun rejoinFloorAffectsAutomaticAndManualTargets() {
         val floor = impact().detourContext().minimumSafeRejoinProgress!!
         val generator = RejoinCandidateGenerator(route, 100.0, minimumSafeRejoinProgress = floor)
