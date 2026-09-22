@@ -108,7 +108,8 @@ Activity recreation; final coverage additionally rotates the closure warning bet
 
 Screenshots after waiting for style/layer installation were visually inspected: Kanto basemap,
 closure × / dashed segment, source-labelled alert, forward target and disabled conflicting activation
-are visible and readable. Screenshots remain local build artifacts, not archive source files.
+are visible and readable. The landscape operations panel reserves 80dp so its detail remains visible
+beside a traffic warning. Screenshots remain local build artifacts, not archive source files.
 
 ## 31. Physical Android
 
@@ -152,7 +153,9 @@ operation notes in suitable models. Licensed live facility information remains a
 
 * `c1fb506` — feat: add traffic restriction sources overlays and explicit detour protection
 * `98d236b` — fix: preserve distance ordering within traffic impact levels
-* Review/test finalization commit — recorded by archive meta and final response.
+* `b03098c` — test: finalize Phase010 traffic review and rotation coverage
+* `b0f8c44` — fix: reserve landscape operations space beside traffic alerts
+* Final review documentation commit — recorded by archive meta and final response.
 
 Final HEAD is authoritative in each archive's `meta/review-info.txt` and final report; BASE_SHA above
 is used throughout, never substituted with the prior phase's base.
