@@ -68,7 +68,6 @@ class MapController(
     private val cameraStartedListener = MapLibreMap.OnCameraMoveStartedListener { reason ->
         if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
             gestureSuspended = true
-            map?.cancelTransitions()
             onGesture()
         }
     }
@@ -231,7 +230,6 @@ class MapController(
     private val moveListener = object : MapLibreMap.OnMoveListener {
         override fun onMoveBegin(detector: MoveGestureDetector) {
             gestureSuspended = true
-            map?.cancelTransitions()
             onGesture()
         }
         override fun onMove(detector: MoveGestureDetector) = Unit
@@ -307,7 +305,9 @@ class MapController(
         if (recenter || (!previous.following && isFollowing)) gestureSuspended = false
         val fresh = !cameraState.active || headingFreshness.isFresh(location, android.os.SystemClock.elapsedRealtime())
         if (location == null || !fresh) {
-            map?.cancelTransitions()
+            // Only an active follow animation belongs to navigation. Editor camera
+            // updates also arrive without a location and must not cancel native gestures.
+            if (cameraState.active && isFollowing && !gestureSuspended) map?.cancelTransitions()
             return
         }
         latestLocation = location
