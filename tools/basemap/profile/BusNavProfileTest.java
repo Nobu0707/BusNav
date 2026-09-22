@@ -40,6 +40,27 @@ public final class BusNavProfileTest {
             }
         }
         check(count == 2, "both existing layers must be enriched");
+        var point = new GeometryFactory().createPoint(new Coordinate(139.741, 35.677));
+        var junction = SimpleFeature.createFakeOsmFeature(point,
+            Map.of("highway", "motorway_junction", "name", "三宅坂JCT"), "osm", null, 8, List.of());
+        var junctionFeatures = new FeatureCollector.Factory(runner.config(), runner.stats()).get(junction);
+        profile.processFeature(junction, junctionFeatures);
+        boolean found = false;
+        for (var f : junctionFeatures) if (f.getLayer().equals("busnav_expressway_facilities")) {
+            found = true;
+            check("junction".equals(f.getAttrsAtZoom(14).get("facility_type")), "JCT source designation");
+        }
+        check(found, "custom point layer missing");
+        var urbanInfo = profile.preprocessOsmRelation(new OsmElement.Relation(2, Map.of("type", "route", "route", "road",
+            "network", "首都高速道路", "ref", "C2"), List.of()));
+        var urban = SimpleFeature.createFakeOsmFeature(geometry, Map.of("highway", "motorway", "ref", "C2"), "osm", null, 9,
+            urbanInfo.stream().map(i -> new OsmReader.RelationMember<OsmRelationInfo>("", i)).toList());
+        var urbanFeatures = new FeatureCollector.Factory(runner.config(), runner.stats()).get(urban);
+        profile.processFeature(urban, urbanFeatures);
+        for (var f : urbanFeatures) if (f.getLayer().startsWith("transportation")) {
+            check("urban_expressway".equals(f.getAttrsAtZoom(14).get("route_network")), "urban classification");
+            check("C2".equals(f.getAttrsAtZoom(14).get("route_ref")), "urban ref");
+        }
         System.out.println("BusNavProfileTest PASS: both layers enriched; OMT route relation retained");
     }
     static void check(boolean ok, String message) { if (!ok) throw new AssertionError(message); }

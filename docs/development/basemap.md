@@ -117,3 +117,10 @@ start-tileserver.sh. Large artifacts remain outside Git. The original relation f
 OMT schema version stay intact. Android-owned vector images are registered at runtime;
 TileServer does not serve a per-route-number sprite. See [road visual language](../japanese-road-visual-language.md)
 and [Review014a](../reviews/014a-japanese-road-map-style.md).
+
+
+## Phase010.5A.1 road details
+
+The profile schema is now 2: separate `urban_expressway`, preserved `route_source_network`, and additive `busnav_expressway_facilities` / `busnav_named_intersections` point layers. Both Kanto and Chubu must be regenerated from existing PBFs; Japan Valhalla remains unchanged. All four regional/theme styles use identical filtering and density rules; intersection background/text colors follow the theme. Android registers all vector backgrounds on every reload.
+
+Shields are globally gated by projected visible map span (show <=2,200 m, hide >2,600 m), with routes inserted below shields and critical traffic above. The Route Editor passes its bottom occlusion into the same calculation. See [road details policy](../map-road-facilities.md) and Review014a1. Phase010.5B camera/compass/vehicle work is not included.

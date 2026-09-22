@@ -7,4 +7,5 @@ mkdir -p "$root/build/road-profile"
 javac --release 21 -encoding UTF-8 -classpath "$cache/app/classes:$cache/app/libs/*" \
   -d "$root/build/road-profile" \
   "$root/app/src/main/java/net/nobu0707/busnav/map/JapaneseRoadNetwork.java" \
+  "$root/app/src/main/java/net/nobu0707/busnav/map/RoadMapDetails.java" \
   "$root/tools/basemap/profile/BusNavProfile.java"

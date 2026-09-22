@@ -5,6 +5,27 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class JapaneseRoadNetworkTest {
+    @Test fun urbanNetworksRequireEvidenceAndUseOwnCanonicalRef() {
+        listOf("C1", "C2", "3", "B", "Y", "K1", "S1", "K7", "S5").forEach {
+            val route = JapaneseRoadNetwork.fromNetwork("首都高速道路", it)
+            assertEquals(URBAN_EXPRESSWAY, route.kind)
+            assertEquals(it, route.ref)
+        }
+        listOf("E1", "E20", "C4").forEach {
+            assertEquals(EXPRESSWAY, JapaneseRoadNetwork.fromNetwork("JP:E", it).kind)
+        }
+        assertEquals(EXPRESSWAY, JapaneseRoadNetwork.fromNetwork("JP:C", "C1").kind)
+        assertEquals(URBAN_EXPRESSWAY, JapaneseRoadNetwork.fromNetwork("名古屋高速道路", "C1").kind)
+        assertEquals("6", JapaneseRoadNetwork.fromNetwork("名古屋高速道路", "6;455").ref)
+        assertNull(JapaneseRoadNetwork.fromNetwork("首都高速道路", "E1").ref)
+        listOf("3", "C1", "C2", "B").forEach {
+            assertEquals(OTHER, JapaneseRoadNetwork.classify(emptyList(), null, null, "motorway", it).kind)
+        }
+        val urban = JapaneseRoadNetwork.fromNetwork("首都高速道路", "3")
+        val national = JapaneseRoadNetwork.fromNetwork("JP:E", "E1")
+        assertEquals("3", JapaneseRoadNetwork.classify(listOf(national, urban), null, null, "motorway", "E1").ref)
+    }
+
     @Test fun normalizesOnlyUnambiguousRefs() {
         listOf("E 1" to "E1", "E20" to "E20", "C 4" to "C4", "E1A" to "E1A").forEach { (input, output) ->
             assertEquals(output, JapaneseRoadNetwork.normalize(input, EXPRESSWAY))
@@ -23,7 +44,7 @@ class JapaneseRoadNetworkTest {
         assertEquals(NATIONAL_ROUTE, route.kind)
         assertEquals("246", route.ref)
         assertEquals(PREFECTURAL_ROUTE, JapaneseRoadNetwork.classify(listOf(pref), null, null, "primary", "12").kind)
-        assertEquals(EXPRESSWAY, JapaneseRoadNetwork.fromNetwork("首都高速道路", "3").kind)
+        assertEquals(URBAN_EXPRESSWAY, JapaneseRoadNetwork.fromNetwork("首都高速道路", "3").kind)
         assertNull(JapaneseRoadNetwork.fromNetwork("首都高速道路", "4号新宿線").ref)
     }
     @Test fun noNationalOrPrefecturalGuessFromBareNumbersOrRoadClass() {

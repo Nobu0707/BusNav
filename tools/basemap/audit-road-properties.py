@@ -56,6 +56,8 @@ def decode(data):
                 kind, value = next(fields(v))
                 if kind == 1:
                     value = value.decode()
+                elif kind == 6:
+                    value = (value >> 1) ^ -(value & 1)
                 elif kind in (2, 3):
                     value = struct.unpack('<f' if kind == 2 else '<d', value)[0]
                 values.append(value)
@@ -81,9 +83,13 @@ def audit(path):
     metadata = dict(db.execute('select name,value from metadata'))
     print(json.dumps({'file': path.name, 'version': metadata.get('version'),
                       'layers': [x for x in json.loads(metadata['json'])['vector_layers']
-                                 if x['id'].startswith('transportation')]}, ensure_ascii=False))
+                                 if x['id'].startswith(('transportation', 'busnav_'))]}, ensure_ascii=False))
     sites = [('shibuya-246', 35.658, 139.701), ('tomei', 35.625, 139.615),
-             ('hachioji', 35.660, 139.310), ('ken-o', 35.650, 139.250)]
+             ('hachioji', 35.660, 139.310), ('ken-o', 35.650, 139.250),
+             ('miyakezaka', 35.678, 139.742), ('tanimachi', 35.668, 139.741),
+             ('takebashi', 35.692, 139.754), ('hakozaki', 35.681, 139.787),
+             ('ohashi', 35.651, 139.689), ('bayshore', 35.632, 139.791),
+             ('kanagawa', 35.469, 139.629), ('kawaguchi', 35.821, 139.734)]
     if path.stem == 'chubu':
         sites = [('nagoya', 35.17, 136.90), ('gifu', 35.42, 136.76),
                  ('shizuoka', 34.97, 138.39), ('kofu', 35.66, 138.57)]
@@ -96,10 +102,10 @@ def audit(path):
         if not row:
             continue
         for layer, features in decode(row[0]).items():
-            if not layer.startswith('transportation'):
+            if not layer.startswith(('transportation', 'busnav_')):
                 continue
-            unique = {json.dumps({k: v for k, v in p.items() if k in ('class', 'subclass', 'ref', 'network', 'network_type', 'route_network', 'route_ref', 'route_1_network', 'route_1_ref', 'route_2_network', 'route_2_ref')}, ensure_ascii=False, sort_keys=True) for p in features
-                      if p.get('class') in ('motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor', 'service')}
+            unique = {json.dumps({k: v for k, v in p.items() if k in ('class', 'subclass', 'ref', 'network', 'network_type', 'route_network', 'route_ref', 'route_1_network', 'route_1_ref', 'route_2_network', 'route_2_ref', 'route_source_network', 'route_operator', 'facility_type', 'name', 'rank', 'signalized', 'major_way_count', 'operator', 'toll')}, ensure_ascii=False, sort_keys=True) for p in features
+                      if layer.startswith('busnav_') or p.get('class') in ('motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor', 'service')}
             print(json.dumps({'site': site, 'tile': [z, x, y], 'layer': layer,
                               'properties': [json.loads(p) for p in sorted(unique)][:65]}, ensure_ascii=False))
 

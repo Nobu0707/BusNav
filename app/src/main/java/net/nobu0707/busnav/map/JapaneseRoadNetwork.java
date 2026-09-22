@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 /** Shared by Android and the pinned Planetiler extension; never infers national roads from highway class. */
 public final class JapaneseRoadNetwork {
     private JapaneseRoadNetwork() {}
-    public enum Kind { EXPRESSWAY, NATIONAL_ROUTE, PREFECTURAL_ROUTE, OTHER }
+    public enum Kind { URBAN_EXPRESSWAY, EXPRESSWAY, NATIONAL_ROUTE, PREFECTURAL_ROUTE, OTHER }
     public static final class Route {
         public final Kind kind;
         public final String ref;
@@ -16,6 +16,7 @@ public final class JapaneseRoadNetwork {
         public String tileClass() {
             return switch (kind) {
                 case EXPRESSWAY -> "expressway";
+                case URBAN_EXPRESSWAY -> "urban_expressway";
                 case NATIONAL_ROUTE -> "national";
                 case PREFECTURAL_ROUTE -> "prefectural";
                 case OTHER -> "other";
@@ -29,7 +30,9 @@ public final class JapaneseRoadNetwork {
 
     public static Kind networkKind(String network) {
         if (network == null) return Kind.OTHER;
-        if (network.equals("JP:E") || network.equals("JP:C") || network.equals("首都高速道路"))
+        if (network.equals("首都高速道路") || network.equals("名古屋高速道路"))
+            return Kind.URBAN_EXPRESSWAY;
+        if (network.equals("JP:E") || network.equals("JP:C"))
             return Kind.EXPRESSWAY;
         if (network.equals("JP:national")) return Kind.NATIONAL_ROUTE;
         if (network.equals("JP:prefectural") || network.matches("JP:prefectural:[a-z]+"))
@@ -41,11 +44,15 @@ public final class JapaneseRoadNetwork {
     public static String normalize(String raw, Kind kind) {
         if (raw == null || kind == Kind.OTHER) return null;
         String first = raw.split(";", -1)[0].trim();
+        if (kind == Kind.URBAN_EXPRESSWAY) {
+            String upper = first.toUpperCase(Locale.ROOT).replace(" ", "");
+            return upper.matches("(?:C[12]|[1-9][0-9]?|B|Y|[KS][1-9][0-9]?|R)") ? upper : null;
+        }
         if (kind == Kind.EXPRESSWAY) {
             String upper = first.toUpperCase(Locale.ROOT);
             Matcher m = EXPRESS.matcher(upper);
             if (m.matches()) return upper.substring(0, 1) + m.group(1) + m.group(2);
-            return NUMBER.matcher(first).matches() ? first : null;
+            return null;
         }
         if (NUMBER.matcher(first).matches()) return first;
         Matcher m = (kind == Kind.NATIONAL_ROUTE ? NATIONAL : PREFECTURAL).matcher(first);
@@ -71,6 +78,7 @@ public final class JapaneseRoadNetwork {
         if (best != null) return best;
         Kind generated = switch (providerClass == null ? "" : providerClass) {
             case "expressway" -> Kind.EXPRESSWAY;
+            case "urban_expressway" -> Kind.URBAN_EXPRESSWAY;
             case "national" -> Kind.NATIONAL_ROUTE;
             case "prefectural" -> Kind.PREFECTURAL_ROUTE;
             default -> Kind.OTHER;
@@ -79,7 +87,7 @@ public final class JapaneseRoadNetwork {
         // Audited Japanese regional inputs: motorway + an exact E/C token is safe; numeric-only is not.
         String normalized = normalize(ref, Kind.EXPRESSWAY);
         if (("motorway".equals(highway) || "motorway_link".equals(highway)) && normalized != null &&
-            EXPRESS.matcher(normalized).matches()) return new Route(Kind.EXPRESSWAY, normalized);
+            !normalized.equals("C1") && !normalized.equals("C2") && EXPRESS.matcher(normalized).matches()) return new Route(Kind.EXPRESSWAY, normalized);
         return new Route(Kind.OTHER, null);
     }
 }

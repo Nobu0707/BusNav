@@ -92,8 +92,8 @@ class MapController(
     private var editorBottomPadding: Int? = null
     private var onEditorCameraApplied: (Long) -> Unit = {}
     private var lastEditorRequestId: Long? = null
-    private val cameraListener = MapLibreMap.OnCameraMoveListener { saveCamera() }
-    private val layoutListener = android.view.View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fitEditorIfRequested() }
+    private val cameraListener = MapLibreMap.OnCameraMoveListener { saveCamera(); scheduleMapDetails() }
+    private val layoutListener = android.view.View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fitEditorIfRequested(); scheduleMapDetails() }
 
     private fun saveCamera() {
         val camera = map?.cameraPosition ?: return
@@ -111,6 +111,7 @@ class MapController(
     fun updateEditorCamera(request: EditorCameraRequest?, bottomPadding: Int?, onApplied: (Long) -> Unit) {
         editorRequest = request
         editorBottomPadding = bottomPadding
+        scheduleMapDetails()
         onEditorCameraApplied = onApplied
         fitEditorIfRequested()
     }
@@ -147,10 +148,52 @@ class MapController(
         onEditorCameraApplied(request.id)
     }
 
+    private val shieldSpanPolicy = ShieldSpanPolicy()
+    private val detailVisibility = mutableMapOf<String, Boolean>()
+    private var detailUpdatePending = false
+    private val detailUpdate = Runnable {
+        detailUpdatePending = false
+        updateMapDetails()
+    }
+    private fun scheduleMapDetails() {
+        if (detailUpdatePending) return
+        val view = mapView ?: return
+        detailUpdatePending = true
+        view.postDelayed(detailUpdate, 75)
+    }
+    private fun updateMapDetails() {
+        val native = map ?: return
+        val view = mapView ?: return
+        val loaded = style ?: return
+        val bottom = (view.height - (editorBottomPadding ?: 0)).coerceAtLeast(0).toFloat()
+        val span = VisibleMapSpanCalculator.measure(VisibleMapSpanCalculator.Rect(0f, 0f, view.width.toFloat(), bottom)) {
+            val point = native.projection.fromScreenLocation(PointF(it.x, it.y))
+            GeoPoint(point.latitude, point.longitude)
+        }
+        val shields = shieldSpanPolicy.update(span)
+        loaded.layers.forEach { layer ->
+            val show = when {
+                layer.id.startsWith("route-shield-") -> shields
+                layer.id.startsWith("facility-junction-") -> span.isFinite() && span in 0.0..5000.0
+                layer.id.startsWith("facility-access-") -> span.isFinite() && span in 0.0..3000.0
+                layer.id.startsWith("facility-toll-") -> span.isFinite() && span in 0.0..2000.0
+                layer.id == "intersection-major" -> span.isFinite() && span in 0.0..3000.0
+                layer.id == "intersection-normal" -> span.isFinite() && span in 0.0..1500.0
+                else -> return@forEach
+            }
+            if (detailVisibility[layer.id] != show) {
+                layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.visibility(
+                    if (show) Property.VISIBLE else Property.NONE))
+                detailVisibility[layer.id] = show
+            }
+        }
+    }
+
     private var readyDelivered = false
     private val styleLoadedListener = MapView.OnDidFinishLoadingStyleListener {
         map?.style?.let { loadedStyle ->
             style = loadedStyle
+            detailVisibility.clear()
             basemapController.onStyleLoaded()
             installOverlays(loadedStyle)
             if (!readyDelivered) {
@@ -220,6 +263,8 @@ class MapController(
             routePlanOverlay.setRoutePlan(latestRoutePlan)
             routePlanOverlay.install(loadedStyle)
             installVehicleLayer(loadedStyle)
+            OverlayLayerOrder.restore(loadedStyle)
+            updateMapDetails()
             latestLocation?.let(::renderLocation)
             fitRouteIfRequested()
             fitRoutePlanIfRequested()
@@ -296,6 +341,8 @@ class MapController(
     }
 
     fun detach() {
+        mapView?.removeCallbacks(detailUpdate)
+        detailUpdatePending = false
         saveCamera()
         mapView?.removeOnLayoutChangeListener(layoutListener)
         map?.removeOnCameraMoveListener(cameraListener)

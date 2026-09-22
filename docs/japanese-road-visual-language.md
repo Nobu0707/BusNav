@@ -82,3 +82,16 @@ road data. Release continues to use its existing fallback configuration.
 Sources: [MapLibre SymbolLayer specification](https://maplibre.org/maplibre-style-spec/layers/#symbol),
 [Planetiler SourceFeature API](https://github.com/onthegomap/planetiler/blob/v0.10.2/planetiler-core/src/main/java/com/onthegomap/planetiler/reader/SourceFeature.java).
 See [Review014a](reviews/014a-japanese-road-map-style.md) for actual execution results.
+
+
+## Phase010.5A.1: national and urban expressways
+
+The [official Shutoko guidance page](https://www.shutoko.jp/driving/convenience/guidance/) was inspected on 2026-09-22, including the route-mark table, C1/C2 directional variants and entrance/exit numbering. It separates route-name-based Shutoko marks from nearby national E/C numbering. C1/C2 use circular marks; other Shutoko marks use a rounded lower silhouette. Arrows describe travel direction. Exit numbering is a separate identifier and is never used as a route shield.
+
+BusNav uses its own green/white vector drawings: the national E/C rounded rectangle is retained; urban routes have a shield with a curved lower edge, with a separate circular background for explicitly identified Shutoko C1/C2. Small map marks omit direction arrows because direction is not reliably present in the audited relation data. No official image is copied into runtime assets.
+
+The exact audited networks `首都高速道路` and `名古屋高速道路` classify as `URBAN_EXPRESSWAY`. `EXPRESSWAY` now means national numbering only (`JP:E` / `JP:C`). Original `route_source_network` is retained beside generated `route_network=urban_expressway`, allowing the circular Shutoko variant without applying it to Nagoya. Nagoya uses the generic urban family. Names containing 高速 and numeric motorway refs do not establish network membership. Unqualified C1/C2 remain neutral; national C4 still has the existing safe E/C motorway fallback. An explicit national network may use C1, but an urban C1/C2 never uses the national artwork.
+
+Urban relation refs take precedence over concurrent national numbering. Normalize the first semicolon token only; `6;455` becomes urban `6`. Urban refs accept C1/C2, numeric, B/Y, K/S and R; E refs in an urban relation are suppressed rather than converted into an urban mark. Unknown networks remain neutral unless the documented national E/C fallback applies.
+
+See [facility, intersection, span and layering policy](map-road-facilities.md). This section supersedes the original Phase010.5A overview shield visibility and route-above-shield policy.

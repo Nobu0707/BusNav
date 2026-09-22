@@ -18,10 +18,41 @@ def format_json(value, indent=0):
     return json.dumps(value, ensure_ascii=False)
 
 
+def detail_layers(light):
+    common = {'visibility': 'none', 'symbol-placement': 'point',
+        'icon-rotation-alignment': 'viewport', 'icon-pitch-alignment': 'viewport',
+        'text-rotation-alignment': 'viewport', 'text-pitch-alignment': 'viewport',
+        'icon-allow-overlap': False, 'text-allow-overlap': False,
+        'icon-ignore-placement': False, 'text-ignore-placement': False,
+        'icon-optional': False, 'text-optional': False, 'icon-padding': 2, 'text-padding': 3}
+    label = {'text-field': ['get', 'name'], 'text-font': ['Klokantech Noto Sans CJK Regular'],
+        'text-size': 11, 'text-max-width': 16, 'icon-text-fit': 'both', 'icon-text-fit-padding': [3, 5, 3, 5]}
+    result = []
+    for name, rank in [('major', 0), ('normal', 1)]:
+        result.append({'id': 'intersection-' + name, 'type': 'symbol', 'source': 'openmaptiles',
+            'source-layer': 'busnav_named_intersections', 'minzoom': 13 if rank == 0 else 14,
+            'filter': ['==', ['get', 'rank'], rank],
+            'layout': dict(common, **label, **{'icon-image': 'jp-intersection-light' if light else 'jp-intersection-dark',
+                'symbol-sort-key': ['get', 'rank'], 'text-offset': [0, 1.3]}),
+            'paint': {'text-color': '#243740' if light else '#E4EEF3'}})
+    for group, types, zoom, icon in [
+        ('junction', ['junction'], 12, 'jp-facility-junction'),
+        ('access', ['interchange', 'entrance', 'exit'], 13, 'jp-facility-access'),
+        ('toll', ['toll_gate', 'mainline_toll_gate'], 14, 'jp-facility-toll')]:
+        base = {'type': 'symbol', 'source': 'openmaptiles', 'source-layer': 'busnav_expressway_facilities',
+            'minzoom': zoom, 'filter': ['in', ['get', 'facility_type'], ['literal', types]]}
+        result.append(dict(base, id='facility-' + group + '-icon', layout=dict(common, **{'icon-image': icon})))
+        result.append(dict(base, id='facility-' + group + '-label',
+            filter=['all', base['filter'], ['has', 'name']],
+            layout=dict(common, **label, **{'icon-image': 'jp-facility-label',
+                'text-anchor': 'left', 'text-offset': [2.6, 0]}), paint={'text-color': '#FFFFFF'}))
+    return result
+
+
 def update(path, palette):
     style = json.loads(path.read_text(encoding='utf-8'))
-    style['metadata']['busnav:road-schema'] = 1
-    layers = [x for x in style['layers'] if not x['id'].startswith('route-shield-')]
+    style['metadata']['busnav:road-schema'] = 2
+    layers = [x for x in style['layers'] if not x['id'].startswith(('route-shield-', 'facility-', 'intersection-', 'busnav-')) and x['id'] != 'motorway-junctions']
     for layer in layers:
         if (layer['id'].startswith('roads-') and not layer['id'].endswith('-casing')) or layer['id'] in ('road-tunnels', 'road-bridges'):
             old = layer['paint']['line-color']
@@ -35,7 +66,7 @@ def update(path, palette):
                 # A distinct tint keeps the structural stroke visible over the classified fill.
                 colors = ('#84AED1', '#E3ADA5', '#91BEA2') if 'light' in path.name else ('#99BDDF', '#E3B0AA', '#A3C9B0')
             layer['paint']['line-color'] = ['match', ['get', 'route_network'],
-                'expressway', colors[0], 'national', colors[1], 'prefectural', colors[2], old]
+                ['expressway', 'urban_expressway'], colors[0], 'national', colors[1], 'prefectural', colors[2], old]
         if layer['id'] == 'road-labels':
             layer['filter'] = ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor', 'service']]]
             layer['layout']['text-field'] = ['coalesce', ['get', 'name:ja'], ['get', 'name'], '']
@@ -43,10 +74,13 @@ def update(path, palette):
             layer['layout']['text-ignore-placement'] = False
     layers = [x for x in layers if x['id'] != 'motorway-refs']
     shields = []
-    for rank, (kind, zoom, spacing) in enumerate([('expressway', 7, 420), ('national', 8, 550), ('prefectural', 13, 680)]):
+    for rank, (kind, zoom, spacing) in enumerate([('expressway', 7, 420), ('urban_expressway', 12, 420), ('national', 8, 550), ('prefectural', 13, 680)]):
         icon = 'jp-' + kind
         if kind == 'expressway':
             icon = ['case', ['>', ['length', ['get', 'route_ref']], 3], 'jp-expressway-wide', 'jp-expressway']
+        if kind == 'urban_expressway':
+            icon = ['case', ['all', ['==', ['get', 'route_source_network'], '首都高速道路'],
+                ['in', ['get', 'route_ref'], ['literal', ['C1', 'C2']]]], 'jp-urban-ring', 'jp-urban']
         filters = ['all', ['==', ['geometry-type'], 'LineString'],
                    ['==', ['get', 'route_network'], kind], ['has', 'route_ref']]
         if kind == 'national':
@@ -54,7 +88,7 @@ def update(path, palette):
             filters.append(['any', ['>=', ['zoom'], 10], ['<=', ['length', ['get', 'route_ref']], 2]])
         shields.append({'id': 'route-shield-' + kind, 'type': 'symbol', 'source': 'openmaptiles',
             'source-layer': 'transportation_name', 'minzoom': zoom, 'filter': filters,
-            'layout': {'symbol-placement': 'line', 'symbol-spacing': spacing, 'symbol-sort-key': rank,
+            'layout': {'visibility': 'none', 'symbol-placement': 'line', 'symbol-spacing': spacing, 'symbol-sort-key': rank,
                 'icon-image': icon, 'icon-size': 1, 'icon-anchor': 'center',
                 'icon-rotation-alignment': 'viewport', 'icon-pitch-alignment': 'viewport',
                 'icon-allow-overlap': False, 'icon-ignore-placement': False, 'icon-optional': False,
@@ -66,7 +100,11 @@ def update(path, palette):
                 'text-allow-overlap': False, 'text-ignore-placement': False, 'text-optional': False,
                 'text-padding': 8}, 'paint': {'text-color': '#ffffff'}})
     insertion = next(i for i, x in enumerate(layers) if x['id'] == 'road-labels') + 1
-    layers[insertion:insertion] = shields
+    # Invisible line sentinel allows runtime route insertion below every route shield.
+    anchor = {'id': 'busnav-shield-anchor', 'type': 'line', 'source': 'openmaptiles',
+        'source-layer': 'transportation', 'layout': {'visibility': 'none'}}
+    details = detail_layers('light' in path.name)
+    layers[insertion:insertion] = [anchor] + details[:2] + shields + details[2:]
     style['layers'] = layers
     path.write_text(format_json(style) + '\n', encoding='utf-8')
 

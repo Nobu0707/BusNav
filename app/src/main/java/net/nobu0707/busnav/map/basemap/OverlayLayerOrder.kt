@@ -1,8 +1,8 @@
 package net.nobu0707.busnav.map.basemap
 
 /**
- * MapLibre appends these layers after every basemap style load. Their order is
- * intentionally stable: routes, editable points, then the live vehicle.
+ * Restore explicit ordering after every style load: route lines below shields,
+ * then traffic, editable points and the live vehicle.
  */
 object OverlayLayerOrder {
     const val ACTIVE_ROUTE_CASING = "busnav-scheduled-route-casing-layer"
@@ -25,25 +25,24 @@ object OverlayLayerOrder {
     const val TRAFFIC_MARKER = "busnav-traffic-marker"
     const val VEHICLE = "busnav-vehicle-layer"
 
-    val orderedLayerIds = listOf(
-        ACTIVE_ROUTE_CASING,
-        ACTIVE_ROUTE,
-        ACTIVE_START,
-        ACTIVE_STOP,
-        ACTIVE_VIA,
-        ACTIVE_SHAPING,
-        ACTIVE_DESTINATION,
-        DETOUR_CASING,
-        DETOUR_LINE,
-        DETOUR_MARKERS,
-        TRAFFIC_AREA,
-        TRAFFIC_LINE,
-        TRAFFIC_MARKER,
-        PLAN_PREVIEW,
-        START,
-        VIA,
-        SHAPING,
-        DESTINATION,
-        VEHICLE,
+    const val SHIELD_ANCHOR = "busnav-shield-anchor"
+    val routeLineIds = listOf(ACTIVE_ROUTE_CASING, ACTIVE_ROUTE, DETOUR_CASING, DETOUR_LINE, PLAN_PREVIEW)
+
+    /** Called after every reload. Fallback styles may not contain a shield anchor. */
+    fun restore(style: org.maplibre.android.maps.Style) {
+        val anchor = style.getLayer(SHIELD_ANCHOR)?.id
+            ?: style.layers.firstOrNull { it.id.startsWith("route-shield-") }?.id
+        if (anchor != null) routeLineIds.forEach { id ->
+            style.getLayer(id)?.let { layer -> style.removeLayer(layer); style.addLayerBelow(layer, anchor) }
+        }
+        orderedLayerIds.filterNot { it in routeLineIds }.forEach { id ->
+            style.getLayer(id)?.let { layer -> style.removeLayer(layer); style.addLayer(layer) }
+        }
+    }
+
+    val orderedLayerIds = routeLineIds + listOf(
+        DETOUR_MARKERS, TRAFFIC_AREA, TRAFFIC_LINE, TRAFFIC_MARKER,
+        ACTIVE_START, ACTIVE_STOP, ACTIVE_VIA, ACTIVE_SHAPING, ACTIVE_DESTINATION,
+        START, VIA, SHAPING, DESTINATION, VEHICLE,
     )
 }

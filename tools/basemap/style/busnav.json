@@ -4,7 +4,7 @@
   "metadata": {
     "busnav:purpose": "navigation night/tunnel",
     "openmaptiles:version": "3.x",
-    "busnav:road-schema": 1
+    "busnav:road-schema": 2
   },
   "center": [137.9, 35.8],
   "zoom": 6,
@@ -99,7 +99,7 @@
       "minzoom": 14,
       "filter": ["==", ["get", "class"], "service"],
       "paint": {
-        "line-color": ["match", ["get", "route_network"], "expressway", "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", "#68727a"],
+        "line-color": ["match", ["get", "route_network"], ["expressway", "urban_expressway"], "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", "#68727a"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.24, 8, 0.45, 12, 1.05, 16, 3, 18, 5.4, 20, 9, 22, 13.5]
       }
     },
@@ -123,7 +123,7 @@
       "minzoom": 12,
       "filter": ["==", ["get", "class"], "minor"],
       "paint": {
-        "line-color": ["match", ["get", "route_network"], "expressway", "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", "#7b858c"],
+        "line-color": ["match", ["get", "route_network"], ["expressway", "urban_expressway"], "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", "#7b858c"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.36, 8, 0.67, 12, 1.57, 16, 4.5, 18, 8.1, 20, 13.5, 22, 20.25]
       }
     },
@@ -147,7 +147,7 @@
       "minzoom": 9,
       "filter": ["==", ["get", "class"], "tertiary"],
       "paint": {
-        "line-color": ["match", ["get", "route_network"], "expressway", "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", "#9a936f"],
+        "line-color": ["match", ["get", "route_network"], ["expressway", "urban_expressway"], "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", "#9a936f"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.52, 8, 0.97, 12, 2.27, 16, 6.5, 18, 11.7, 20, 19.5, 22, 29.25]
       }
     },
@@ -171,7 +171,7 @@
       "minzoom": 7,
       "filter": ["==", ["get", "class"], "secondary"],
       "paint": {
-        "line-color": ["match", ["get", "route_network"], "expressway", "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", "#b09c68"],
+        "line-color": ["match", ["get", "route_network"], ["expressway", "urban_expressway"], "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", "#b09c68"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.62, 8, 1.17, 12, 2.73, 16, 7.8, 18, 14.04, 20, 23.4, 22, 35.1]
       }
     },
@@ -207,7 +207,7 @@
       "minzoom": 5,
       "filter": ["==", ["get", "class"], "primary"],
       "paint": {
-        "line-color": ["match", ["get", "route_network"], "expressway", "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", ["match", ["get", "class"], "trunk", "#d19b59", "#c5a866"]],
+        "line-color": ["match", ["get", "route_network"], ["expressway", "urban_expressway"], "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", ["match", ["get", "class"], "trunk", "#d19b59", "#c5a866"]],
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.72, 8, 1.35, 12, 3.15, 16, 9, 18, 16.2, 20, 27, 22, 40.5]
       }
     },
@@ -219,7 +219,7 @@
       "minzoom": 5,
       "filter": ["==", ["get", "class"], "trunk"],
       "paint": {
-        "line-color": ["match", ["get", "route_network"], "expressway", "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", ["match", ["get", "class"], "trunk", "#d19b59", "#c5a866"]],
+        "line-color": ["match", ["get", "route_network"], ["expressway", "urban_expressway"], "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", ["match", ["get", "class"], "trunk", "#d19b59", "#c5a866"]],
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.84, 8, 1.57, 12, 3.67, 16, 10.5, 18, 18.9, 20, 31.5, 22, 47.25]
       }
     },
@@ -243,7 +243,7 @@
       "minzoom": 4,
       "filter": ["==", ["get", "class"], "motorway"],
       "paint": {
-        "line-color": ["match", ["get", "route_network"], "expressway", "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", "#777c82"],
+        "line-color": ["match", ["get", "route_network"], ["expressway", "urban_expressway"], "#629AD0", "national", "#D7857D", "prefectural", "#71AD86", "#777c82"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.96, 8, 1.8, 12, 4.2, 16, 12, 18, 21.6, 20, 36, 22, 54.0]
       }
     },
@@ -255,7 +255,7 @@
       "minzoom": 9,
       "filter": ["==", ["get", "brunnel"], "tunnel"],
       "paint": {
-        "line-color": ["match", ["get", "route_network"], "expressway", "#99BDDF", "national", "#E3B0AA", "prefectural", "#A3C9B0", "#69747d"],
+        "line-color": ["match", ["get", "route_network"], ["expressway", "urban_expressway"], "#99BDDF", "national", "#E3B0AA", "prefectural", "#A3C9B0", "#69747d"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 9, 1, 16, 3, 20, 7, 22, 10],
         "line-dasharray": [2, 2],
         "line-opacity": 0.75
@@ -269,7 +269,7 @@
       "minzoom": 9,
       "filter": ["==", ["get", "brunnel"], "bridge"],
       "paint": {
-        "line-color": ["match", ["get", "route_network"], "expressway", "#99BDDF", "national", "#E3B0AA", "prefectural", "#A3C9B0", "#d9c189"],
+        "line-color": ["match", ["get", "route_network"], ["expressway", "urban_expressway"], "#99BDDF", "national", "#E3B0AA", "prefectural", "#A3C9B0", "#d9c189"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 9, 1, 16, 3, 20, 7, 22, 10],
         "line-opacity": 0.85
       }
@@ -298,6 +298,87 @@
       }
     },
     {
+      "id": "busnav-shield-anchor",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "layout": {
+        "visibility": "none"
+      }
+    },
+    {
+      "id": "intersection-major",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "busnav_named_intersections",
+      "minzoom": 13,
+      "filter": ["==", ["get", "rank"], 0],
+      "layout": {
+        "visibility": "none",
+        "symbol-placement": "point",
+        "icon-rotation-alignment": "viewport",
+        "icon-pitch-alignment": "viewport",
+        "text-rotation-alignment": "viewport",
+        "text-pitch-alignment": "viewport",
+        "icon-allow-overlap": false,
+        "text-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "text-ignore-placement": false,
+        "icon-optional": false,
+        "text-optional": false,
+        "icon-padding": 2,
+        "text-padding": 3,
+        "text-field": ["get", "name"],
+        "text-font": ["Klokantech Noto Sans CJK Regular"],
+        "text-size": 11,
+        "text-max-width": 16,
+        "icon-text-fit": "both",
+        "icon-text-fit-padding": [3, 5, 3, 5],
+        "icon-image": "jp-intersection-dark",
+        "symbol-sort-key": ["get", "rank"],
+        "text-offset": [0, 1.3]
+      },
+      "paint": {
+        "text-color": "#E4EEF3"
+      }
+    },
+    {
+      "id": "intersection-normal",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "busnav_named_intersections",
+      "minzoom": 14,
+      "filter": ["==", ["get", "rank"], 1],
+      "layout": {
+        "visibility": "none",
+        "symbol-placement": "point",
+        "icon-rotation-alignment": "viewport",
+        "icon-pitch-alignment": "viewport",
+        "text-rotation-alignment": "viewport",
+        "text-pitch-alignment": "viewport",
+        "icon-allow-overlap": false,
+        "text-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "text-ignore-placement": false,
+        "icon-optional": false,
+        "text-optional": false,
+        "icon-padding": 2,
+        "text-padding": 3,
+        "text-field": ["get", "name"],
+        "text-font": ["Klokantech Noto Sans CJK Regular"],
+        "text-size": 11,
+        "text-max-width": 16,
+        "icon-text-fit": "both",
+        "icon-text-fit-padding": [3, 5, 3, 5],
+        "icon-image": "jp-intersection-dark",
+        "symbol-sort-key": ["get", "rank"],
+        "text-offset": [0, 1.3]
+      },
+      "paint": {
+        "text-color": "#E4EEF3"
+      }
+    },
+    {
       "id": "route-shield-expressway",
       "type": "symbol",
       "source": "openmaptiles",
@@ -305,10 +386,49 @@
       "minzoom": 7,
       "filter": ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "route_network"], "expressway"], ["has", "route_ref"]],
       "layout": {
+        "visibility": "none",
         "symbol-placement": "line",
         "symbol-spacing": 420,
         "symbol-sort-key": 0,
         "icon-image": ["case", [">", ["length", ["get", "route_ref"]], 3], "jp-expressway-wide", "jp-expressway"],
+        "icon-size": 1,
+        "icon-anchor": "center",
+        "icon-rotation-alignment": "viewport",
+        "icon-pitch-alignment": "viewport",
+        "icon-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "icon-optional": false,
+        "icon-padding": 8,
+        "text-field": ["get", "route_ref"],
+        "text-font": ["Klokantech Noto Sans CJK Regular"],
+        "text-size": 13,
+        "text-anchor": "center",
+        "text-justify": "center",
+        "text-offset": [0, 0],
+        "text-rotation-alignment": "viewport",
+        "text-pitch-alignment": "viewport",
+        "text-allow-overlap": false,
+        "text-ignore-placement": false,
+        "text-optional": false,
+        "text-padding": 8
+      },
+      "paint": {
+        "text-color": "#ffffff"
+      }
+    },
+    {
+      "id": "route-shield-urban_expressway",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "transportation_name",
+      "minzoom": 12,
+      "filter": ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "route_network"], "urban_expressway"], ["has", "route_ref"]],
+      "layout": {
+        "visibility": "none",
+        "symbol-placement": "line",
+        "symbol-spacing": 420,
+        "symbol-sort-key": 1,
+        "icon-image": ["case", ["all", ["==", ["get", "route_source_network"], "首都高速道路"], ["in", ["get", "route_ref"], ["literal", ["C1", "C2"]]]], "jp-urban-ring", "jp-urban"],
         "icon-size": 1,
         "icon-anchor": "center",
         "icon-rotation-alignment": "viewport",
@@ -342,9 +462,10 @@
       "minzoom": 8,
       "filter": ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "route_network"], "national"], ["has", "route_ref"], ["any", [">=", ["zoom"], 10], ["<=", ["length", ["get", "route_ref"]], 2]]],
       "layout": {
+        "visibility": "none",
         "symbol-placement": "line",
         "symbol-spacing": 550,
-        "symbol-sort-key": 1,
+        "symbol-sort-key": 2,
         "icon-image": "jp-national",
         "icon-size": 1,
         "icon-anchor": "center",
@@ -379,9 +500,10 @@
       "minzoom": 13,
       "filter": ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "route_network"], "prefectural"], ["has", "route_ref"]],
       "layout": {
+        "visibility": "none",
         "symbol-placement": "line",
         "symbol-spacing": 680,
-        "symbol-sort-key": 2,
+        "symbol-sort-key": 3,
         "icon-image": "jp-prefectural",
         "icon-size": 1,
         "icon-anchor": "center",
@@ -409,23 +531,186 @@
       }
     },
     {
-      "id": "motorway-junctions",
       "type": "symbol",
       "source": "openmaptiles",
-      "source-layer": "transportation_name",
-      "minzoom": 10,
-      "filter": ["==", ["get", "class"], "motorway_junction"],
+      "source-layer": "busnav_expressway_facilities",
+      "minzoom": 12,
+      "filter": ["in", ["get", "facility_type"], ["literal", ["junction"]]],
+      "id": "facility-junction-icon",
       "layout": {
-        "text-field": ["coalesce", ["get", "name:ja"], ["get", "name"], ["get", "ref"]],
+        "visibility": "none",
+        "symbol-placement": "point",
+        "icon-rotation-alignment": "viewport",
+        "icon-pitch-alignment": "viewport",
+        "text-rotation-alignment": "viewport",
+        "text-pitch-alignment": "viewport",
+        "icon-allow-overlap": false,
+        "text-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "text-ignore-placement": false,
+        "icon-optional": false,
+        "text-optional": false,
+        "icon-padding": 2,
+        "text-padding": 3,
+        "icon-image": "jp-facility-junction"
+      }
+    },
+    {
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "busnav_expressway_facilities",
+      "minzoom": 12,
+      "filter": ["all", ["in", ["get", "facility_type"], ["literal", ["junction"]]], ["has", "name"]],
+      "id": "facility-junction-label",
+      "layout": {
+        "visibility": "none",
+        "symbol-placement": "point",
+        "icon-rotation-alignment": "viewport",
+        "icon-pitch-alignment": "viewport",
+        "text-rotation-alignment": "viewport",
+        "text-pitch-alignment": "viewport",
+        "icon-allow-overlap": false,
+        "text-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "text-ignore-placement": false,
+        "icon-optional": false,
+        "text-optional": false,
+        "icon-padding": 2,
+        "text-padding": 3,
+        "text-field": ["get", "name"],
         "text-font": ["Klokantech Noto Sans CJK Regular"],
         "text-size": 11,
-        "text-allow-overlap": false,
-        "text-offset": [0, 0.8]
+        "text-max-width": 16,
+        "icon-text-fit": "both",
+        "icon-text-fit-padding": [3, 5, 3, 5],
+        "icon-image": "jp-facility-label",
+        "text-anchor": "left",
+        "text-offset": [2.6, 0]
       },
       "paint": {
-        "text-color": "#ffd6a5",
-        "text-halo-color": "#111820",
-        "text-halo-width": 1.5
+        "text-color": "#FFFFFF"
+      }
+    },
+    {
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "busnav_expressway_facilities",
+      "minzoom": 13,
+      "filter": ["in", ["get", "facility_type"], ["literal", ["interchange", "entrance", "exit"]]],
+      "id": "facility-access-icon",
+      "layout": {
+        "visibility": "none",
+        "symbol-placement": "point",
+        "icon-rotation-alignment": "viewport",
+        "icon-pitch-alignment": "viewport",
+        "text-rotation-alignment": "viewport",
+        "text-pitch-alignment": "viewport",
+        "icon-allow-overlap": false,
+        "text-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "text-ignore-placement": false,
+        "icon-optional": false,
+        "text-optional": false,
+        "icon-padding": 2,
+        "text-padding": 3,
+        "icon-image": "jp-facility-access"
+      }
+    },
+    {
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "busnav_expressway_facilities",
+      "minzoom": 13,
+      "filter": ["all", ["in", ["get", "facility_type"], ["literal", ["interchange", "entrance", "exit"]]], ["has", "name"]],
+      "id": "facility-access-label",
+      "layout": {
+        "visibility": "none",
+        "symbol-placement": "point",
+        "icon-rotation-alignment": "viewport",
+        "icon-pitch-alignment": "viewport",
+        "text-rotation-alignment": "viewport",
+        "text-pitch-alignment": "viewport",
+        "icon-allow-overlap": false,
+        "text-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "text-ignore-placement": false,
+        "icon-optional": false,
+        "text-optional": false,
+        "icon-padding": 2,
+        "text-padding": 3,
+        "text-field": ["get", "name"],
+        "text-font": ["Klokantech Noto Sans CJK Regular"],
+        "text-size": 11,
+        "text-max-width": 16,
+        "icon-text-fit": "both",
+        "icon-text-fit-padding": [3, 5, 3, 5],
+        "icon-image": "jp-facility-label",
+        "text-anchor": "left",
+        "text-offset": [2.6, 0]
+      },
+      "paint": {
+        "text-color": "#FFFFFF"
+      }
+    },
+    {
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "busnav_expressway_facilities",
+      "minzoom": 14,
+      "filter": ["in", ["get", "facility_type"], ["literal", ["toll_gate", "mainline_toll_gate"]]],
+      "id": "facility-toll-icon",
+      "layout": {
+        "visibility": "none",
+        "symbol-placement": "point",
+        "icon-rotation-alignment": "viewport",
+        "icon-pitch-alignment": "viewport",
+        "text-rotation-alignment": "viewport",
+        "text-pitch-alignment": "viewport",
+        "icon-allow-overlap": false,
+        "text-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "text-ignore-placement": false,
+        "icon-optional": false,
+        "text-optional": false,
+        "icon-padding": 2,
+        "text-padding": 3,
+        "icon-image": "jp-facility-toll"
+      }
+    },
+    {
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "busnav_expressway_facilities",
+      "minzoom": 14,
+      "filter": ["all", ["in", ["get", "facility_type"], ["literal", ["toll_gate", "mainline_toll_gate"]]], ["has", "name"]],
+      "id": "facility-toll-label",
+      "layout": {
+        "visibility": "none",
+        "symbol-placement": "point",
+        "icon-rotation-alignment": "viewport",
+        "icon-pitch-alignment": "viewport",
+        "text-rotation-alignment": "viewport",
+        "text-pitch-alignment": "viewport",
+        "icon-allow-overlap": false,
+        "text-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "text-ignore-placement": false,
+        "icon-optional": false,
+        "text-optional": false,
+        "icon-padding": 2,
+        "text-padding": 3,
+        "text-field": ["get", "name"],
+        "text-font": ["Klokantech Noto Sans CJK Regular"],
+        "text-size": 11,
+        "text-max-width": 16,
+        "icon-text-fit": "both",
+        "icon-text-fit-padding": [3, 5, 3, 5],
+        "icon-image": "jp-facility-label",
+        "text-anchor": "left",
+        "text-offset": [2.6, 0]
+      },
+      "paint": {
+        "text-color": "#FFFFFF"
       }
     },
     {

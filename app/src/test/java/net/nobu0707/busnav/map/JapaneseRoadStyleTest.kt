@@ -14,13 +14,14 @@ class JapaneseRoadStyleTest {
         val light = layers("busnav-light")
         val dark = layers("busnav")
         val shields = light.filter { it.getValue("id").jsonPrimitive.content.startsWith("route-shield-") }
-        assertEquals(3, shields.size)
+        assertEquals(4, shields.size)
         assertEquals(shields, dark.filter { it.getValue("id").jsonPrimitive.content.startsWith("route-shield-") })
         for ((i, shield) in shields.withIndex()) {
             assertEquals("transportation_name", shield.getValue("source-layer").jsonPrimitive.content)
-            assertEquals(listOf(7, 8, 13)[i], shield.getValue("minzoom").jsonPrimitive.int)
+            assertEquals(listOf(7, 12, 8, 13)[i], shield.getValue("minzoom").jsonPrimitive.int)
             val layout = shield.getValue("layout").jsonObject
-            assertEquals(listOf(420, 550, 680)[i], layout.getValue("symbol-spacing").jsonPrimitive.int)
+            assertEquals("none", layout.getValue("visibility").jsonPrimitive.content)
+            assertEquals(listOf(420, 420, 550, 680)[i], layout.getValue("symbol-spacing").jsonPrimitive.int)
             assertEquals(i, layout.getValue("symbol-sort-key").jsonPrimitive.int)
             assertEquals("line", layout.getValue("symbol-placement").jsonPrimitive.content)
             assertEquals("center", layout.getValue("text-anchor").jsonPrimitive.content)
@@ -33,6 +34,22 @@ class JapaneseRoadStyleTest {
             assertEquals("[\"get\",\"route_ref\"]", layout.getValue("text-field").toString())
         }
         assertFalse(light.any { it.getValue("id").jsonPrimitive.content == "motorway-refs" })
+    }
+    @Test fun detailLayersUseBackgroundsCollisionAndCorrectAnchor() {
+        for (theme in listOf("busnav", "busnav-light")) {
+            val all = layers(theme)
+            val ids = all.map { it.getValue("id").jsonPrimitive.content }
+            assertTrue(ids.indexOf("busnav-shield-anchor") < ids.indexOf("route-shield-urban_expressway"))
+            for (group in listOf("junction", "access", "toll")) {
+                val layer = all.first { it.getValue("id").jsonPrimitive.content == "facility-$group-label" }
+                val layout = layer.getValue("layout").jsonObject
+                assertEquals("both", layout.getValue("icon-text-fit").jsonPrimitive.content)
+                assertEquals("jp-facility-label", layout.getValue("icon-image").jsonPrimitive.content)
+                assertEquals("viewport", layout.getValue("text-rotation-alignment").jsonPrimitive.content)
+                assertFalse(layout.getValue("text-allow-overlap").jsonPrimitive.boolean)
+            }
+            assertTrue(ids.containsAll(listOf("intersection-major", "intersection-normal")))
+        }
     }
     @Test fun allRoadFillsAndStructuresUseEvidenceBasedPaletteWithNeutralFallback() {
         for ((theme, colors) in listOf("busnav-light" to listOf("#397BB8", "#D16D61", "#50956C"),
