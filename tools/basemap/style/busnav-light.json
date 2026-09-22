@@ -3,7 +3,8 @@
   "name": "BusNav Light",
   "metadata": {
     "busnav:purpose": "default daylight presentation",
-    "openmaptiles:version": "3.x"
+    "openmaptiles:version": "3.x",
+    "busnav:road-schema": 1
   },
   "center": [137.9, 35.8],
   "zoom": 6,
@@ -98,7 +99,7 @@
       "minzoom": 14,
       "filter": ["==", ["get", "class"], "service"],
       "paint": {
-        "line-color": "#ffffff",
+        "line-color": ["match", ["get", "route_network"], "expressway", "#397BB8", "national", "#D16D61", "prefectural", "#50956C", "#ffffff"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.24, 8, 0.45, 12, 1.05, 16, 3, 18, 5.4, 20, 9, 22, 13.5]
       }
     },
@@ -122,7 +123,7 @@
       "minzoom": 12,
       "filter": ["==", ["get", "class"], "minor"],
       "paint": {
-        "line-color": "#ffffff",
+        "line-color": ["match", ["get", "route_network"], "expressway", "#397BB8", "national", "#D16D61", "prefectural", "#50956C", "#ffffff"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.36, 8, 0.67, 12, 1.57, 16, 4.5, 18, 8.1, 20, 13.5, 22, 20.25]
       }
     },
@@ -146,7 +147,7 @@
       "minzoom": 9,
       "filter": ["==", ["get", "class"], "tertiary"],
       "paint": {
-        "line-color": "#f4e5bd",
+        "line-color": ["match", ["get", "route_network"], "expressway", "#397BB8", "national", "#D16D61", "prefectural", "#50956C", "#f4e5bd"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.52, 8, 0.97, 12, 2.27, 16, 6.5, 18, 11.7, 20, 19.5, 22, 29.25]
       }
     },
@@ -170,7 +171,7 @@
       "minzoom": 7,
       "filter": ["==", ["get", "class"], "secondary"],
       "paint": {
-        "line-color": "#f6d99b",
+        "line-color": ["match", ["get", "route_network"], "expressway", "#397BB8", "national", "#D16D61", "prefectural", "#50956C", "#f6d99b"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.62, 8, 1.17, 12, 2.73, 16, 7.8, 18, 14.04, 20, 23.4, 22, 35.1]
       }
     },
@@ -206,7 +207,7 @@
       "minzoom": 5,
       "filter": ["==", ["get", "class"], "primary"],
       "paint": {
-        "line-color": ["match", ["get", "class"], "trunk", "#efbd75", "#f0cb86"],
+        "line-color": ["match", ["get", "route_network"], "expressway", "#397BB8", "national", "#D16D61", "prefectural", "#50956C", ["match", ["get", "class"], "trunk", "#efbd75", "#f0cb86"]],
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.72, 8, 1.35, 12, 3.15, 16, 9, 18, 16.2, 20, 27, 22, 40.5]
       }
     },
@@ -218,7 +219,7 @@
       "minzoom": 5,
       "filter": ["==", ["get", "class"], "trunk"],
       "paint": {
-        "line-color": ["match", ["get", "class"], "trunk", "#efbd75", "#f0cb86"],
+        "line-color": ["match", ["get", "route_network"], "expressway", "#397BB8", "national", "#D16D61", "prefectural", "#50956C", ["match", ["get", "class"], "trunk", "#efbd75", "#f0cb86"]],
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.84, 8, 1.57, 12, 3.67, 16, 10.5, 18, 18.9, 20, 31.5, 22, 47.25]
       }
     },
@@ -242,7 +243,7 @@
       "minzoom": 4,
       "filter": ["==", ["get", "class"], "motorway"],
       "paint": {
-        "line-color": "#e6a083",
+        "line-color": ["match", ["get", "route_network"], "expressway", "#397BB8", "national", "#D16D61", "prefectural", "#50956C", "#d3c7ae"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.96, 8, 1.8, 12, 4.2, 16, 12, 18, 21.6, 20, 36, 22, 54.0]
       }
     },
@@ -254,7 +255,7 @@
       "minzoom": 9,
       "filter": ["==", ["get", "brunnel"], "tunnel"],
       "paint": {
-        "line-color": "#899497",
+        "line-color": ["match", ["get", "route_network"], "expressway", "#397BB8", "national", "#D16D61", "prefectural", "#50956C", "#899497"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 9, 1, 16, 3, 20, 7, 22, 10],
         "line-dasharray": [2, 2],
         "line-opacity": 0.75
@@ -268,30 +269,9 @@
       "minzoom": 9,
       "filter": ["==", ["get", "brunnel"], "bridge"],
       "paint": {
-        "line-color": "#c7ac77",
+        "line-color": ["match", ["get", "route_network"], "expressway", "#397BB8", "national", "#D16D61", "prefectural", "#50956C", "#c7ac77"],
         "line-width": ["interpolate", ["linear"], ["zoom"], 9, 1, 16, 3, 20, 7, 22, 10],
         "line-opacity": 0.85
-      }
-    },
-    {
-      "id": "motorway-refs",
-      "type": "symbol",
-      "source": "openmaptiles",
-      "source-layer": "transportation_name",
-      "minzoom": 7,
-      "filter": ["in", ["get", "class"], ["literal", ["motorway", "trunk"]]],
-      "layout": {
-        "symbol-placement": "line",
-        "symbol-spacing": 450,
-        "text-field": ["coalesce", ["get", "ref"], ["get", "name:ja"], ["get", "name"]],
-        "text-font": ["Klokantech Noto Sans CJK Regular"],
-        "text-size": 11,
-        "text-rotation-alignment": "map"
-      },
-      "paint": {
-        "text-color": "#544137",
-        "text-halo-color": "#f4f6f3",
-        "text-halo-width": 1.5
       }
     },
     {
@@ -300,19 +280,132 @@
       "source": "openmaptiles",
       "source-layer": "transportation_name",
       "minzoom": 11,
-      "filter": ["in", ["get", "class"], ["literal", ["primary", "secondary", "tertiary", "minor", "service"]]],
+      "filter": ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary", "secondary", "tertiary", "minor", "service"]]],
       "layout": {
         "symbol-placement": "line",
         "symbol-spacing": 500,
-        "text-field": ["coalesce", ["get", "name:ja"], ["get", "name"], ["get", "ref"]],
+        "text-field": ["coalesce", ["get", "name:ja"], ["get", "name"], ""],
         "text-font": ["Klokantech Noto Sans CJK Regular"],
         "text-size": ["interpolate", ["linear"], ["zoom"], 11, 10, 16, 13],
-        "text-rotation-alignment": "map"
+        "text-rotation-alignment": "map",
+        "text-allow-overlap": false,
+        "text-ignore-placement": false
       },
       "paint": {
         "text-color": "#38454b",
         "text-halo-color": "#f4f6f3",
         "text-halo-width": 1.5
+      }
+    },
+    {
+      "id": "route-shield-expressway",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "transportation_name",
+      "minzoom": 7,
+      "filter": ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "route_network"], "expressway"], ["has", "route_ref"]],
+      "layout": {
+        "symbol-placement": "line",
+        "symbol-spacing": 420,
+        "symbol-sort-key": 0,
+        "icon-image": ["case", [">", ["length", ["get", "route_ref"]], 3], "jp-expressway-wide", "jp-expressway"],
+        "icon-size": 1,
+        "icon-anchor": "center",
+        "icon-rotation-alignment": "viewport",
+        "icon-pitch-alignment": "viewport",
+        "icon-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "icon-optional": false,
+        "icon-padding": 8,
+        "text-field": ["get", "route_ref"],
+        "text-font": ["Klokantech Noto Sans CJK Regular"],
+        "text-size": 13,
+        "text-anchor": "center",
+        "text-justify": "center",
+        "text-offset": [0, 0],
+        "text-rotation-alignment": "viewport",
+        "text-pitch-alignment": "viewport",
+        "text-allow-overlap": false,
+        "text-ignore-placement": false,
+        "text-optional": false,
+        "text-padding": 8
+      },
+      "paint": {
+        "text-color": "#ffffff"
+      }
+    },
+    {
+      "id": "route-shield-national",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "transportation_name",
+      "minzoom": 8,
+      "filter": ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "route_network"], "national"], ["has", "route_ref"], ["any", [">=", ["zoom"], 10], ["<=", ["length", ["get", "route_ref"]], 2]]],
+      "layout": {
+        "symbol-placement": "line",
+        "symbol-spacing": 550,
+        "symbol-sort-key": 1,
+        "icon-image": "jp-national",
+        "icon-size": 1,
+        "icon-anchor": "center",
+        "icon-rotation-alignment": "viewport",
+        "icon-pitch-alignment": "viewport",
+        "icon-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "icon-optional": false,
+        "icon-padding": 8,
+        "text-field": ["get", "route_ref"],
+        "text-font": ["Klokantech Noto Sans CJK Regular"],
+        "text-size": 13,
+        "text-anchor": "center",
+        "text-justify": "center",
+        "text-offset": [0, -0.12],
+        "text-rotation-alignment": "viewport",
+        "text-pitch-alignment": "viewport",
+        "text-allow-overlap": false,
+        "text-ignore-placement": false,
+        "text-optional": false,
+        "text-padding": 8
+      },
+      "paint": {
+        "text-color": "#ffffff"
+      }
+    },
+    {
+      "id": "route-shield-prefectural",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "transportation_name",
+      "minzoom": 13,
+      "filter": ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "route_network"], "prefectural"], ["has", "route_ref"]],
+      "layout": {
+        "symbol-placement": "line",
+        "symbol-spacing": 680,
+        "symbol-sort-key": 2,
+        "icon-image": "jp-prefectural",
+        "icon-size": 1,
+        "icon-anchor": "center",
+        "icon-rotation-alignment": "viewport",
+        "icon-pitch-alignment": "viewport",
+        "icon-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "icon-optional": false,
+        "icon-padding": 8,
+        "text-field": ["get", "route_ref"],
+        "text-font": ["Klokantech Noto Sans CJK Regular"],
+        "text-size": 13,
+        "text-anchor": "center",
+        "text-justify": "center",
+        "text-offset": [0, 0],
+        "text-rotation-alignment": "viewport",
+        "text-pitch-alignment": "viewport",
+        "text-allow-overlap": false,
+        "text-ignore-placement": false,
+        "text-optional": false,
+        "text-padding": 8
+      },
+      "paint": {
+        "text-color": "#ffffff"
       }
     },
     {

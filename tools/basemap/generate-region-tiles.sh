@@ -3,7 +3,8 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 data_dir="${BUSNAV_BASEMAP_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/busnav/basemap}"
-image="${BUSNAV_PLANETILER_IMAGE:-openmaptiles/planetiler-openmaptiles@sha256:cdd536498df473ffe8bebf20ed62a89f05a01ba63d5ee7cb92a3581afcaaaa89}"
+image="openmaptiles/planetiler-openmaptiles@sha256:cdd536498df473ffe8bebf20ed62a89f05a01ba63d5ee7cb92a3581afcaaaa89"
+# Profile compilation and execution must use this same pinned API.
 region="${1:?Usage: generate-region-tiles.sh kanto|chubu [PBF]}"
 case "$region" in kanto|chubu) ;; *) echo "Unsupported region: $region" >&2; exit 1 ;; esac
 output="$data_dir/$region.mbtiles"
@@ -35,6 +36,7 @@ if [[ -e "$output" && "${BUSNAV_FORCE_REGENERATE:-0}" != "1" ]]; then
 fi
 
 pbf="$(realpath "$pbf")"
+bash "$script_dir/build-road-profile.sh"
 mkdir -p "$data_dir"
 # Build separately so a failed rebuild cannot truncate a served MBTiles file.
 pending="$data_dir/$region.pending.mbtiles"
@@ -45,7 +47,9 @@ docker run --rm \
   -e JAVA_TOOL_OPTIONS="${BUSNAV_PLANETILER_JAVA_OPTIONS:--Xmx4g}" \
   -v "$(dirname "$pbf"):/input:ro" \
   -v "$data_dir:/data" \
-  "$image" \
+  -v "$script_dir/../../build/road-profile:/profile:ro" \
+  --entrypoint java "$image" \
+  -cp "/profile:/app/resources:/app/classes:/app/libs/*" net.nobu0707.busnav.tiles.BusNavProfile \
   --osm-path="/input/$(basename "$pbf")" \
   --output="/data/$region.pending.mbtiles" \
   --download \

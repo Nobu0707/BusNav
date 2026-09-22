@@ -89,3 +89,31 @@ Noto Sans CJK glyphのlicense/attributionは固定revisionのupstreamに従い�
 ## Phase 004.5.1 regional basemaps
 
 全国Valhallaのrouting coverageとKanto/Chubuの表示coverageは独立しています。BasemapRegionをDeveloper ConnectionsのDataStoreへ保存し、BasemapConfigが地域別style URLを生成します。MapViewと経路状態を保持したままstyleをreloadします。単一style templateからruntimeで2地域のstyleを生成し、日本語glyphと旧Chubu成果物を維持します。[構築・切替・rollback手順](japan-routing-and-regional-basemaps.md)。
+
+## Phase010.5A — Japanese road networks and shields
+
+The profile now adds `route_network` / `route_ref` to transportation and transportation_name.
+The original tile schema lacked classification on road lines, so Kanto and Chubu require a
+one-time rebuild with the existing regional PBFs. Valhalla does not require regeneration.
+
+WSL needs JDK 21+ (`javac` and `javap`) in addition to the existing Docker/Python tools.
+`build-road-profile.sh` compiles against the exact pinned container classes; its dependency
+cache and compiled output stay in `build/`. Do not substitute a different Planetiler image
+without updating and validating both compilation and execution together. Generate the two
+regions sequentially because the existing runtime temporary directory is shared:
+
+```bash
+bash tools/basemap/test-road-profile.sh
+BUSNAV_FORCE_REGENERATE=1 bash tools/basemap/generate-region-tiles.sh kanto
+BUSNAV_FORCE_REGENERATE=1 bash tools/basemap/generate-region-tiles.sh chubu
+bash tools/basemap/start-tileserver.sh
+python3 tools/basemap/audit-road-properties.py ~/.local/share/busnav/basemap/kanto.mbtiles
+docker exec -i busnav-tileserver node < tools/basemap/validate-road-style.cjs
+```
+
+Generation writes a pending MBTiles file and validates it before replacement. A running
+TileServer retains its old SQLite handle until restarted, so finish both rebuilds, then run
+start-tileserver.sh. Large artifacts remain outside Git. The original relation fields and
+OMT schema version stay intact. Android-owned vector images are registered at runtime;
+TileServer does not serve a per-route-number sprite. See [road visual language](../japanese-road-visual-language.md)
+and [Review014a](../reviews/014a-japanese-road-map-style.md).

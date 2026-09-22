@@ -212,6 +212,7 @@ class MapController(
 
     private fun installOverlays(loadedStyle: Style) {
         runCatching {
+            mapView?.context?.let { JapaneseRoadShields.install(it, loadedStyle) }
             routeOverlay.setRoute(latestRoute)
             routeOverlay.install(loadedStyle)
             detourOverlay.install(loadedStyle)

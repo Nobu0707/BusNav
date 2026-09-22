@@ -120,3 +120,13 @@ live smokeは現在の実道路タイルに合成位置と注入Clockを使い�
 ## Phase008.5D activation
 
 navigationActive の source は isNavigationStarted と activeRoute の存在です。saved ID の null/non-null や maneuvers の有無から activation を推測しません。FREE preview・再計算 preview・editor・library は LIGHT、明示開始後の案内画面のみ夜間/トンネル条件で DARK に切り替わります。
+
+## Phase010.5A — Road presentation update
+
+The prior statement that no MBTiles rebuild is needed applies to the Phase008.5A theme-only
+change. Phase010.5A enriches transportation layers and requires rebuilding Kanto/Chubu once.
+Both themes now use safe route-network blue/red/green road colors, neutral unknown roads,
+and original Japanese route shields with dynamic white numbers. Road width hierarchy and
+casing remain unchanged. Route/traffic/vehicle overlays retain their existing ordering.
+See [Japanese road visual language](japanese-road-visual-language.md) and
+[Review014a](reviews/014a-japanese-road-map-style.md) for classification, density and evidence.
