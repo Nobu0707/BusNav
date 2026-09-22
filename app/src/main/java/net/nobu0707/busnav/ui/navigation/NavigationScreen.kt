@@ -120,6 +120,7 @@ fun NavigationRoute(
     val orientation by orientationFlow.collectAsState(null)
     val preferenceScope = androidx.compose.runtime.rememberCoroutineScope()
     val uiState by stateHolder.uiState.collectAsState()
+    SideEffect { if (!uiState.isNavigationStarted) navigationViewModel.hasNavigationCamera = false }
     val freeHolder = viewModel { FreeNavigationViewModel(routingEngine, stateHolder) }.holder
     val freeState by freeHolder.state.collectAsState()
     val trafficHolder = viewModel { TrafficViewModel(stateHolder) }.holder
@@ -337,6 +338,8 @@ fun NavigationRoute(
                         ),
                         onToggleOrientation = if (orientation == null || showTraffic || showConnections) null else ({ preferenceScope.launch { mapPreferences.toggleOrientation() }; Unit }),
                         initialCamera = if (uiState.isNavigationStarted) navigationViewModel.camera else routePlanHolder.camera?.copy(bearing = 0.0, tilt = 0.0),
+                        initialNavigationCamera = navigationViewModel.hasNavigationCamera,
+                        onNavigationCameraInitialized = { navigationViewModel.hasNavigationCamera = true },
                         onCameraChanged = {
                             if (uiState.isNavigationStarted) navigationViewModel.camera = it
                             else routePlanHolder.saveCamera(it.copy(bearing = 0.0, tilt = 0.0))

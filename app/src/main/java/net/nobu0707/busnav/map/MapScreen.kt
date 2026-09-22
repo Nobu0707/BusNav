@@ -61,6 +61,8 @@ fun MapScreen(
     navigationCamera: net.nobu0707.busnav.domain.navigation.NavigationCameraState = net.nobu0707.busnav.domain.navigation.NavigationCameraState(),
     onToggleOrientation: (() -> Unit)? = null,
     initialCamera: EditorCamera? = null,
+    initialNavigationCamera: Boolean = navigationCamera.active && initialCamera != null,
+    onNavigationCameraInitialized: () -> Unit = {},
     onCameraChanged: (EditorCamera) -> Unit = {},
     editorCameraRequest: EditorCameraRequest? = null,
     editorBottomPadding: Int? = null,
@@ -93,9 +95,12 @@ fun MapScreen(
     }
     var cameraBearing by remember { mutableStateOf(initialCamera?.bearing ?: 0.0) }
     val cameraCallback by androidx.compose.runtime.rememberUpdatedState(onCameraChanged)
+    val initializedCallback by androidx.compose.runtime.rememberUpdatedState(onNavigationCameraInitialized)
     val controller = remember(mapView, routePaddingPx) {
         MapController(
             initialCamera = initialCamera,
+            initialNavigationCamera = initialNavigationCamera,
+            onNavigationCameraInitialized = { initializedCallback() },
             onCameraChanged = { camera -> cameraBearing = camera.bearing; cameraCallback(camera) },
             onReady = onMapReady,
             onGesture = onMapGesture,

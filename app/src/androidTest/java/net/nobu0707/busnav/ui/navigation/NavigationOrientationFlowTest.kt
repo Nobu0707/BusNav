@@ -61,6 +61,14 @@ class NavigationOrientationFlowTest {
             }
             rule.waitUntil(15_000) { rule.onAllNodesWithTag("navigation_compass").fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithContentDescription("地図表示：進行方向が上。タップで北を上にする").assertIsDisplayed()
+            fun awaitNavigationZoom() = rule.waitUntil(15_000) {
+                var centered = false
+                rule.runOnUiThread { findMap(rule.activity.window.decorView)?.getMapAsync {
+                    centered = kotlin.math.abs(it.cameraPosition.zoom - 16.5) < 0.01
+                } }
+                centered
+            }
+            awaitNavigationZoom()
             for (orientation in listOf(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)) {
                 rule.runOnUiThread { rule.activity.requestedOrientation = orientation }
                 val expected = if (orientation == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) Configuration.ORIENTATION_PORTRAIT else Configuration.ORIENTATION_LANDSCAPE
@@ -68,6 +76,7 @@ class NavigationOrientationFlowTest {
                 rule.runOnUiThread { content() }
                 rule.waitUntil(15_000) { rule.onAllNodesWithTag("navigation_compass").fetchSemanticsNodes().isNotEmpty() }
                 rule.onNodeWithTag("navigation_compass").assertIsDisplayed()
+                awaitNavigationZoom()
                 val compass = rule.onNodeWithTag("navigation_compass").fetchSemanticsNode().boundsInRoot
                 val map = rule.onNodeWithTag(NavigationTestTags.MAP).fetchSemanticsNode().boundsInRoot
                 assertTrue(map.contains(compass.center))

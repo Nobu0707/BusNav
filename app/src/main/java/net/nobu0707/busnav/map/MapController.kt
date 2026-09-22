@@ -51,6 +51,8 @@ class MapController(
     mapDiagnostics: MapDiagnostics,
     onBasemapStateChanged: (BasemapState) -> Unit,
     private val initialCamera: EditorCamera? = null,
+    private val initialNavigationCamera: Boolean = false,
+    private val onNavigationCameraInitialized: () -> Unit = {},
     private val onCameraChanged: (EditorCamera) -> Unit = {},
 ) {
     private var map: MapLibreMap? = null
@@ -58,6 +60,7 @@ class MapController(
     private var style: Style? = null
     private var latestLocation: LocationState? = null
     private var navigationCamera = NavigationCameraState()
+    private var navigationInitialized = initialNavigationCamera
     private val headingConfig = NavigationHeadingConfig()
     private val headingFreshness = NavigationHeadingResolver(headingConfig)
     private var gestureSuspended = false
@@ -299,6 +302,7 @@ class MapController(
         cameraState: NavigationCameraState = NavigationCameraState()) {
         val previous = navigationCamera
         navigationCamera = cameraState.copy(following = isFollowing)
+        if (!cameraState.active) navigationInitialized = false
         val recenter = recenterRequestId != lastRecenterRequestId
         if (recenter || (!previous.following && isFollowing)) gestureSuspended = false
         val fresh = !cameraState.active || headingFreshness.isFresh(location, android.os.SystemClock.elapsedRealtime())
@@ -312,19 +316,27 @@ class MapController(
         if (!isFollowing || gestureSuspended) return
         val changed = location.timestampMillis != lastFollowedTimestampMillis ||
             location.elapsedRealtimeMillis != lastFollowedElapsedMillis
-        if (!hasCenteredOnFirstLocation || recenter || changed || previous != navigationCamera) {
+        val initialNavigationFollow = navigationCamera.active && !navigationInitialized
+        if (initialNavigationFollow || !hasCenteredOnFirstLocation || recenter || changed || previous != navigationCamera) {
             val camera = native.cameraPosition
             val next = CameraPosition.Builder(camera)
                 .target(location.point.toLatLng())
                 .bearing(if (previous.active && !navigationCamera.active) 0.0 else navigationCamera.targetBearing(camera.bearing))
                 .tilt(0.0)
-                .zoom(if (!hasCenteredOnFirstLocation && initialCamera == null) FOLLOW_ZOOM else camera.zoom)
+                .zoom(if (initialNavigationFollow || (!hasCenteredOnFirstLocation && initialCamera == null)) FOLLOW_ZOOM else camera.zoom)
                 .build()
             val interval = location.elapsedRealtimeMillis?.let { time -> lastFollowedElapsedMillis?.let { time - it } }
             val duration = interval?.takeIf { it > 0 }?.coerceIn(80, headingConfig.animationDurationMillis.toLong())?.toInt()
                 ?: headingConfig.animationDurationMillis
             native.cancelTransitions()
-            native.easeCamera(CameraUpdateFactory.newCameraPosition(next), duration)
+            // Establish the first navigation zoom atomically, so recreation cannot save an
+            // intermediate overview zoom. Subsequent bearing/follow updates remain animated.
+            if (initialNavigationFollow) native.moveCamera(CameraUpdateFactory.newCameraPosition(next))
+            else native.easeCamera(CameraUpdateFactory.newCameraPosition(next), duration)
+            if (navigationCamera.active) {
+                navigationInitialized = true
+                onNavigationCameraInitialized()
+            }
             hasCenteredOnFirstLocation = true
             lastRecenterRequestId = recenterRequestId
             lastFollowedTimestampMillis = location.timestampMillis
