@@ -10,7 +10,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import net.nobu0707.busnav.domain.model.GeoPoint
@@ -70,15 +69,12 @@ class JapaneseRoadPresentationTest {
         Thread.sleep(1200)
     }
     private fun screenshot(name: String) {
-        val done = AtomicBoolean(false)
-        rule.runOnUiThread {
-            native.snapshot { bitmap ->
-                val folder = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "road-style").apply { mkdirs() }
-                File(folder, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                done.set(true)
-            }
-        }
-        rule.waitUntil(10_000) { done.get() }
+        // Capture displayed pixels: Vulkan framebuffer readback can crash on the x86 emulator.
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val bitmap = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+        val folder = File(instrumentation.targetContext.getExternalFilesDir(null), "road-style").apply { mkdirs() }
+        File(folder, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
     }
     @Test fun liveKantoZoomThemeMatrixAndChubuRegression() {
         val config = start()

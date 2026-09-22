@@ -10,7 +10,6 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.*
 import net.nobu0707.busnav.domain.model.GeoPoint
 import net.nobu0707.busnav.domain.navigation.*
@@ -94,11 +93,14 @@ class NavigationCameraTest {
         }
     }
     private fun snapshot(name: String): Bitmap {
-        val result = AtomicReference<Bitmap>()
-        rule.runOnUiThread { native.snapshot { result.set(it) } }
-        rule.waitUntil(10_000) { result.get() != null }
-        val bitmap = result.get()
-        val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "navigation-camera").apply { mkdirs() }
+        rule.waitForIdle()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val screen = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+        val bounds = IntArray(2)
+        var width = 0; var height = 0
+        rule.runOnUiThread { view.getLocationOnScreen(bounds); width = view.width; height = view.height }
+        val bitmap = Bitmap.createBitmap(screen, bounds[0], bounds[1], width, height)
+        val dir = File(instrumentation.targetContext.getExternalFilesDir(null), "navigation-camera").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         return bitmap
     }
