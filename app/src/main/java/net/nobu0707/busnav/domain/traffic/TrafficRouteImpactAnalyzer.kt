@@ -154,7 +154,7 @@ class TrafficRouteImpactAnalyzer(
 
     companion object {
         val impactOrder = compareByDescending<TrafficRouteImpact> { it.level.ordinal }
-            .thenByDescending { it.highwayDecisionLabel != null }.thenBy { it.distanceAheadMeters ?: Double.MAX_VALUE }
+            .thenBy { it.distanceAheadMeters ?: Double.MAX_VALUE }.thenByDescending { it.highwayDecisionLabel != null }
         fun level(kind: TrafficEventKind) = when (kind) {
             TrafficEventKind.ROAD_CLOSURE, TrafficEventKind.ENTRY_CLOSURE, TrafficEventKind.EXIT_CLOSURE, TrafficEventKind.WINTER_CLOSURE -> TrafficImpactLevel.BLOCKING
             TrafficEventKind.LANE_RESTRICTION, TrafficEventKind.SPEED_RESTRICTION, TrafficEventKind.ACCIDENT,

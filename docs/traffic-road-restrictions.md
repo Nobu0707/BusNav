@@ -87,7 +87,7 @@ unreliable positioning suppresses distance-ahead claims instead of treating the 
 | Congestion | DELAY |
 | Weather, disaster, unknown | INFORMATION, not an inferred closure |
 
-The list sorts BLOCKING, RESTRICTION, DELAY, INFORMATION, then applicable highway decision and distance.
+The list sorts BLOCKING, RESTRICTION, DELAY, INFORMATION, then distance. Applicable highway decisions break distance ties and receive a separate badge.
 Primary alerts select forward events, then current or uncertain nearby information; behind events
 remain in the panel. LOW/AMBIGUOUS wording says “経路付近”. Event severity is shown through its kind
 and impact policy, not used to invent a recommended route. Exact road-link / OSM edge mapping is absent.
