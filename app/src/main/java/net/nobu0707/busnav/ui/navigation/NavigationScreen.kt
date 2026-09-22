@@ -694,7 +694,7 @@ private fun LandscapeNavigationLayout(
             PlaceholderPanel(
                 title = if (uiState.navigationMode == NavigationMode.FREE) "現在地からナビ" else if (onOpenLibrary != null) "所定経路 • 一覧・保存" else "運行情報",
                 detail = operationsSummary(uiState, hasRoutePlan),
-                modifier = Modifier.fillMaxWidth().weight(1f).testTag(NavigationTestTags.OPERATIONS)
+                modifier = Modifier.fillMaxWidth().height(80.dp).testTag(NavigationTestTags.OPERATIONS)
                 .then(if (onOpenLibrary != null) Modifier.clickable(onClick = onOpenLibrary).semantics { contentDescription = "所定経路一覧を開く" } else Modifier),
             )
         }
