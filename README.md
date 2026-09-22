@@ -135,3 +135,9 @@ Phase010ではVICS・交通情報・道路規制sourceをDetourReason / DetourDr
 「ルート」→「現在地からナビ」で地図中央から目的地を選び、大型車条件で計算・プレビュー後に「案内開始」できます。一般道・高速案内、手動再計算、到着確認と明示終了に対応します。FREE は保存経路と分離し、OFF_ROUTE で自動再計算しません。
 
 設計・操作: [Free Navigation](docs/free-navigation.md)。検証: [Review011d](docs/reviews/011d-free-navigation.md)。PRESCRIBED専用detour/rejoinとは分離しています。
+
+## Phase010: traffic / road restrictions
+
+[交通情報・道路規制基盤](docs/traffic-road-restrictions.md) を追加しました。下部「規制」から情報源・鮮度・経路影響を確認し、PRESCRIBED では明示的に迂回を検討できます。規制区間を通る高信頼な迂回候補は適用を拒否します。自動再探索は行いません。
+
+**VICS/JARTIC live feed 未接続（NOT CONFIGURED）**。Release は NoOp、Debug の「開発用交通情報」は合成 fixture です。実データの scraping や非公式 API は使用していません。[Review013](docs/reviews/013-traffic-road-restrictions.md) を参照してください。

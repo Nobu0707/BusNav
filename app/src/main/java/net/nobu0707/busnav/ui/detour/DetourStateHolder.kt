@@ -3,6 +3,7 @@ package net.nobu0707.busnav.ui.detour
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import net.nobu0707.busnav.domain.detour.*
+import net.nobu0707.busnav.domain.traffic.*
 import net.nobu0707.busnav.domain.model.GeoPoint
 import net.nobu0707.busnav.domain.navigation.RouteDeviationState
 import net.nobu0707.busnav.domain.prescribed.NavigationMode
@@ -16,6 +17,8 @@ import java.util.UUID
 
 enum class DetourMapMode { NONE, REJOIN, VIA, SHAPING }
 data class DetourUiState(
+    val trafficContext: TrafficDetourContext? = null,
+    val trafficValidation: TrafficDetourValidation? = null,
     val stage: DetourSessionState = DetourSessionState.IDLE,
     val candidates: List<RejoinTarget> = emptyList(),
     val target: RejoinTarget? = null,
@@ -41,9 +44,12 @@ class DetourStateHolder(
     val config: DetourConfig = DetourConfig(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val diagnostics: (String) -> Unit = {},
+    private val trafficSnapshot: () -> TrafficSnapshot = { TrafficSnapshot(NoOpTrafficInformationProvider().source, TrafficProviderStatus.NOT_CONFIGURED) },
+    private val epochMillis: () -> Long = System::currentTimeMillis,
+    private val trafficUpdates: StateFlow<net.nobu0707.busnav.ui.traffic.TrafficUiState>? = null,
 ) {
     private data class Session(val token: Long, val id: String, val route: ScheduledRoute,
-        val profile: VehicleProfile, val anchor: Double, val reason: DetourReason)
+        val profile: VehicleProfile, val anchor: Double, val reason: DetourReason, val trafficContext: TrafficDetourContext?)
     private val _state = MutableStateFlow(DetourUiState())
     val state = _state.asStateFlow()
     private val calculation = RouteCalculationStateHolder(engine, scope)
@@ -57,6 +63,19 @@ class DetourStateHolder(
         private set
 
     init {
+        scope.launch {
+            trafficUpdates?.collect {
+                val candidate = _state.value.candidate
+                if (candidate != null && _state.value.stage == DetourSessionState.PREVIEW) {
+                    val validation = withContext(dispatcher) { TrafficDetourValidator().validate(candidate.route, trafficSnapshot(), epochMillis()) }
+                    if (_state.value.candidate === candidate) {
+                        if (_state.value.trafficValidation?.conflict != validation.conflict && validation.conflict != TrafficDetourConflict.NONE)
+                            diagnostics("traffic.detour.conflict")
+                        _state.value = _state.value.copy(trafficValidation = validation)
+                    }
+                }
+            }
+        }
         scope.launch {
             navigation.uiState.collect { nav ->
                 if (session != null && !sessionCurrent()) {
@@ -80,8 +99,12 @@ class DetourStateHolder(
                 when (result) {
                     is RouteCalculationState.Success -> if (result.planRevision == revision) {
                         val candidate = DetourCandidate(UUID.randomUUID().toString(), requireNotNull(draft), result.route, result.summary)
+                        val validation = withContext(dispatcher) { TrafficDetourValidator().validate(candidate.route, trafficSnapshot(), epochMillis()) }
+                        if (result.planRevision != revision || !sessionCurrent()) return@collect
                         _state.value = _state.value.copy(stage = DetourSessionState.PREVIEW, candidate = candidate,
+                            trafficValidation = validation,
                             cameraRequest = EditorCameraRequest(revision, result.route.geometry.points))
+                        if (validation.conflict != TrafficDetourConflict.NONE) diagnostics("traffic.detour.conflict")
                         diagnostics("detour.preview.ready")
                     }
                     is RouteCalculationState.Failure -> if (result.planRevision == revision) {
@@ -121,7 +144,7 @@ class DetourStateHolder(
         return true
     }
 
-    fun begin(reason: DetourReason? = null): Boolean {
+    fun begin(reason: DetourReason? = null, trafficContext: TrafficDetourContext? = null): Boolean {
         val nav = navigation.uiState.value
         if (!nav.navigationActive || nav.navigationMode != NavigationMode.PRESCRIBED ||
             nav.activePrescribedRouteId == null || nav.prescribedRouteSnapshot == null || nav.prescribedVehicleProfile == null) return false
@@ -136,14 +159,16 @@ class DetourStateHolder(
         invalidate()
         val current = Session(nav.prescribedSessionToken, nav.activePrescribedRouteId, nav.prescribedRouteSnapshot,
             nav.prescribedVehicleProfile, requireNotNull(anchor).progressMeters,
-            reason ?: if (nav.deviationSnapshot.state == RouteDeviationState.OFF_ROUTE) DetourReason.OFF_ROUTE_RECOVERY else DetourReason.MANUAL)
+            reason ?: if (nav.deviationSnapshot.state == RouteDeviationState.OFF_ROUTE) DetourReason.OFF_ROUTE_RECOVERY else DetourReason.MANUAL, trafficContext)
         session = current
         generator = null
         val request = revision
         _state.value = DetourUiState(stage = DetourSessionState.SELECTING_REJOIN, preparing = true,
+            trafficContext = trafficContext,
             anchorProgressMeters = current.anchor, vehicleProfile = current.profile)
         prepareJob = scope.launch {
-            val prepared = withContext(dispatcher) { RejoinCandidateGenerator(current.route, current.anchor, config) }
+            val prepared = withContext(dispatcher) { RejoinCandidateGenerator(current.route, current.anchor, config,
+                minimumSafeRejoinProgress = trafficContext?.minimumSafeRejoinProgress) }
             if (revision != request || !sessionCurrent()) return@launch
             generator = prepared
             val candidates = prepared.generate()
@@ -217,7 +242,7 @@ class DetourStateHolder(
         if (problem != null) { _state.value = _state.value.copy(error = problem); return false }
         invalidate()
         // Raw GPS is sampled at the explicit calculate action, never taken from a projection.
-        draft = DetourDraft(s.id, s.reason, requireNotNull(navigation.uiState.value.location).point, s.anchor, target, _state.value.points.toList())
+        draft = DetourDraft(s.id, s.reason, requireNotNull(navigation.uiState.value.location).point, s.anchor, target, _state.value.points.toList(), s.trafficContext)
         _state.value = _state.value.copy(stage = DetourSessionState.CALCULATING, candidate = null, error = null, mapMode = DetourMapMode.NONE)
         val accepted = calculation.calculate(requireNotNull(draft).toRoutePlan("detour-" + UUID.randomUUID()), revision, s.profile)
         if (!accepted) _state.value = _state.value.copy(stage = DetourSessionState.FAILED, error = "復帰地点と経由地を確認してください")
@@ -228,6 +253,13 @@ class DetourStateHolder(
         if (_state.value.stage != DetourSessionState.PREVIEW || !editable()) return false
         locationProblem()?.let { _state.value = _state.value.copy(error = it); return false }
         val candidate = _state.value.candidate ?: return false
+        val validation = TrafficDetourValidator().validate(candidate.route, trafficSnapshot(), epochMillis())
+        _state.value = _state.value.copy(trafficValidation = validation)
+        if (!validation.activationAllowed) {
+            diagnostics("traffic.detour.conflict")
+            _state.value = _state.value.copy(error = validation.message)
+            return false
+        }
         if (!navigation.activateDetour(candidate, requireNotNull(session).token, config.rejoin)) return false
         invalidate()
         _state.value = _state.value.copy(stage = DetourSessionState.ACTIVE, mapMode = DetourMapMode.NONE, cameraRequest = null)

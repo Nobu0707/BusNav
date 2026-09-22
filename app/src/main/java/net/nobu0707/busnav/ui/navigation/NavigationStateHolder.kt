@@ -256,6 +256,8 @@ class NavigationStateHolder(
         emitTransitions()
         val state = _uiState.value
         _uiState.value = state.copy(
+            trafficProgressMeters = null,
+            trafficHighwayDecisionProgressMeters = null,
             guidance = if (!state.navigationActive) GuidanceUiState() else GuidanceUiState(GuidanceStatus.WAITING_LOCATION, "位置情報を確認中"),
             highwayGuidance = null,
             deviation = if (!state.navigationActive) DeviationUiState() else deviationUiState(deviation, state.navigationMode, state.activeDetour != null),
@@ -283,7 +285,9 @@ class NavigationStateHolder(
         val rejoinMatching = prescribedMatcher.takeIf { state.activeDetour != null }
         val rejoinBefore = rejoinMatcherState
         val rejoinEvidence = state.rejoin
-        val rejoinFloor = state.activeDetour?.candidate?.draft?.anchorProgressMeters?.plus(rejoinDetector.config.minimumForwardMeters)
+        val rejoinFloor = state.activeDetour?.candidate?.draft?.let { draft -> maxOf(
+            draft.anchorProgressMeters + rejoinDetector.config.minimumForwardMeters,
+            draft.trafficContext?.minimumSafeRejoinProgress ?: 0.0) }
         guidanceJob = scope.launch {
             val (result, rejoinResult) = withContext(computationDispatcher) {
                 matching.match(location, previous, elapsedMillis()) to
@@ -335,7 +339,8 @@ class NavigationStateHolder(
                     progress.isProjectionReliable, elapsedMillis())
             } ?: ArrivalSnapshot()
             emitTransitions()
-            _uiState.value = _uiState.value.copy(guidance = display, highwayGuidance = HighwayInstructionFormatter.format(highway),
+            _uiState.value = _uiState.value.copy(trafficHighwayDecisionProgressMeters = highway.currentDecision?.distanceAlongRouteMeters.takeIf { highway.isReliable },
+                trafficProgressMeters = progress.distanceAlongRouteMeters.takeIf { progress.isProjectionReliable && match.quality == RouteMatchQuality.MATCHED }, guidance = display, highwayGuidance = HighwayInstructionFormatter.format(highway),
                 deviation = deviationUiState(deviation, state.navigationMode, state.activeDetour != null), deviationSnapshot = deviation, arrival = arrival)
         }
     }

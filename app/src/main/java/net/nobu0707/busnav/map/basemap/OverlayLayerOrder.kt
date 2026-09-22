@@ -20,6 +20,9 @@ object OverlayLayerOrder {
     const val DETOUR_CASING = "busnav-detour-casing"
     const val DETOUR_LINE = "busnav-detour-line"
     const val DETOUR_MARKERS = "busnav-detour-markers"
+    const val TRAFFIC_AREA = "busnav-traffic-area"
+    const val TRAFFIC_LINE = "busnav-traffic-line"
+    const val TRAFFIC_MARKER = "busnav-traffic-marker"
     const val VEHICLE = "busnav-vehicle-layer"
 
     val orderedLayerIds = listOf(
@@ -33,6 +36,9 @@ object OverlayLayerOrder {
         DETOUR_CASING,
         DETOUR_LINE,
         DETOUR_MARKERS,
+        TRAFFIC_AREA,
+        TRAFFIC_LINE,
+        TRAFFIC_MARKER,
         PLAN_PREVIEW,
         START,
         VIA,

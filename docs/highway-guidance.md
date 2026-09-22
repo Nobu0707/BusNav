@@ -53,3 +53,7 @@ unit tests は数値 enum、実 highway fixture、抽出、施設名、標識、
 ## Phase008による信頼性gate
 
 RouteMatcherのAMBIGUOUS/UNRELIABLE、または逸脱状態がON_ROUTE以外ならHighwayGuidanceCalculatorへ非RELIABLEを渡します。sign、距離、方向、模式図の確信表示を抑制し、逸脱/位置確認bannerを優先します。元routeとdecision cacheは維持し、復帰確認後に通常の案内を再開します。route差替え時だけcacheを再構築。lane推定、auto rerouteは追加していません。[matching設計](map-matching-deviation.md)。
+
+## Phase010 restrictions near highway guidance
+
+現在の次 decision の progress と交通影響範囲が重なり、道路識別・方向の信頼度が高い場合、案内付近に分岐・出入口の規制警告を表示します。入口/出口閉鎖を距離だけで断定せず、既存の案内方向や schematic は変更しません。[判定方針](traffic-road-restrictions.md)。

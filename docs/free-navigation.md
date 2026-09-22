@@ -90,3 +90,7 @@ live 関東試験は東京駅付近→上野駅付近の公共地点を使用し
 Phase009のdetour/rejoinとspeed lockはPRESCRIBED専用です。FREEでは「迂回」は無効で、既存の明示的な再計算・preview/start/arrival/endを維持します。FREE開始時にはprescribedRouteSnapshot / prescribedVehicleProfile / activePrescribedRouteIdを消去します。[境界の詳細](detour-rejoin.md)。
 FREE 自動 reroute、VIA 編集、FREE の自動保存、process-death 自動復元は対象外です。
 将来の FREE 自動 reroute は専用 lifecycle・頻度制限・品質/応答世代検証と利用者への通知を設計し、PRESCRIBED detour policy と分離します。
+
+## Phase010 traffic display
+
+FREE も規制パネル・地図 overlay・経路警告を表示します。受信だけで再計算せず、PRESCRIBED 専用の交通迂回開始を提供しません。既存の手動再計算は維持しますが、交通規制の回避や渋滞を考慮した最速経路を保証しません。交通情報で route duration / Valhalla cost を変更しません。[交通情報基盤](traffic-road-restrictions.md)。

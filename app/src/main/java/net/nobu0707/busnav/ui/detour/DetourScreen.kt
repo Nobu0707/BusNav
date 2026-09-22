@@ -31,6 +31,11 @@ fun DetourScreen(state: DetourUiState, onCancel: () -> Unit, onTarget: (String) 
                 Text("水色：所定経路 / 太い紫線：迂回経路", style = MaterialTheme.typography.bodySmall)
                 if (state.locked) Text(DetourStateHolder.SAFETY_MESSAGE, color = MaterialTheme.colorScheme.error)
                 state.error?.let { Text(it, Modifier.testTag("detour_error"), color = MaterialTheme.colorScheme.error) }
+                state.trafficContext?.let { context ->
+                    Text(if (context.minimumSafeRejoinProgress == null) "規制の終端は未確認です。現地情報を確認して復帰地点を選択してください。"
+                        else "規制区間の終端と安全余裕より先に復帰します。", style = MaterialTheme.typography.bodySmall)
+                }
+                if (preview) state.trafficValidation?.message?.let { Text(it, Modifier.testTag("traffic_detour_validation"), color = MaterialTheme.colorScheme.error) }
                 if (state.preparing) LinearProgressIndicator(Modifier.fillMaxWidth())
                 if (choosing) {
                     if (!state.preparing && state.candidates.isEmpty()) Text("安全な自動候補がありません。地図で復帰地点を選択してください。")
@@ -59,7 +64,7 @@ fun DetourScreen(state: DetourUiState, onCancel: () -> Unit, onTarget: (String) 
                     TextButton(onClick = onEdit, enabled = enabled) { Text("編集に戻る") }
                 } else if (!choosing && state.stage != DetourSessionState.CALCULATING) {
                     TextButton(onClick = { onMapMode(DetourMapMode.REJOIN) }, enabled = enabled) { Text("復帰地点を変更") }
-                    Text("通行止め情報は未反映です。必要に応じて別の道路に経由地を置いてください。", style = MaterialTheme.typography.bodySmall)
+                    Text("経路計算は交通規制を自動回避しません。必要に応じて別の道路に経由地を置いてください。", style = MaterialTheme.typography.bodySmall)
                     Row {
                         TextButton(onClick = { onMapMode(DetourMapMode.VIA) }, enabled = enabled, modifier = Modifier.testTag("detour_via")) { Text("経由地を追加") }
                         TextButton(onClick = { onMapMode(DetourMapMode.SHAPING) }, enabled = enabled, modifier = Modifier.testTag("detour_shaping")) { Text("通過指定を追加") }
@@ -86,7 +91,7 @@ fun DetourScreen(state: DetourUiState, onCancel: () -> Unit, onTarget: (String) 
                     Text(if (state.mapMode == DetourMapMode.REJOIN) "復帰地点に設定" else "この地点を追加")
                 }
             } else if (preview) {
-                Button(onClick = onActivate, enabled = enabled, modifier = Modifier.fillMaxWidth().testTag("detour_activate")) { Text("この迂回経路を使用") }
+                Button(onClick = onActivate, enabled = enabled && state.trafficValidation?.activationAllowed != false, modifier = Modifier.fillMaxWidth().testTag("detour_activate")) { Text("この迂回経路を使用") }
             } else if (!choosing && state.stage != DetourSessionState.CALCULATING) {
                 Button(onClick = onCalculate, enabled = enabled && state.target != null, modifier = Modifier.testTag("detour_calculate")) { Text("迂回経路を計算") }
             }

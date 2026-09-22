@@ -194,3 +194,7 @@ RouteCalculationViewModelは探索・candidateをActivity再生成をまたい�
 [Free Navigation](free-navigation.md) を追加。FreeNavigationPlan / FreeNavigationConfig / ArrivalDetector は純粋な domain、FreeNavigationStateHolder は既存 RouteCalculationStateHolder と共有 NavigationStateHolder を合成します。新しい GPS 購読と保存 repository 依存はありません。
 NavigationMode と isNavigationStarted が session の用途と開始状態を所有します。FREE 計算完了は previewFreeRoute、明示開始は startFreeNavigation、再計算採用は replaceFreeRoute。editor 候補適用は previewEditorCandidate として開始から分離しました。
 MapSelectionCursor を editor/FREE で共用し、MapSelectionMode で listener 寿命を制御します。経路置換は既存の index・案内・逸脱 reset を再利用し、arrival も reset します。
+
+## Phase010 traffic boundary
+
+`domain/traffic` owns provider-neutral event/geometry/status/freshness, route impact and candidate validation. `ui/traffic` observes foreground snapshots and cached geometry impacts; it has no RoutingEngine dependency. `TrafficOverlayController` reinstalls its retained data after style changes. Debug/release source-set factories isolate fixture implementation from production. Detour receives explicit reason/context and a known restriction-end floor; activation rechecks the latest snapshot. No traffic data is stored in prescribed Room records. See [traffic architecture](traffic-road-restrictions.md).

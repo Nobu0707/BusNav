@@ -51,6 +51,7 @@ fun MapScreen(
     modifier: Modifier = Modifier,
     routePlan: RoutePlan? = null,
     detourOverlay: DetourOverlayData = DetourOverlayData(),
+    trafficEvents: List<net.nobu0707.busnav.domain.traffic.TrafficEvent> = emptyList(),
     planOverviewRequestId: Int = 0,
     onMapLongPress: ((GeoPoint) -> Unit)? = null,
     basemapConfig: BasemapConfig = BasemapConfig.fromBuildValue(
@@ -174,6 +175,7 @@ fun MapScreen(
         controller.update(location, isFollowingLocation, recenterRequestId)
         controller.updateRoute(activeRoute, routeOverviewRequestId)
         controller.updateDetour(detourOverlay)
+        controller.updateTraffic(trafficEvents)
         controller.updateRoutePlan(routePlan, planOverviewRequestId)
         controller.updateEditorCamera(editorCameraRequest, editorBottomPadding, onEditorCameraApplied)
     }

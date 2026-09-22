@@ -68,3 +68,7 @@ Reason: no physical device attached
 接続されたのは Pixel 8 AVD / Android 16 のみ。端末ID/serialは記録しない。
 
 現在の全国routing・両地域地図の手順と実機検証は [環境ガイド](japan-routing-and-regional-basemaps.md) と [Review011](../reviews/011-kanto-japan-routing-environment.md) を参照してください。
+
+## Phase010 traffic fixture
+
+Debug の「規制」パネル内 Developer tools で None / Debug fixture と各 scenario を選択します。CLOSURE / ENTRANCE / ACCIDENT / ROADWORK / CONGESTION / FUTURE / EXPIRED / PARALLEL / MIXED は公開の合成関東座標で、実GPS履歴を使いません。Release には fixture 実装・操作 UI を含めません。情報源ラベルは「開発用交通情報」で、VICS/JARTIC live feed は未接続です。端末試験は TrafficFlowTest と TrafficOverlayTest を含む全 connected tests を実行します。USB 端末では runtime URL と adb reverse を使用しても構いません。端末IDをレビューへ保存しないでください。[Review013](../reviews/013-traffic-road-restrictions.md)。

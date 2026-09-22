@@ -7,7 +7,7 @@ import net.nobu0707.busnav.domain.routeplan.*
 import net.nobu0707.busnav.domain.routing.RoutingSummary
 
 enum class PrescribedNavigationSubmode { NORMAL, DETOUR }
-enum class DetourReason { OFF_ROUTE_RECOVERY, MANUAL, ROAD_CLOSURE, OPERATIONS_INSTRUCTION, OTHER }
+enum class DetourReason { OFF_ROUTE_RECOVERY, MANUAL, ROAD_CLOSURE, TRAFFIC_INCIDENT, ROADWORK, OPERATIONS_INSTRUCTION, OTHER }
 enum class DetourSessionState { IDLE, SELECTING_REJOIN, EDITING, CALCULATING, PREVIEW, ACTIVE, REJOIN_PENDING, COMPLETED, FAILED }
 enum class RejoinTargetSource { AUTOMATIC_CANDIDATE, MANUAL }
 enum class DetourDraftPointType { VIA, SHAPING }
@@ -15,7 +15,8 @@ data class RejoinTarget(val id: String, val geometryIndex: Int, val progressMete
     val point: GeoPoint, val source: RejoinTargetSource)
 data class DetourDraftPoint(val id: String, val type: DetourDraftPointType, val position: GeoPoint)
 data class DetourDraft(val prescribedRouteId: String, val reason: DetourReason, val start: GeoPoint,
-    val anchorProgressMeters: Double, val rejoinTarget: RejoinTarget, val points: List<DetourDraftPoint>) {
+    val anchorProgressMeters: Double, val rejoinTarget: RejoinTarget, val points: List<DetourDraftPoint>,
+    val trafficContext: net.nobu0707.busnav.domain.traffic.TrafficDetourContext? = null) {
     fun toRoutePlan(id: String) = RoutePlan(id, "迂回経路", buildList {
         add(RoutePlanPoint("start", RoutePlanPointType.START, start, "現在地"))
         points.forEach { add(RoutePlanPoint(it.id, RoutePlanPointType.valueOf(it.type.name), it.position)) }

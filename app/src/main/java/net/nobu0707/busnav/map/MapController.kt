@@ -68,6 +68,7 @@ class MapController(
     private val routeOverlay = RouteOverlayController()
     private val routePlanOverlay = RoutePlanOverlayController()
     private val detourOverlay = DetourOverlayController()
+    private val trafficOverlay = TrafficOverlayController()
     private val basemapController = BasemapController(
         config = basemapConfig,
         diagnostics = mapDiagnostics,
@@ -214,6 +215,7 @@ class MapController(
             routeOverlay.setRoute(latestRoute)
             routeOverlay.install(loadedStyle)
             detourOverlay.install(loadedStyle)
+            trafficOverlay.install(loadedStyle)
             routePlanOverlay.setRoutePlan(latestRoutePlan)
             routePlanOverlay.install(loadedStyle)
             installVehicleLayer(loadedStyle)
@@ -258,6 +260,12 @@ class MapController(
             }
         }
         fitRouteIfRequested()
+    }
+
+    fun updateTraffic(events: List<net.nobu0707.busnav.domain.traffic.TrafficEvent>) {
+        if (trafficOverlay.events == events) return
+        trafficOverlay.events = events
+        style?.let { trafficOverlay.render(it) }
     }
 
     fun updateDetour(data: DetourOverlayData) {

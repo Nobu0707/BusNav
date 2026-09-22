@@ -117,3 +117,7 @@ landscapeでは列幅に合わせる。TextはmaxLines=1、softWrap=false、中�
 
 下部5項目を維持し、「ルート」は「現在地からナビ」「所定経路・一覧と保存」「経路編集」のメニューを開きます。active session 中に別画面の設定へ入る場合は「終了して続ける」の確認が必要です。
 FREE の地図中央カーソル・目的地設定・車両条件付き preview と「案内開始」は独立画面です。案内画面には「現在地から再計算」「案内終了」、到着確認時には「目的地周辺です」を表示します。詳細は [Free Navigation](../free-navigation.md)。
+
+## Phase010 規制操作
+
+単一行の下部「規制」を有効化し、情報源・受信時刻・鮮度・経路影響・周辺情報・予告規制を scrollable dialog で表示します。イベントを tap して有効期間・出典・一致の信頼度を確認できます。警告は記号 + 文章 + contentDescription を備え、前方の閉鎖は強調します。PRESCRIBED のみ「迂回を検討」から既存 planner へ進みます。地図は ×/工/!/≋ と破線/面で表現し、light/dark reload 後も維持します。[詳細](../traffic-road-restrictions.md)。

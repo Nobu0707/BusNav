@@ -1,6 +1,8 @@
 package net.nobu0707.busnav.ui.navigation
 
 import net.nobu0707.busnav.ui.free.*
+import net.nobu0707.busnav.ui.traffic.*
+import net.nobu0707.busnav.domain.traffic.*
 import net.nobu0707.busnav.ui.detour.*
 import net.nobu0707.busnav.domain.detour.*
 import net.nobu0707.busnav.map.DetourOverlayData
@@ -110,7 +112,10 @@ fun NavigationRoute(
     val uiState by stateHolder.uiState.collectAsState()
     val freeHolder = viewModel { FreeNavigationViewModel(routingEngine, stateHolder) }.holder
     val freeState by freeHolder.state.collectAsState()
-    val detourHolder = viewModel { DetourViewModel(routingEngine, stateHolder) }.holder
+    val trafficHolder = viewModel { TrafficViewModel(stateHolder) }.holder
+    val trafficState by trafficHolder.state.collectAsState()
+    var showTraffic by rememberSaveable { mutableStateOf(false) }
+    val detourHolder = viewModel { DetourViewModel(routingEngine, stateHolder, trafficHolder) }.holder
     val detourState by detourHolder.state.collectAsState()
     var detourCursorReader by remember { mutableStateOf<(() -> GeoPoint?)?>(null) }
     var freeCursorReader by remember { mutableStateOf<(() -> GeoPoint?)?>(null) }
@@ -146,6 +151,13 @@ fun NavigationRoute(
             kotlinx.coroutines.delay(4000)
             detourHolder.clearCompleted()
         } else if (detourState.stage == DetourSessionState.IDLE && screen == BusNavScreen.DETOUR) screen = BusNavScreen.NAVIGATION
+    }
+    fun considerTraffic(impact: TrafficRouteImpact) {
+        if (uiState.activeDetour != null || trafficState.route !== uiState.activeRoute) return
+        if (detourHolder.begin(impact.event.detourReason(), impact.detourContext())) {
+            showTraffic = false
+            screen = BusNavScreen.DETOUR
+        }
     }
     fun beginDetour() {
         if (detourHolder.begin()) screen = BusNavScreen.DETOUR
@@ -209,15 +221,17 @@ fun NavigationRoute(
     DisposableEffect(lifecycleOwner, stateHolder) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> stateHolder.startLocationUpdates()
-                Lifecycle.Event.ON_STOP -> stateHolder.stopLocationUpdates()
+                Lifecycle.Event.ON_START -> { stateHolder.startLocationUpdates(); trafficHolder.start() }
+                Lifecycle.Event.ON_STOP -> { stateHolder.stopLocationUpdates(); trafficHolder.stop() }
                 else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) trafficHolder.start()
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             stateHolder.stopLocationUpdates()
+            trafficHolder.stop()
         }
     }
 
@@ -249,6 +263,9 @@ fun NavigationRoute(
         }
     }
     BusNavTheme(darkTheme = dark) {
+        if (showTraffic) TrafficPanel(trafficState,
+            uiState.navigationActive && uiState.navigationMode == NavigationMode.PRESCRIBED && uiState.activeDetour == null,
+            ::considerTraffic, { showTraffic = false }, { TrafficDeveloperControls(trafficHolder.provider) })
         if (routeMenu) AlertDialog(onDismissRequest = { routeMenu = false },
             title = { Text("ルート") },
             text = { Column {
@@ -280,6 +297,7 @@ fun NavigationRoute(
             BusNavScreen.NAVIGATION -> NavigationScreen(
                 uiState = uiState,
                 hasRoutePlan = routePlanUiState.currentPlan.points.isNotEmpty(),
+                trafficState = trafficState, onTraffic = { showTraffic = true }, onConsiderTraffic = ::considerTraffic,
                 onOpenLibrary = library?.let { { requestScreen(BusNavScreen.LIBRARY) } },
                 onDetour = { beginDetour() },
                 onEndDetour = detourHolder::endDetour,
@@ -300,6 +318,7 @@ fun NavigationRoute(
                 onEditRoute = { routeMenu = true },
                 mapContent = { modifier ->
                     MapScreen(
+                        trafficEvents = trafficState.activeEvents,
                         initialCamera = routePlanHolder.camera,
                         onCameraChanged = routePlanHolder::saveCamera,
                         basemapConfig = basemapConfig.withTheme(dark),
@@ -334,6 +353,7 @@ fun NavigationRoute(
                 mapContent = { modifier ->
                     androidx.compose.runtime.key(detourState.stage == DetourSessionState.PREVIEW) {
                         MapScreen(
+                            trafficEvents = trafficState.activeEvents,
                             location = uiState.location, isFollowingLocation = false, recenterRequestId = 0,
                             activeRoute = uiState.prescribedRouteSnapshot, routeOverviewRequestId = 0,
                             detourOverlay = DetourOverlayData(detourState.candidate?.route ?: uiState.activeDetour?.candidate?.route,
@@ -367,6 +387,7 @@ fun NavigationRoute(
                     // The preview has different bounds from selection/calculation. Fit a laid-out preview viewport.
                     androidx.compose.runtime.key(freeState.stage == FreeNavigationStage.PREVIEW) {
                         MapScreen(
+                            trafficEvents = trafficState.activeEvents,
                             initialCamera = freeHolder.camera ?: uiState.location?.let { net.nobu0707.busnav.ui.routeplan.EditorCamera(it.point, 14.0) },
                             onCameraChanged = freeHolder::saveCamera,
                             basemapConfig = basemapConfig.withTheme(false),
@@ -477,6 +498,7 @@ fun NavigationRoute(
                 },
                 mapContent = { modifier ->
                     MapScreen(
+                        trafficEvents = trafficState.activeEvents,
                         initialCamera = routePlanHolder.camera,
                         onCameraChanged = routePlanHolder::saveCamera,
                         basemapConfig = basemapConfig.withTheme(dark),
@@ -539,6 +561,9 @@ fun NavigationScreen(
     onDetour: () -> Unit = {},
     onEndDetour: () -> Unit = {},
     detourMessage: String? = null,
+    trafficState: TrafficUiState = TrafficUiState(),
+    onTraffic: () -> Unit = {},
+    onConsiderTraffic: (TrafficRouteImpact) -> Unit = {},
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     BoxWithConstraints(
@@ -562,6 +587,7 @@ fun NavigationScreen(
                 onFreeRecalculate = onFreeRecalculate,
                 onEndNavigation = onEndNavigation,
                 onDetour = onDetour, onEndDetour = onEndDetour, detourMessage = detourMessage,
+                trafficState = trafficState, onTraffic = onTraffic, onConsiderTraffic = onConsiderTraffic,
                 mapContent = mapContent,
             )
             NavigationLayoutMode.LandscapeThreeColumn -> LandscapeNavigationLayout(
@@ -575,6 +601,7 @@ fun NavigationScreen(
                 onFreeRecalculate = onFreeRecalculate,
                 onEndNavigation = onEndNavigation,
                 onDetour = onDetour, onEndDetour = onEndDetour, detourMessage = detourMessage,
+                trafficState = trafficState, onTraffic = onTraffic, onConsiderTraffic = onConsiderTraffic,
                 mapContent = mapContent,
             )
         }
@@ -595,6 +622,9 @@ private fun PortraitNavigationLayout(
     onDetour: () -> Unit,
     onEndDetour: () -> Unit,
     detourMessage: String?,
+    trafficState: TrafficUiState,
+    onTraffic: () -> Unit,
+    onConsiderTraffic: (TrafficRouteImpact) -> Unit,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     Column(
@@ -604,6 +634,7 @@ private fun PortraitNavigationLayout(
         DeviationBanner(uiState.deviation)
         DetourNavigationActions(uiState, onDetour, onEndDetour, detourMessage)
         FreeNavigationActions(uiState, onFreeRecalculate, onEndNavigation)
+        TrafficAlert(trafficState, uiState.navigationActive && uiState.navigationMode == NavigationMode.PRESCRIBED && uiState.activeDetour == null, onConsiderTraffic, onTraffic)
         NavigationGuidanceCard(uiState, Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.35f).dp))
         MapArea(
             uiState = uiState,
@@ -621,6 +652,7 @@ private fun PortraitNavigationLayout(
         )
         AuxiliaryControls(
             onEditRoute = onEditRoute,
+            onTraffic = onTraffic,
             onDetour = onDetour, detourEnabled = uiState.navigationActive && uiState.navigationMode == NavigationMode.PRESCRIBED,
             modifier = Modifier.fillMaxWidth().height(72.dp).testTag(NavigationTestTags.AUXILIARY),
         )
@@ -641,6 +673,9 @@ private fun LandscapeNavigationLayout(
     onDetour: () -> Unit,
     onEndDetour: () -> Unit,
     detourMessage: String?,
+    trafficState: TrafficUiState,
+    onTraffic: () -> Unit,
+    onConsiderTraffic: (TrafficRouteImpact) -> Unit,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     Row(
@@ -654,6 +689,7 @@ private fun LandscapeNavigationLayout(
             DeviationBanner(uiState.deviation)
             DetourNavigationActions(uiState, onDetour, onEndDetour, detourMessage)
         FreeNavigationActions(uiState, onFreeRecalculate, onEndNavigation)
+            TrafficAlert(trafficState, uiState.navigationActive && uiState.navigationMode == NavigationMode.PRESCRIBED && uiState.activeDetour == null, onConsiderTraffic, onTraffic)
             NavigationGuidanceCard(uiState, Modifier.fillMaxWidth().weight(2f))
             PlaceholderPanel(
                 title = if (uiState.navigationMode == NavigationMode.FREE) "現在地からナビ" else if (onOpenLibrary != null) "所定経路 • 一覧・保存" else "運行情報",
@@ -672,6 +708,7 @@ private fun LandscapeNavigationLayout(
         )
         AuxiliaryControls(
             onEditRoute = onEditRoute,
+            onTraffic = onTraffic,
             onDetour = onDetour, detourEnabled = uiState.navigationActive && uiState.navigationMode == NavigationMode.PRESCRIBED,
             vertical = true,
             modifier = Modifier.fillMaxHeight().weight(0.18f).testTag(NavigationTestTags.AUXILIARY),
@@ -778,18 +815,19 @@ internal fun AuxiliaryControls(
     vertical: Boolean = false,
     onDetour: () -> Unit = {},
     detourEnabled: Boolean = false,
+    onTraffic: () -> Unit = {},
 ) {
     Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         if (vertical) {
             Column(Modifier.fillMaxSize().padding(4.dp), verticalArrangement = Arrangement.SpaceEvenly) {
                 BottomControl("ルート", true, onEditRoute, Modifier.fillMaxWidth())
-                BottomLabelLayout.secondaryLabels.forEach { BottomControl(it, it == "迂回" && detourEnabled, if (it == "迂回") onDetour else ({}), Modifier.fillMaxWidth()) }
+                BottomLabelLayout.secondaryLabels.forEach { BottomControl(it, it == "規制" || it == "迂回" && detourEnabled, if (it == "規制") onTraffic else if (it == "迂回") onDetour else ({}), Modifier.fillMaxWidth()) }
             }
         } else {
             Row(Modifier.fillMaxSize().padding(4.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 BottomControl("ルート", true, onEditRoute, Modifier.weight(1.5f))
-                BottomLabelLayout.secondaryLabels.forEach { BottomControl(it, it == "迂回" && detourEnabled, if (it == "迂回") onDetour else ({}), Modifier.weight(1f)) }
+                BottomLabelLayout.secondaryLabels.forEach { BottomControl(it, it == "規制" || it == "迂回" && detourEnabled, if (it == "規制") onTraffic else if (it == "迂回") onDetour else ({}), Modifier.weight(1f)) }
             }
         }
     }
