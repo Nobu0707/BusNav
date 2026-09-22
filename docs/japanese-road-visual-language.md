@@ -70,7 +70,7 @@ collision policy and theme parity. The profile integration test verifies both en
 layers and preservation of OMT `route_1_network`. The pinned TileServer's MapLibre style
 validator checks four regional/theme styles against actual source layers and attributes.
 Android instrumentation covers live Kanto zooms 8/10/12/14/16 in both themes, suburban
-and Chubu reloads, overlay order, and a synthetic nine-number fixture.
+and Chubu reloads, overlay order, rendered route/traffic symbols in both themes, and a synthetic nine-number fixture.
 
 Incomplete OSM relation coverage produces deliberately neutral gaps, including some
 segments with numeric refs. Unknown urban networks are not guessed. The chosen canonical

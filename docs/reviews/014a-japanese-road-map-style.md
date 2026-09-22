@@ -31,7 +31,7 @@ network classification from highway class. `audit-road-properties.py` reproduces
 Therefore **both Kanto and Chubu MBTiles were regenerated** from existing regional PBFs.
 Generated files stay in the external WSL basemap data directory. Japan Valhalla was not rebuilt.
 The final Kanto MBTiles is 277,340,160 bytes; Chubu is 302,845,952 bytes.
-Both pass SQLite quick_check and layer/format/bounds validation. Actual post-generation
+Both pass SQLite quick_check and layer/format/bounds validation. Additional Chubu audits cover Nagoya, Gifu, Shizuoka and Kofu; Kofu national 52/358/411 and prefectural 5 are explicitly classified, while unsupported bare refs remain neutral. Actual post-generation
 tiles have `route_network` and `route_ref` in both required layers and preserve OMT fields.
 
 Planetiler remains 0.10.2, git `0e5588c4a6e8c29a270a33afe8df62027d889604`, image digest
@@ -60,19 +60,19 @@ Navigation route casing and the existing OverlayLayerOrder are preserved.
 
 Build-local evidence directory: `build/phase0105a/` (not committed or source archived).
 
-* Unit/static: classifier + ref normalization + unknown/multi-ref + shield policy + colors/parity.
+* Unit/static: **362 PASS, 0 failures, 0 skipped** (356 existing + 6 added), covering classifier, normalization, unknown/multi-ref, shield policy and colors/parity.
 * Profile integration: actual OMT generation preserves standard fields and enriches both layers.
 * Style validation: official MapLibre validator in pinned TileServer; four styles and actual layer schema.
-* Build: test, lint, assembleDebug, assembleRelease, assembleDebugAndroidTest.
-* Android: JapaneseRoadPresentationTest and all prior Phase010 regression tests.
+* Build: test, lint, assembleDebug, assembleRelease, assembleDebugAndroidTest: **PASS**. Lint: **0 errors, 20 warnings, 1 hint**.
+* Android: JapaneseRoadPresentationTest and all prior Phase010 regression tests. Physical SOG06 / Android 14: **70 PASS, 0 failures, 0 skipped** on the implementation run. Pixel 8 AVD / Android 16: **70 PASS, 0 failures, 0 skipped**. Both full suites retain all Phase010 traffic/overlay regressions.
 * Live TileServer: Kanto/Chubu Light/Dark style, TileJSON, PBF and Japanese glyph smoke.
 
-Execution status will be finalized after the full device suite and archive checks.
+The final-head formal workflow reruns all Gradle checks and the complete physical-device suite. The emulator focused presentation run after adding explicit rendered assertions for all four traffic symbol kinds also passed: **2 PASS, 0 failures, 0 skipped**. Authoritative final-head checks are included in both review archives.
 
 ## Visual smoke
 
 Live Tokyo/Kanto screenshots cover zooms 8/10/12/14/16, light/dark; suburban Hachioji and
-Chubu are also captured. The synthetic source checks centered `1`, `12`, `246`, `E1`,
+Chubu are also captured. Route/traffic views in both themes verify the cyan route with its casing and visible closure, accident, roadwork and congestion symbols. The synthetic source checks centered `1`, `12`, `246`, `E1`,
 `E20`, `C4`, and prefectural `12`, `34`, `300`. Its line-center placement isolates shape
 alignment; production uses repeated line placement. Screenshots are local evidence only.
 An initial cold run queried before tile rendering had completed; the final test waits for
@@ -85,7 +85,8 @@ ref is shown. No prefecture text is inferred. Generic web previews need their ow
 of the application shield images; Android installs them on each reload. No licensed live traffic
 feed was introduced. Traffic regression uses the existing explicitly labelled debug fixtures.
 
+Implementation commit: `a5fec1b` — feat: add Japanese road shields and route-class map styling.
 Final HEAD/commit list and both archive results are recorded by archive metadata and the final
 report. Both review archives must use the BASE_SHA above, with final-head checks and ZIP self-checks.
 
-Status: **IN PROGRESS** pending final device and archive validation.
+Status: **PASS / COMPLETE**, conditional on the final-head formal checks and both archive self-checks recorded in the delivered archives. The final response confirms their actual outcomes.

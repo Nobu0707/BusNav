@@ -105,7 +105,10 @@ class JapaneseRoadPresentationTest {
             rule.runOnUiThread {
                 val screen = RectF(0f, 0f, view.width.toFloat(), view.height.toFloat())
                 assertTrue(native.queryRenderedFeatures(screen, OverlayLayerOrder.ACTIVE_ROUTE).isNotEmpty())
-                assertTrue(native.queryRenderedFeatures(screen, OverlayLayerOrder.TRAFFIC_MARKER).size >= 4)
+                val trafficIcons = native.queryRenderedFeatures(screen, OverlayLayerOrder.TRAFFIC_MARKER)
+                    .map { it.getStringProperty("icon") }.toSet()
+                assertTrue("Missing rendered traffic symbols: $trafficIcons", trafficIcons.containsAll(listOf(
+                    "busnav-traffic-ROAD_CLOSURE", "busnav-traffic-ACCIDENT", "busnav-traffic-ROADWORK", "busnav-traffic-CONGESTION")))
             }
             screenshot("route-traffic-${if (dark) "dark" else "light"}")
         }

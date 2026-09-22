@@ -84,6 +84,9 @@ def audit(path):
                                  if x['id'].startswith('transportation')]}, ensure_ascii=False))
     sites = [('shibuya-246', 35.658, 139.701), ('tomei', 35.625, 139.615),
              ('hachioji', 35.660, 139.310), ('ken-o', 35.650, 139.250)]
+    if path.stem == 'chubu':
+        sites = [('nagoya', 35.17, 136.90), ('gifu', 35.42, 136.76),
+                 ('shizuoka', 34.97, 138.39), ('kofu', 35.66, 138.57)]
     for site, lat, lon in sites:
         z = 14
         x = int((lon + 180) / 360 * 2**z)
