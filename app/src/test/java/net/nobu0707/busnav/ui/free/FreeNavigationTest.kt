@@ -46,7 +46,7 @@ class FreeNavigationTest {
                     guidance = RouteGuidance(listOf(RouteManeuver(0, ManeuverType.RIGHT, "", 1, 1)))),
                     RoutingSummary(900.0, 120.0))
             }
-        }, nav, scope.backgroundScope, { scope.testScheduler.currentTime }, profile = profile)
+        }, nav, scope.backgroundScope, profile = profile)
 
         fun ready() {
             nav.setPermission(LocationPermissionState.Granted)
@@ -121,14 +121,61 @@ class FreeNavigationTest {
         assertFalse(h.free.calculate()); assertEquals("端末の位置情報を有効にしてください", h.free.state.value.error)
     }
     @Test fun staleLocationCannotRoute() = runTest {
-        val h = Harness(this); h.ready(); advanceTimeBy(10001); runCurrent()
+        val h = Harness(this); h.ready(); advanceTimeBy(15001); runCurrent()
         h.free.beginSelection(); h.free.selectDestination(destination)
-        assertFalse(h.free.calculate()); assertEquals("現在地が古いため、更新を待っています", h.free.state.value.error)
+        assertFalse(h.free.calculate()); assertEquals("現在地を更新中です", h.free.state.value.error)
     }
     @Test fun poorAccuracyCannotRoute() = runTest {
-        val h = Harness(this); h.ready(); h.send(accuracy = 80f)
+        val h = Harness(this); h.ready(); h.send(accuracy = 160f, dt = 16000)
         h.free.beginSelection(); h.free.selectDestination(destination)
-        assertFalse(h.free.calculate()); assertEquals("現在地の精度が十分ではありません", h.free.state.value.error)
+        assertFalse(h.free.calculate()); assertEquals("現在地の精度が不足しています", h.free.state.value.error)
+    }
+    @Test fun degradedFreeFixStartsAndGuidanceRecovers() = runTest {
+        val h = Harness(this)
+        h.nav.setPermission(LocationPermissionState.Granted); runCurrent()
+        h.send(accuracy = 120f)
+        assertEquals(LocationQuality.DEGRADED, h.nav.uiState.value.startLocationQuality)
+        assertTrue(h.nav.uiState.value.startLocationAllowed)
+        h.preview()
+        assertTrue(h.free.start()); runCurrent()
+        assertEquals(NavigationMode.FREE, h.nav.uiState.value.navigationMode)
+        assertTrue(h.nav.uiState.value.isNavigationStarted)
+        assertEquals(GuidanceStatus.UNCERTAIN, h.nav.uiState.value.guidance.status)
+        assertEquals(RouteMatchQuality.UNRELIABLE, h.nav.uiState.value.deviationSnapshot.matchQuality)
+        assertNotEquals(RouteDeviationState.OFF_ROUTE, h.nav.uiState.value.deviationSnapshot.state)
+        h.send(accuracy = 20f)
+        assertEquals(GuidanceStatus.RELIABLE, h.nav.uiState.value.guidance.status)
+    }
+    @Test fun prescribedUsesSameStartGateAndRecovers() = runTest {
+        val h = Harness(this)
+        val record = prescribedFixture()
+        h.nav.setPermission(LocationPermissionState.Granted); runCurrent()
+        assertTrue(h.nav.openPrescribedRoute(record))
+        assertFalse(h.nav.startNavigation())
+        h.send(point = record.route.geometry.first, accuracy = 120f)
+        assertTrue(h.nav.startNavigation()); runCurrent()
+        assertEquals(NavigationMode.PRESCRIBED, h.nav.uiState.value.navigationMode)
+        assertEquals(GuidanceStatus.UNCERTAIN, h.nav.uiState.value.guidance.status)
+        h.send(point = record.route.geometry.first, accuracy = 20f)
+        assertEquals(GuidanceStatus.RELIABLE, h.nav.uiState.value.guidance.status)
+    }
+    @Test fun approximatePermissionExplainsWhyStartIsUnavailable() = runTest {
+        val h = Harness(this)
+        h.nav.setPermission(LocationPermissionState.Approximate); runCurrent()
+        h.send(accuracy = 20f)
+        h.free.beginSelection(); h.free.selectDestination(destination)
+        assertFalse(h.free.calculate())
+        assertEquals("正確な位置情報を許可してください", h.free.state.value.error)
+        assertFalse(h.nav.uiState.value.startLocationAllowed)
+    }
+    @Test fun oneBadFixKeepsRecentRawStartButMarkerShowsNewest() = runTest {
+        val h = Harness(this); h.ready()
+        val badPoint = GeoPoint(35.681, 139.76)
+        h.send(point = badPoint, accuracy = 180f)
+        assertEquals(badPoint, h.nav.uiState.value.location!!.point)
+        assertTrue(h.nav.uiState.value.startLocationAllowed)
+        h.preview()
+        assertEquals(origin, h.requests.single().origin)
     }
     @Test fun noGuidanceRouteCanStartWithExplicitNoGuidanceState() = runTest {
         val sample = prescribedFixture().route

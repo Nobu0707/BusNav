@@ -38,7 +38,8 @@ class DetourStateTest {
         }
         fun ready() {
             nav.setPermission(LocationPermissionState.Granted); test.runCurrent()
-            nav.openPrescribedRoute(saved); nav.startNavigation(); test.runCurrent()
+            fix()
+            nav.openPrescribedRoute(saved); assertTrue(nav.startNavigation()); test.runCurrent()
             fix()
             assertNotNull(nav.uiState.value.lastReliablePrescribedProgress)
         }

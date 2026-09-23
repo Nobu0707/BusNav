@@ -61,7 +61,8 @@ class GuidanceUiStateTest {
     @Test fun missingLocationWaitsInsteadOfAssumingStart() {
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
         try { val h=holder(route(),TestProvider(),scope); h.setPermission(LocationPermissionState.Granted)
-            assertEquals(GuidanceStatus.WAITING_LOCATION,h.uiState.value.guidance.status)
+            assertFalse(h.startFreeNavigation())
+            assertEquals(GuidanceStatus.NO_ROUTE,h.uiState.value.guidance.status)
             assertNull(h.uiState.value.guidance.distanceText)
         } finally { scope.cancel() }
     }
@@ -69,7 +70,7 @@ class GuidanceUiStateTest {
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
         try {
             val r=route(); val provider=TestProvider(); val h=holder(r,provider,scope)
-            h.setPermission(LocationPermissionState.Granted); provider.position()
+            h.setPermission(LocationPermissionState.Granted); provider.position(); assertTrue(h.startFreeNavigation())
             assertEquals("右折", h.uiState.value.guidance.primaryText)
             assertNotNull(h.uiState.value.guidance.distanceText)
             assertEquals("目的地へ",h.uiState.value.guidance.nextNextInstruction)
@@ -84,7 +85,7 @@ class GuidanceUiStateTest {
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
         try {
             val p=TestProvider(); val h=holder(route(),p,scope);h.setPermission(LocationPermissionState.Granted)
-            p.position(accuracy=100f);assertEquals(GuidanceStatus.UNCERTAIN,h.uiState.value.guidance.status)
+            p.position(accuracy=100f);assertTrue(h.startFreeNavigation());assertEquals(GuidanceStatus.UNCERTAIN,h.uiState.value.guidance.status)
             p.flow.tryEmit(LocationUpdate.Disabled);assertEquals(GuidanceStatus.WAITING_LOCATION,h.uiState.value.guidance.status)
             p.position();h.setPermission(LocationPermissionState.Denied)
             assertEquals(GuidanceStatus.WAITING_LOCATION,h.uiState.value.guidance.status)

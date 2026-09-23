@@ -7,6 +7,7 @@ enum class LocationPermissionState {
     Unknown,
     Requestable,
     Granted,
+    Approximate,
     Denied,
 }
 
@@ -26,6 +27,9 @@ data class NavigationUiState(
     val isMapReady: Boolean = false,
     val locationPermissionState: LocationPermissionState = LocationPermissionState.Unknown,
     val location: LocationState? = null,
+    val startLocationQuality: net.nobu0707.busnav.location.LocationQuality = net.nobu0707.busnav.location.LocationQuality.UNUSABLE,
+    val startLocationAllowed: Boolean = false,
+    val startLocationMessage: String? = null,
     val isFollowingLocation: Boolean = true,
     val locationError: String? = null,
     val layoutMode: NavigationLayoutMode = NavigationLayoutMode.PortraitMap,

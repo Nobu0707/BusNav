@@ -40,6 +40,7 @@ class TrafficIntegrationTest {
         val saved = detourFixture(13)
         fun ready(free: Boolean = false) {
             nav.setPermission(LocationPermissionState.Granted); test.runCurrent()
+            fix(100.0)
             if (free) { nav.previewFreeRoute(FreeNavigationPlan(saved.route.geometry.last), saved.route); nav.startFreeNavigation() }
             else { nav.openPrescribedRoute(saved); nav.startNavigation() }
             traffic.start(); test.runCurrent(); fix(100.0)

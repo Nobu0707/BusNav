@@ -207,20 +207,19 @@ fun NavigationRoute(
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { result ->
-        val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        val permission = when {
+            result[Manifest.permission.ACCESS_FINE_LOCATION] == true -> LocationPermissionState.Granted
+            result[Manifest.permission.ACCESS_COARSE_LOCATION] == true -> LocationPermissionState.Approximate
+            else -> LocationPermissionState.Denied
+        }
         stateHolder.setPermission(
-            if (granted) LocationPermissionState.Granted else LocationPermissionState.Denied,
+            permission,
         )
     }
 
     LaunchedEffect(context) {
         stateHolder.setPermission(
-            if (context.hasLocationPermission()) {
-                LocationPermissionState.Granted
-            } else {
-                LocationPermissionState.Requestable
-            },
+            context.locationPermissionState(),
         )
     }
 
@@ -283,8 +282,14 @@ fun NavigationRoute(
                 TextButton(onClick = { requestScreen(BusNavScreen.FREE) }, modifier = Modifier.testTag("open_free")) { Text("現在地からナビ") }
                 if (library != null) TextButton(onClick = { requestScreen(BusNavScreen.LIBRARY) }) { Text("所定経路・一覧と保存") }
                 TextButton(onClick = { requestScreen(BusNavScreen.ROUTE_EDIT) }) { Text("経路編集") }
-                if (uiState.activeRoute != null && !uiState.isNavigationStarted)
-                    TextButton(onClick = { stateHolder.startNavigation(); routeMenu = false }) { Text("案内開始") }
+                if (uiState.activeRoute != null && !uiState.isNavigationStarted) {
+                    uiState.startLocationMessage?.let { Text(it) }
+                    if (uiState.startLocationAllowed && uiState.startLocationQuality in listOf(
+                            net.nobu0707.busnav.location.LocationQuality.DEGRADED,
+                            net.nobu0707.busnav.location.LocationQuality.UNUSABLE))
+                        Text("位置精度が低下しています。案内開始後も進路案内を控えめに表示します。")
+                    TextButton(onClick = { if (stateHolder.startNavigation()) routeMenu = false }) { Text("案内開始") }
+                }
                 if (uiState.isNavigationStarted)
                     TextButton(onClick = { freeHolder.endNavigation(); library?.clearCurrent(); routeMenu = false }) { Text("案内終了") }
             } },
@@ -405,6 +410,13 @@ fun NavigationRoute(
                 onChangeDestination = freeHolder::changeDestination,
                 onPermission = { permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) },
                 needsPermission = uiState.locationPermissionState != LocationPermissionState.Granted,
+                approximatePermission = uiState.locationPermissionState == LocationPermissionState.Approximate,
+                startAllowed = uiState.startLocationAllowed,
+                startMessage = if (uiState.locationPermissionState == LocationPermissionState.Approximate)
+                    "正確な位置情報を許可してください" else uiState.startLocationMessage,
+                degraded = uiState.startLocationAllowed && uiState.startLocationQuality in listOf(
+                    net.nobu0707.busnav.location.LocationQuality.DEGRADED,
+                    net.nobu0707.busnav.location.LocationQuality.UNUSABLE),
                 cursorReady = freeCursorReader != null && uiState.isMapReady,
                 mapContent = { modifier ->
                     // The preview has different bounds from selection/calculation. Fit a laid-out preview viewport.
@@ -755,6 +767,7 @@ private fun MapArea(
         if (uiState.locationPermissionState != LocationPermissionState.Granted) {
             PermissionPrompt(
                 denied = uiState.locationPermissionState == LocationPermissionState.Denied,
+                approximate = uiState.locationPermissionState == LocationPermissionState.Approximate,
                 onRequestPermission = onRequestPermission,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
             )
@@ -794,6 +807,7 @@ private fun MapArea(
 @Composable
 private fun PermissionPrompt(
     denied: Boolean,
+    approximate: Boolean,
     onRequestPermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -803,13 +817,14 @@ private fun PermissionPrompt(
     ) {
         Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                if (denied) "位置情報が許可されていません。地図はそのまま閲覧できます。"
+                if (approximate) "正確な位置情報を許可すると案内を開始できます。"
+                else if (denied) "位置情報が許可されていません。地図はそのまま閲覧できます。"
                 else "自車位置と追従表示のため、位置情報を使用します。",
                 style = MaterialTheme.typography.bodySmall,
             )
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = onRequestPermission) {
-                Text(if (denied) "位置情報を再要求" else "位置情報を許可")
+                Text(if (approximate) "正確な位置情報を許可" else if (denied) "位置情報を再要求" else "位置情報を許可")
             }
         }
     }
@@ -885,14 +900,16 @@ internal fun operationsSummary(state: NavigationUiState, hasRoutePlan: Boolean =
         state.activeRoute != null -> "${state.routeLabel}：${if (state.navigationMode == NavigationMode.FREE) state.freePlan?.destinationName ?: "目的地まで" else state.activePrescribedRouteName ?: state.activeRoute.name}"
         else -> "経路：未選択"
     }
-    val location = state.locationError ?: locationSummary(state)
+    val location = state.locationError ?: state.startLocationMessage ?: locationSummary(state)
     val plan = if (hasRoutePlan) "・編集プランあり" else ""
     return "$route$plan\n$location"
 }
 
-private fun Context.hasLocationPermission(): Boolean =
-    ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+private fun Context.locationPermissionState(): LocationPermissionState = when {
+    ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED -> LocationPermissionState.Granted
+    ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED -> LocationPermissionState.Approximate
+    else -> LocationPermissionState.Requestable
+}
 
 @Preview(widthDp = 412, heightDp = 915, showBackground = true)
 @Composable

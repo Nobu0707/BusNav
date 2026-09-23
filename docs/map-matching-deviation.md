@@ -160,3 +160,6 @@ Phase008は元routeへ戻った観測を確認するだけで、新しいrejoin 
 
 FREE でも既存 matcher と raw GPS marker policy を維持します。NavigationMode に応じて「所定経路」/「案内経路」の逸脱文言を表示します。preview では案内を開始しません。
 OFF_ROUTE 単独の RoutingEngine 呼出し増分は0。手動操作の1要求→preview→採用確認でのみ置換し、そのとき matcher/deviation/highway/arrival を reset します。詳細は [Free Navigation](free-navigation.md)。Phase009 detour/rejoin は未実装です。
+# Phase 010.6B start boundary
+
+Navigation start now uses the separate [location quality policy](location-quality-policy.md). The matcher retains its 40 m and 10 s reliability gates, ambiguity checks, continuity safeguards, and deviation hysteresis. A degraded start does not create `MATCHED` or `OFF_ROUTE` evidence.

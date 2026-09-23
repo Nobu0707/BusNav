@@ -23,6 +23,10 @@ fun FreeNavigationScreen(
     onChangeDestination: () -> Unit,
     onPermission: () -> Unit,
     needsPermission: Boolean,
+    approximatePermission: Boolean,
+    startAllowed: Boolean,
+    startMessage: String?,
+    degraded: Boolean,
     cursorReady: Boolean,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
@@ -33,6 +37,10 @@ fun FreeNavigationScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("安全な場所で操作してください", style = MaterialTheme.typography.bodySmall)
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("free_error")) }
+                if (state.stage == FreeNavigationStage.PREVIEW) {
+                    startMessage?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("free_location_message")) }
+                    if (degraded) Text("位置精度が低下しています。案内を控えめに表示します。", modifier = Modifier.testTag("free_degraded"))
+                }
                 when (state.stage) {
                     FreeNavigationStage.SELECTING -> {
                         if (!state.isRecalculation) Text("地図を動かして中央の十字を目的地に合わせます")
@@ -56,7 +64,9 @@ fun FreeNavigationScreen(
                     FreeNavigationStage.IDLE -> Unit
                 }
             }
-            if (needsPermission) Button(onClick = onPermission) { Text("位置情報を許可") }
+            if (needsPermission) Button(onClick = onPermission) {
+                Text(if (approximatePermission) "正確な位置情報を許可" else "位置情報を許可")
+            }
             // Actions stay outside the scrolling details, including in short landscape viewports.
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 when (state.stage) {
@@ -67,7 +77,7 @@ fun FreeNavigationScreen(
                             modifier = Modifier.testTag("free_calculate")) { Text("経路を計算") }
                     }
                     FreeNavigationStage.PREVIEW -> {
-                        Button(onClick = onStart, modifier = Modifier.testTag("free_start")) {
+                        Button(onClick = onStart, enabled = startAllowed, modifier = Modifier.testTag("free_start")) {
                             Text(if (state.isRecalculation) "新しい経路を使用" else "案内開始")
                         }
                         if (!state.isRecalculation) TextButton(onClick = onChangeDestination) { Text("目的地を変更") }

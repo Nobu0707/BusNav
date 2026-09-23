@@ -98,3 +98,6 @@ FREE も規制パネル・地図 overlay・経路警告を表示します。受�
 ## Phase010.5B navigation camera
 
 FREE navigation uses the default HEADING_UP camera and persisted NORTH_UP toggle after explicit start. Destination selection and route preview do not rotate automatically or show the compass. Ending navigation returns to ordinary map behavior. See [navigation map orientation](navigation-map-orientation.md).
+# Phase 010.6B location start
+
+FREE route calculation and explicit preview start use the shared [location quality policy](location-quality-policy.md). A fresh 100–150 m raw fix may start in degraded mode; the route START remains a raw coordinate and strong guidance waits for reliable matching. Detour planning and arrival keep their stricter requirements.

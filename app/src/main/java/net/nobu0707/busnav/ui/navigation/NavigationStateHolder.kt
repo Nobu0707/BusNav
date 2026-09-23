@@ -9,6 +9,9 @@ import net.nobu0707.busnav.domain.route.ScheduledRouteRepository
 import net.nobu0707.busnav.domain.route.ScheduledRoute
 import net.nobu0707.busnav.location.LocationProvider
 import net.nobu0707.busnav.location.LocationUpdate
+import net.nobu0707.busnav.location.LocationQuality
+import net.nobu0707.busnav.location.LocationQualityPolicy
+import net.nobu0707.busnav.location.RecentStartFixes
 
 class NavigationStateHolder(
     private val locationProvider: LocationProvider,
@@ -30,6 +33,8 @@ class NavigationStateHolder(
     private var matcher: RouteMatcher? = null
     private var matcherState = RouteMatcherState()
     private val detector = RouteDeviationDetector()
+    private val startPolicy = LocationQualityPolicy()
+    private val recentStartFixes = RecentStartFixes(startPolicy)
     private val arrivalDetector = ArrivalDetector()
     private var deviation = RouteDeviationSnapshot()
     private var previousHighway: HighwayGuidanceSnapshot? = null
@@ -67,12 +72,16 @@ class NavigationStateHolder(
     fun setLayoutMode(layoutMode: NavigationLayoutMode) = update { copy(layoutMode = layoutMode) }
 
     fun setPermission(permissionState: LocationPermissionState) {
+        val changed = _uiState.value.locationPermissionState != permissionState
+        if (changed) stopLocationUpdates()
         update { copy(locationPermissionState = permissionState, isLoading = false) }
-        if (permissionState == LocationPermissionState.Granted) startLocationUpdates() else stopLocationUpdates()
+        refreshStartState()
+        if (permissionState == LocationPermissionState.Granted || permissionState == LocationPermissionState.Approximate)
+            startLocationUpdates() else { stopLocationUpdates(); recentStartFixes.clear() }
     }
 
     fun startLocationUpdates() {
-        if (_uiState.value.locationPermissionState != LocationPermissionState.Granted || locationJob?.isActive == true) return
+        if (_uiState.value.locationPermissionState !in listOf(LocationPermissionState.Granted, LocationPermissionState.Approximate) || locationJob?.isActive == true) return
         if (!locationProvider.isLocationEnabled()) update {
             copy(locationError = "端末の位置情報を有効にしてください", isLoading = false)
         }
@@ -87,13 +96,17 @@ class NavigationStateHolder(
                         // Reject old/duplicate fixes before changing either the raw marker or navigation state.
                         if (time != null && latestFixTime != null && time <= requireNotNull(latestFixTime)) return@collect
                         if (time != null && time in 0..elapsedMillis()) latestFixTime = time
+                        recentStartFixes.add(incoming.location, elapsedMillis())
                         update { copy(location = incoming.location, locationError = null, isLoading = false,
                             navigationHeading = headingResolver.resolve(incoming.location, navigationHeading, elapsedMillis())) }
+                        refreshStartState()
                         freshnessJob?.cancel()
                         freshnessJob = scope.launch {
                             val remaining = time?.let { matcherConfig.staleAfterMillis - (elapsedMillis() - it) } ?: 0
                             delay(remaining.coerceIn(0, matcherConfig.staleAfterMillis))
                             if (_uiState.value.location === incoming.location) markUnavailable()
+                            delay((startPolicy.config.maxStartAgeMillis - matcherConfig.staleAfterMillis + 1).coerceAtLeast(0))
+                            if (_uiState.value.location === incoming.location) refreshStartState()
                         }
                     }
                     is LocationUpdate.Error -> update { copy(locationError = incoming.message, isLoading = false) }
@@ -104,6 +117,30 @@ class NavigationStateHolder(
     }
 
     fun stopLocationUpdates() { locationJob?.cancel(); locationJob = null }
+    fun startLocationFix(): net.nobu0707.busnav.location.LocationState? = recentStartFixes.best(elapsedMillis())
+    private fun refreshStartState() {
+        val state = _uiState.value
+        val problem = startLocationProblem()
+        _uiState.value = state.copy(
+            startLocationQuality = startPolicy.assess(state.location, elapsedMillis()).quality,
+            startLocationAllowed = problem == null,
+            startLocationMessage = problem,
+        )
+    }
+    fun startLocationProblem(): String? {
+        val state = _uiState.value
+        if (state.locationPermissionState == LocationPermissionState.Approximate)
+            return "正確な位置情報を許可してください"
+        if (state.locationPermissionState != LocationPermissionState.Granted)
+            return "位置情報の利用を許可してください"
+        state.locationError?.let { return it }
+        if (startLocationFix() != null) return null
+        return when (startPolicy.assess(state.location, elapsedMillis()).quality) {
+            LocationQuality.GOOD, LocationQuality.USABLE, LocationQuality.DEGRADED -> "現在地を更新中です"
+            LocationQuality.STALE -> "現在地を更新中です"
+            LocationQuality.UNUSABLE -> if (state.location == null) "現在地を取得中です" else "現在地の精度が不足しています"
+        }
+    }
     fun onMapReady() = update { copy(isMapReady = true) }
     fun onMapError(message: String) = update { copy(isMapReady = false, locationError = message, isLoading = false) }
     fun onManualMapGesture() = update { copy(isFollowingLocation = false) }
@@ -147,7 +184,8 @@ class NavigationStateHolder(
     fun startFreeNavigation(): Boolean {
         if (_uiState.value.navigationMode != net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE ||
             _uiState.value.freePlan == null || _uiState.value.activeRoute == null) return false
-        update { copy(isNavigationStarted = true, isFollowingLocation = true) }
+        startLocationProblem()?.let { update { copy(startLocationMessage = it) }; return false }
+        update { copy(isNavigationStarted = true, isFollowingLocation = true, startLocationMessage = null) }
         return true
     }
 
@@ -181,10 +219,12 @@ class NavigationStateHolder(
     fun refreshPrescribedName(id: String, name: String) {
         if (_uiState.value.activePrescribedRouteId == id) update { copy(activePrescribedRouteName = name) }
     }
-    fun startNavigation() {
-        if (_uiState.value.navigationMode == net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE) startFreeNavigation()
-        else if (_uiState.value.activeRoute != null && _uiState.value.activePrescribedRouteId != null)
-            update { copy(isNavigationStarted = true, isFollowingLocation = true) }
+    fun startNavigation(): Boolean {
+        if (_uiState.value.navigationMode == net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE) return startFreeNavigation()
+        if (_uiState.value.activeRoute == null || _uiState.value.activePrescribedRouteId == null) return false
+        startLocationProblem()?.let { update { copy(startLocationMessage = it) }; return false }
+        update { copy(isNavigationStarted = true, isFollowingLocation = true, startLocationMessage = null) }
+        return true
     }
     fun clearRoute() {
         routeGeneration++ // Invalidate even a pending initial load when activeRoute is already null.
@@ -257,7 +297,11 @@ class NavigationStateHolder(
         deviation = detector.uncertain(deviation)
         emitTransitions()
         val state = _uiState.value
+        val startProblem = startLocationProblem()
         _uiState.value = state.copy(
+            startLocationQuality = startPolicy.assess(state.location, elapsedMillis()).quality,
+            startLocationAllowed = startProblem == null,
+            startLocationMessage = startProblem,
             trafficProgressMeters = null,
             trafficHighwayDecisionProgressMeters = null,
             guidance = if (!state.navigationActive) GuidanceUiState() else GuidanceUiState(GuidanceStatus.WAITING_LOCATION, "位置情報を確認中"),

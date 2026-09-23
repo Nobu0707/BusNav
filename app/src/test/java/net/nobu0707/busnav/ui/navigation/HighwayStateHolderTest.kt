@@ -25,6 +25,7 @@ class HighwayStateHolderTest {
             holder.setPermission(LocationPermissionState.Granted)
             fun position(accuracy: Float, lon: Double = .009) { now += 5000; flow.value = LocationUpdate.Position(LocationState(GeoPoint(0.0, lon), accuracy, null, null, 1, now)) }
             position(5f)
+            assertTrue(holder.startFreeNavigation())
             val initial = holder.uiState.value.highwayGuidance!!
             assertNotNull(initial.schematic)
             holder.setLayoutMode(NavigationLayoutMode.LandscapeThreeColumn)

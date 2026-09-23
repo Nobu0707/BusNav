@@ -66,3 +66,6 @@ See [prescribed route library](prescribed-route-library.md).
 ## Phase010.5B navigation camera
 
 Active navigation shares the [HEADING_UP/NORTH_UP camera](navigation-map-orientation.md). Course comes from reliable moving GPS; stationary course holds, with MATCHED/reliable segment fallback only before a heading exists. Guidance reliability and raw marker location remain separate.
+# Phase 010.6B degraded starts
+
+The [location quality policy](location-quality-policy.md) permits starting with a fresh fix up to 150 m. Normal turn and highway instructions still require reliable route matching. With poor accuracy the UI shows uncertain guidance and omits strong distance and JCT/exit instructions; a subsequent reliable fix restores them automatically.

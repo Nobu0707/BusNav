@@ -198,3 +198,6 @@ MapSelectionCursor を editor/FREE で共用し、MapSelectionMode で listener 
 ## Phase010 traffic boundary
 
 `domain/traffic` owns provider-neutral event/geometry/status/freshness, route impact and candidate validation. `ui/traffic` observes foreground snapshots and cached geometry impacts; it has no RoutingEngine dependency. `TrafficOverlayController` reinstalls its retained data after style changes. Debug/release source-set factories isolate fixture implementation from production. Detour receives explicit reason/context and a known restriction-end floor; activation rechecks the latest snapshot. No traffic data is stored in prescribed Room records. See [traffic architecture](traffic-road-restrictions.md).
+# Phase 010.6B location quality boundary
+
+`location/LocationQualityPolicy` and `RecentStartFixes` own start usability and recent raw fix selection. `NavigationStateHolder` applies the shared gate to FREE and PRESCRIBED starts; `FreeNavigationStateHolder` uses the selected raw fix for routing START. `RouteMatcher` and guidance calculators retain independent, stricter continuous reliability checks. See [location quality policy](location-quality-policy.md).

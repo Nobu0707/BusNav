@@ -32,7 +32,7 @@ class PrescribedRouteTest {
         val library = PrescribedRouteLibraryStateHolder(repository, backgroundScope, { nav.uiState.value.activePrescribedRouteId })
         val free = net.nobu0707.busnav.ui.free.FreeNavigationStateHolder(RoutingEngine {
             RoutingResult.Success(record.route, RoutingSummary(1000.0, 120.0))
-        }, nav, backgroundScope, { testScheduler.currentTime })
+        }, nav, backgroundScope)
         nav.setPermission(LocationPermissionState.Granted); runCurrent()
         val before = repository.records.toMap()
         free.beginSelection(); free.selectDestination(record.route.destination.position); free.calculate(); runCurrent()
@@ -192,18 +192,22 @@ class PrescribedRouteTest {
         }
     }
     @Test fun switchingSavedRoutesResetsDeviationAndPreservesStableId() = runTest {
+        val fixes = MutableSharedFlow<LocationUpdate>(extraBufferCapacity = 1)
         val provider = object : LocationProvider {
-            override fun updates(): Flow<LocationUpdate> = emptyFlow()
+            override fun updates(): Flow<LocationUpdate> = fixes
             override fun isLocationEnabled() = true
         }
         val nav = NavigationStateHolder(provider, object : ScheduledRouteRepository {
             override suspend fun getActiveRoute() = null
-        }, backgroundScope, StandardTestDispatcher(testScheduler))
+        }, backgroundScope, StandardTestDispatcher(testScheduler), { testScheduler.currentTime })
+        runCurrent()
+        nav.setPermission(LocationPermissionState.Granted); runCurrent()
+        fixes.tryEmit(LocationUpdate.Position(LocationState(prescribedFixture("a").route.geometry.first, 5f, null, null, 0, 0)))
         runCurrent()
         val a = prescribedFixture("a")
         val b = prescribedFixture("b", size = 200)
         nav.openPrescribedRoute(a); runCurrent()
-        nav.startNavigation()
+        assertTrue(nav.startNavigation())
         assertFalse(nav.openPrescribedRoute(b))
         assertEquals("a", nav.uiState.value.activePrescribedRouteId)
         nav.clearRoute()

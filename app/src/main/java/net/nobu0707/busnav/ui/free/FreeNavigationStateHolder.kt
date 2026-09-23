@@ -4,7 +4,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import net.nobu0707.busnav.domain.model.GeoPoint
-import net.nobu0707.busnav.domain.navigation.FreeNavigationConfig
 import net.nobu0707.busnav.domain.navigation.FreeNavigationPlan
 import net.nobu0707.busnav.domain.prescribed.NavigationMode
 import net.nobu0707.busnav.domain.route.ScheduledRoute
@@ -35,8 +34,6 @@ class FreeNavigationStateHolder(
     engine: RoutingEngine,
     private val navigation: NavigationStateHolder,
     scope: CoroutineScope,
-    private val elapsedMillis: () -> Long,
-    private val config: FreeNavigationConfig = FreeNavigationConfig(),
     profile: VehicleProfile = VehicleProfile.DEVELOPMENT_LARGE_BUS,
 ) {
     private val calculation = RouteCalculationStateHolder(engine, scope, profile)
@@ -88,18 +85,17 @@ class FreeNavigationStateHolder(
         val current = _state.value
         if (current.stage != FreeNavigationStage.SELECTING) return false
         val plan = current.plan ?: return false
-        val nav = navigation.uiState.value
-        val problem = when {
-            nav.locationPermissionState != LocationPermissionState.Granted -> "位置情報の利用を許可してください"
-            nav.locationError != null -> nav.locationError
-            else -> config.locationProblem(nav.location, elapsedMillis())
+        val startFix = navigation.startLocationFix()
+        val problem = navigation.startLocationProblem()
+        if (problem != null || startFix == null) {
+            _state.value = current.copy(error = problem ?: "現在地を更新中です")
+            return false
         }
-        if (problem != null) { _state.value = current.copy(error = problem); return false }
         invalidate()
         _state.value = current.copy(stage = FreeNavigationStage.CALCULATING, error = null,
             calculation = RouteCalculationState.Calculating(revision), previewRoute = null)
         // ONLY raw LocationState.point is read here. Matched projections cannot become START.
-        val accepted = calculation.calculate(plan.toRoutePlan(requireNotNull(nav.location).point,
+        val accepted = calculation.calculate(plan.toRoutePlan(startFix.point,
             "free-" + UUID.randomUUID()), revision, current.vehicleProfile)
         if (!accepted) _state.value = current.copy(error = "目的地を現在地から離れた地点に設定してください")
         return accepted

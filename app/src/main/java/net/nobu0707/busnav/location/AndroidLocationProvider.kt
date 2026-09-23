@@ -1,21 +1,25 @@
 package net.nobu0707.busnav.location
 
 import android.annotation.SuppressLint
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import net.nobu0707.busnav.domain.model.GeoPoint
 
 class AndroidLocationProvider(context: Context) : LocationProvider {
+    private val appContext = context.applicationContext
     private val locationManager =
-        context.applicationContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        appContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
     override fun isLocationEnabled(): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -46,7 +50,10 @@ class AndroidLocationProvider(context: Context) : LocationProvider {
             override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
         }
 
-        val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+        // GPS is the high accuracy source. Approximate-only permission can use NETWORK,
+        // but must not abort the whole subscription when GPS requires FINE permission.
+        val hasFine = ContextCompat.checkSelfPermission(appContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val providers = AndroidLocationRequestPolicy.providers(hasFine)
             .filter(locationManager.allProviders::contains)
 
         if (providers.isEmpty()) {
@@ -62,8 +69,8 @@ class AndroidLocationProvider(context: Context) : LocationProvider {
                 }
                 locationManager.requestLocationUpdates(
                     provider,
-                    UPDATE_INTERVAL_MILLIS,
-                    MIN_DISTANCE_METERS,
+                    AndroidLocationRequestPolicy.updateIntervalMillis,
+                    AndroidLocationRequestPolicy.minimumDistanceMeters,
                     listener,
                     Looper.getMainLooper(),
                 )
@@ -88,8 +95,4 @@ class AndroidLocationProvider(context: Context) : LocationProvider {
         elapsedRealtimeMillis = elapsedRealtimeNanos / 1_000_000,
     )
 
-    private companion object {
-        const val UPDATE_INTERVAL_MILLIS = 1_000L
-        const val MIN_DISTANCE_METERS = 1f
-    }
 }
