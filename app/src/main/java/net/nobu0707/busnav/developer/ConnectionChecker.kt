@@ -14,6 +14,7 @@ import okhttp3.Response
 enum class ConnectionService(val path: String) {
     VALHALLA("/status"), BASEMAP(DeveloperConnectionSettings.STYLE_PATH),
     KANTO("/data/kanto.json"), CHUBU("/data/chubu.json"),
+    JAPAN(DeveloperConnectionSettings.STYLE_PATH),
 }
 enum class ConnectionStatus { SUCCESS, HTTP_ERROR, TIMEOUT, HOST_ERROR, INVALID_URL }
 data class ConnectionResult(val status: ConnectionStatus, val httpCode: Int? = null)

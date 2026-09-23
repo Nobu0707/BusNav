@@ -12,6 +12,7 @@ data class BasemapConfig(
     val styleUrl: String?,
     val mode: BasemapMode,
     val fallbackStyleUrl: String = FALLBACK_STYLE_URL,
+    val failureHint: String? = null,
 ) {
     init {
         require(mode == BasemapMode.FALLBACK || !styleUrl.isNullOrBlank()) {
@@ -31,7 +32,8 @@ data class BasemapConfig(
     companion object {
         const val FALLBACK_STYLE_URL = "asset://basemap/fallback-style.json"
 
-        fun regionStylePath(region: BasemapRegion) = "/styles/busnav-" + region.id + "/style.json"
+        fun regionStylePath(region: BasemapRegion) = if (region == BasemapRegion.JAPAN)
+            "/styles/busnav/style.json" else "/styles/busnav-" + region.id + "/style.json"
 
         fun forRegion(baseUrl: String, region: BasemapRegion, isDebug: Boolean): BasemapConfig =
             fromBuildValue(if (baseUrl.isBlank()) "" else baseUrl.trimEnd('/') + regionStylePath(region), isDebug)

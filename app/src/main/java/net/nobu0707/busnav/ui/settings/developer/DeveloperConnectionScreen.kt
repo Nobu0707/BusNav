@@ -22,6 +22,7 @@ fun DeveloperConnectionScreen(
     repository: DeveloperConnectionRepository,
     onBack: () -> Unit,
     checkConnection: (suspend (String, ConnectionService) -> ConnectionResult)? = null,
+    navigationActive: Boolean = false,
 ) {
     if (!BuildConfig.DEBUG) return
     val scope = rememberCoroutineScope()
@@ -30,6 +31,9 @@ fun DeveloperConnectionScreen(
     var valhalla by rememberSaveable { mutableStateOf("") }
     var basemap by rememberSaveable { mutableStateOf("") }
     var region by rememberSaveable { mutableStateOf(BasemapRegion.KANTO) }
+    var environment by rememberSaveable { mutableStateOf(ConnectionEnvironment.CUSTOM) }
+    val activeNavigation by rememberUpdatedState(navigationActive)
+    val editable = ConnectionSwitchPolicy.canEdit(navigationActive)
     var loaded by rememberSaveable { mutableStateOf(false) }
     var attempted by rememberSaveable { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -48,6 +52,7 @@ fun DeveloperConnectionScreen(
                 valhalla = settings.valhallaBaseUrl
                 basemap = settings.basemapBaseUrl
                 region = settings.basemapRegion
+                environment = settings.selectedConnectionEnvironment
                 loaded = true
             } catch (e: CancellationException) { throw e
             } catch (_: Exception) { snackbar.showSnackbar("設定を読み込めませんでした。画面を開き直してください") }
@@ -62,15 +67,36 @@ fun DeveloperConnectionScreen(
             Text("開発接続設定", style = MaterialTheme.typography.headlineSmall)
             Text("開発用設定。実運行では使用しないでください", style = MaterialTheme.typography.bodySmall)
             Text("エミュレータ: 10.0.2.2\n実機: 開発PCのLAN IPを指定（同一LAN / Wi-Fi）", style = MaterialTheme.typography.bodySmall)
+            if (!editable) Text("ナビゲーションを終了してから接続設定を変更してください")
+            Text("接続環境（選択後に保存して適用）")
+            ConnectionEnvironment.entries.forEach { choice ->
+                FilterChip(selected = environment == choice, onClick = {
+                    busy = true
+                    scope.launch {
+                        try {
+                            ConnectionSwitchPolicy.requireEditable(activeNavigation)
+                            val preset = repository.profile(choice)
+                            environment = preset.selectedConnectionEnvironment
+                            valhalla = preset.valhallaBaseUrl; basemap = preset.basemapBaseUrl
+                            region = preset.basemapRegion
+                            attempted = false; valhallaStatus = null; basemapStatus = null
+                        } catch (e: CancellationException) { throw e
+                        } catch (_: Exception) { snackbar.showSnackbar("設定を読み込めませんでした")
+                        } finally { busy = false }
+                    }
+                }, enabled = editable && loaded && !busy && !valhallaChecking && !basemapChecking,
+                    label = { Text(choice.label) }, modifier = Modifier.testTag("connection_environment_" + choice.id))
+            }
+            if (environment == ConnectionEnvironment.REMOTE_TEST) Text(RemoteTestEndpoints.IPV6_HINT)
             OutlinedTextField(value = valhalla, onValueChange = { valhalla = it; valhallaStatus = null },
                 label = { Text("Valhallaサーバー") }, singleLine = true,
-                enabled = loaded && !busy && !valhallaChecking, isError = valhallaError != null,
+                enabled = editable && environment != ConnectionEnvironment.REMOTE_TEST && loaded && !busy && !valhallaChecking, isError = valhallaError != null,
                 supportingText = { valhallaError?.let { Text(it) } },
                 modifier = Modifier.fillMaxWidth().testTag("valhalla_url"))
             OutlinedButton(onClick = {
                 valhallaChecking = true
                 scope.launch {
-                    try { valhallaStatus = check(valhalla, ConnectionService.VALHALLA).message() }
+                    try { valhallaStatus = check(valhalla, ConnectionService.VALHALLA).message(environment) }
                     finally { valhallaChecking = false }
                 }
             }, enabled = loaded && !busy && !valhallaChecking, modifier = Modifier.testTag("valhalla_check")) {
@@ -79,15 +105,15 @@ fun DeveloperConnectionScreen(
             valhallaStatus?.let { Text(it, Modifier.testTag("valhalla_status")) }
             OutlinedTextField(value = basemap, onValueChange = { basemap = it; basemapStatus = null },
                 label = { Text("地図タイルサーバー") }, singleLine = true,
-                enabled = loaded && !busy && !basemapChecking, isError = basemapError != null,
+                enabled = editable && environment != ConnectionEnvironment.REMOTE_TEST && loaded && !busy && !basemapChecking, isError = basemapError != null,
                 supportingText = { basemapError?.let { Text(it) } },
                 modifier = Modifier.fillMaxWidth().testTag("basemap_url"))
             Text("地図地域 / Basemap region")
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column {
                 BasemapRegion.entries.forEach { choice ->
                     FilterChip(selected = region == choice,
                         onClick = { region = choice; basemapStatus = null },
-                        enabled = loaded && !busy && !basemapChecking,
+                        enabled = editable && environment != ConnectionEnvironment.REMOTE_TEST && loaded && !busy && !basemapChecking,
                         label = { Text(choice.label) },
                         modifier = Modifier.testTag("basemap_region_" + choice.id))
                 }
@@ -96,9 +122,13 @@ fun DeveloperConnectionScreen(
                 basemapChecking = true
                 scope.launch {
                     try {
-                        val service = if (region == BasemapRegion.KANTO) ConnectionService.KANTO else ConnectionService.CHUBU
+                        val service = when (region) {
+                            BasemapRegion.JAPAN -> ConnectionService.JAPAN
+                            BasemapRegion.KANTO -> ConnectionService.KANTO
+                            BasemapRegion.CHUBU -> ConnectionService.CHUBU
+                        }
                         val result = check(basemap, service)
-                        basemapStatus = result.message() + if (result.httpCode == 404) "：選択した地域の地図データがありません" else ""
+                        basemapStatus = result.message(environment) + if (result.httpCode == 404) "：選択した地域の地図データがありません" else ""
                     }
                     finally { basemapChecking = false }
                 }
@@ -112,8 +142,8 @@ fun DeveloperConnectionScreen(
                     busy = true
                     scope.launch {
                         try {
-                            val valid = DeveloperConnectionSettings(valhalla, basemap, region).normalized()
-                            repository.update(valid)
+                            val valid = DeveloperConnectionSettings(valhalla, basemap, region, environment).normalized()
+                            repository.updateWhenIdle(valid, activeNavigation)
                             valhalla = valid.valhallaBaseUrl; basemap = valid.basemapBaseUrl
                             snackbar.showSnackbar("保存しました")
                         } catch (e: CancellationException) { throw e
@@ -121,22 +151,23 @@ fun DeveloperConnectionScreen(
                         } finally { busy = false }
                     }
                 }
-            }, enabled = loaded && !busy && !valhallaChecking && !basemapChecking, modifier = Modifier.testTag("connections_save")) { Text("保存") }
+            }, enabled = editable && loaded && !busy && !valhallaChecking && !basemapChecking, modifier = Modifier.testTag("connections_save")) { Text("保存") }
             OutlinedButton(onClick = {
                 busy = true
                 scope.launch {
                     try {
-                        repository.reset()
+                        repository.resetWhenIdle(activeNavigation)
                         val defaults = repository.settings.first()
                         valhalla = defaults.valhallaBaseUrl; basemap = defaults.basemapBaseUrl
                         region = defaults.basemapRegion
+                        environment = defaults.selectedConnectionEnvironment
                         attempted = false; valhallaStatus = null; basemapStatus = null
                         snackbar.showSnackbar("デフォルトに戻しました")
                     } catch (e: CancellationException) { throw e
                     } catch (_: Exception) { snackbar.showSnackbar("設定を戻せませんでした")
                     } finally { busy = false }
                 }
-            }, enabled = loaded && !busy && !valhallaChecking && !basemapChecking, modifier = Modifier.testTag("connections_reset")) { Text("デフォルトに戻す") }
+            }, enabled = editable && loaded && !busy && !valhallaChecking && !basemapChecking, modifier = Modifier.testTag("connections_reset")) { Text("デフォルトに戻す") }
         }
     }
 }

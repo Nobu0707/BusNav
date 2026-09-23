@@ -84,7 +84,7 @@ class PresentationPolicyTest {
         BasemapRegion.entries.forEach {
             val base=BasemapConfig.forRegion("http://localhost:8080",it,true)
             val light=base.withTheme(false)
-            assertTrue(light.styleUrl!!.contains(it.id+"-light"))
+            assertTrue(light.styleUrl!!.contains(if (it == BasemapRegion.JAPAN) "busnav-light" else it.id+"-light"))
             assertEquals(base,light.withTheme(true))
             assertEquals(light,light.withTheme(false))
         }

@@ -194,7 +194,8 @@ class NavigationCameraTest {
         for (mode in NavigationMapOrientation.entries) {
             rule.runOnIdle { camera.value = camera.value.copy(orientation = mode) }
             send(90f); awaitBearing(if (mode == NavigationMapOrientation.HEADING_UP) 90.0 else 0.0)
-            for (region in BasemapRegion.entries) for (dark in listOf(false, true, false)) {
+            // This local server fixture only provisions the two regional datasets.
+            for (region in listOf(BasemapRegion.KANTO, BasemapRegion.CHUBU)) for (dark in listOf(false, true, false)) {
                 rule.runOnIdle { config.value = BasemapConfig.forRegion(LocalBasemapAssumptions.BASE_URL, region, true).withTheme(dark) }
                 rule.waitUntil(30_000) {
                     var loaded = false

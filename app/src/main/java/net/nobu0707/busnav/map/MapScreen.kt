@@ -203,6 +203,7 @@ fun MapScreen(
                 Modifier.align(Alignment.TopEnd).padding(8.dp))
         }
         BasemapStatusOverlay(
+            failureHint = basemapConfig.failureHint,
             state = basemapState,
             modifier = Modifier.align(Alignment.TopCenter).padding(8.dp),
         )
@@ -220,7 +221,7 @@ object BasemapTestTags {
 }
 
 @Composable
-internal fun BasemapStatusOverlay(state: BasemapState, modifier: Modifier = Modifier) {
+internal fun BasemapStatusOverlay(state: BasemapState, modifier: Modifier = Modifier, failureHint: String? = null) {
     if (state != BasemapState.UNAVAILABLE) return
     Card(
         modifier = modifier.testTag(BasemapTestTags.UNAVAILABLE),
@@ -229,7 +230,8 @@ internal fun BasemapStatusOverlay(state: BasemapState, modifier: Modifier = Modi
         ),
     ) {
         Text(
-            text = "\u8a73\u7d30\u5730\u56f3\u30b5\u30fc\u30d0\u30fc\u672a\u63a5\u7d9a",
+            text = "\u8a73\u7d30\u5730\u56f3\u30b5\u30fc\u30d0\u30fc\u672a\u63a5\u7d9a" +
+                (failureHint?.let { "\n$it" } ?: ""),
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

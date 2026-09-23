@@ -562,7 +562,8 @@ fun NavigationRoute(
         if (BuildConfig.DEBUG && showConnections && connectionRepository != null) {
             Dialog(onDismissRequest = { showConnections = false },
                 properties = DialogProperties(usePlatformDefaultWidth = false)) {
-                DeveloperConnectionScreen(connectionRepository, onBack = { showConnections = false })
+                DeveloperConnectionScreen(connectionRepository, onBack = { showConnections = false },
+                    navigationActive = uiState.navigationActive)
             }
         }
     }

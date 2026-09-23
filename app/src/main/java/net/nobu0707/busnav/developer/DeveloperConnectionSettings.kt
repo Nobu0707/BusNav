@@ -9,15 +9,26 @@ data class DeveloperConnectionSettings(
     val valhallaBaseUrl: String,
     val basemapBaseUrl: String,
     val basemapRegion: BasemapRegion = BasemapRegion.KANTO,
+    val selectedConnectionEnvironment: ConnectionEnvironment = ConnectionEnvironment.CUSTOM,
 ) {
-    fun normalized() = DeveloperConnectionSettings(
-        normalizeBaseUrl(valhallaBaseUrl), normalizeBaseUrl(basemapBaseUrl), basemapRegion,
-    )
-    fun basemapConfig(isDebug: Boolean) = BasemapConfig.forRegion(basemapBaseUrl, basemapRegion, isDebug)
+    fun normalized(): DeveloperConnectionSettings {
+        val valid = copy(valhallaBaseUrl = normalizeBaseUrl(valhallaBaseUrl),
+            basemapBaseUrl = normalizeBaseUrl(basemapBaseUrl))
+        if (selectedConnectionEnvironment == ConnectionEnvironment.REMOTE_TEST) {
+            require(valid == RemoteTestEndpoints.settings()) { "REMOTE_TESTはHTTPSの全国サーバー固定です" }
+        }
+        return valid
+    }
+    fun basemapConfig(isDebug: Boolean) = if (selectedConnectionEnvironment == ConnectionEnvironment.REMOTE_TEST) {
+        normalized()
+        BasemapConfig.fromBuildValue(RemoteTestEndpoints.DARK_STYLE, isDebug)
+            .copy(failureHint = RemoteTestEndpoints.IPV6_HINT)
+    } else BasemapConfig.forRegion(basemapBaseUrl, basemapRegion, isDebug)
     companion object {
         const val STYLE_PATH = "/styles/busnav/style.json"
         fun defaults(valhallaUrl: String, styleUrl: String): DeveloperConnectionSettings {
-            val region = BasemapRegion.entries.firstOrNull { styleUrl.endsWith(BasemapConfig.regionStylePath(it)) }
+            val region = BasemapRegion.entries.filter { it != BasemapRegion.JAPAN }
+                .firstOrNull { styleUrl.endsWith(BasemapConfig.regionStylePath(it)) }
                 ?: BasemapRegion.KANTO
             val baseUrl = styleUrl.removeSuffix(BasemapConfig.regionStylePath(region)).removeSuffix(STYLE_PATH).trimEnd('/')
             return DeveloperConnectionSettings(valhallaUrl, baseUrl, region)
