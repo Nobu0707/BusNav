@@ -4,10 +4,10 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AndroidLocationRequestPolicyTest {
-    @Test fun preciseNavigationUsesGpsAndNetworkAtOneSecond() {
+    @Test fun preciseNavigationRequestsStationaryUpdates() {
         assertEquals(listOf("gps", "network"), AndroidLocationRequestPolicy.providers(true))
         assertEquals(1_000L, AndroidLocationRequestPolicy.updateIntervalMillis)
-        assertTrue(AndroidLocationRequestPolicy.minimumDistanceMeters <= 1f)
+        assertEquals(0f, AndroidLocationRequestPolicy.minimumDistanceMeters)
     }
     @Test fun approximatePermissionDoesNotRequestGps() {
         assertEquals(listOf("network"), AndroidLocationRequestPolicy.providers(false))
