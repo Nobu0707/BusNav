@@ -101,9 +101,29 @@ class NavigationCameraTest {
         rule.runOnUiThread { view.getLocationOnScreen(bounds); width = view.width; height = view.height }
         val bitmap = Bitmap.createBitmap(screen, bounds[0], bounds[1], width, height)
         val dir = File(instrumentation.targetContext.getExternalFilesDir(null), "navigation-camera").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        val file = File(dir, "$name.png")
+        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        instrumentation.uiAutomation.executeShellCommand("cp " + file.absolutePath +
+            " /sdcard/Download/busnav-camera-$name.png").close()
         return bitmap
     }
+    private fun awaitArrowPixels(name: String, expectedHeading: Double) {
+        var last: AssertionError? = null
+        repeat(15) { attempt ->
+            val bitmap = snapshot("$name-$attempt")
+            try {
+                verifyArrowPixels(bitmap, expectedHeading)
+                return
+            } catch (error: AssertionError) {
+                last = error
+            } finally {
+                bitmap.recycle()
+            }
+            Thread.sleep(300)
+        }
+        throw last ?: AssertionError("Vehicle arrow was not rendered")
+    }
+
     /** Checks actual rendered arrow pixels, independent of iconRotate properties. Ring pixels are excluded. */
     private fun verifyArrowPixels(bitmap: Bitmap, expectedHeading: Double) {
         var cx = 0f; var cy = 0f; var radius = 0f
@@ -127,6 +147,58 @@ class NavigationCameraTest {
         assertTrue("Rendered arrow tail points in wrong direction", (dx * -sin(theta) + dy * cos(theta)) / length > 0.95)
     }
 
+    @Test fun inactiveMarkerUsesDeviceHeadingWithManualMapBearing() {
+        val fakeHeading = mutableStateOf(0.0)
+        val raw = mutableStateOf<LocationState?>(null)
+        rule.runOnUiThread { MapLibre.getInstance(rule.activity) }
+        rule.setContent {
+            BusNavTheme {
+                MapScreen(raw.value, false, 0, null, 0,
+                    deviceHeadingOverride = fakeHeading.value,
+                    initialCamera = EditorCamera(GeoPoint(35.678, 139.742), 16.0, 30.0, 0.0),
+                    basemapConfig = BasemapConfig(null, BasemapMode.FALLBACK).withTheme(false),
+                    onMapReady = { ready = true }, onMapGesture = {}, onMapError = {})
+            }
+        }
+        rule.waitUntil(30_000) { ready }
+        rule.runOnUiThread {
+            view = requireNotNull(findMap(rule.activity.window.decorView))
+            view.getMapAsync { native = it }
+        }
+        rule.runOnIdle {
+            raw.value = LocationState(GeoPoint(35.678, 139.742), 5f, 200f, 0f, 1,
+                SystemClock.elapsedRealtime())
+        }
+        for (degrees in listOf(0.0, 90.0, 180.0, 270.0)) {
+            rule.runOnIdle { fakeHeading.value = degrees }
+            val expected = normalizeHeading(degrees - 30.0)
+            rule.waitUntil(10_000) {
+                var matches = false
+                rule.runOnUiThread {
+                    val layer = native.style?.getLayer(OverlayLayerOrder.VEHICLE) as? SymbolLayer
+                    matches = layer?.iconRotate?.value?.let { abs(shortestHeadingDelta(it.toDouble(), expected)) < 0.5 } == true
+                }
+                matches
+            }
+            awaitArrowPixels("inactive-$degrees", expected)
+        }
+    }
+
+    @Test fun headingUpPlacesRawMarkerBelowCenterAndNorthUpCentersIt() {
+        start()
+        val point = LatLng(35.678, 139.742)
+        fun fraction(): Double {
+            var result = 0.0
+            rule.runOnUiThread { result = native.projection.toScreenLocation(point).y / view.height.toDouble() }
+            return result
+        }
+        rule.waitUntil(10_000) { abs(fraction() - 0.72) < 0.03 }
+        assertEquals(0.72, fraction(), 0.03)
+        rule.runOnIdle { camera.value = camera.value.copy(orientation = NavigationMapOrientation.NORTH_UP) }
+        rule.waitUntil(10_000) { abs(fraction() - 0.5) < 0.03 }
+        assertEquals(0.5, fraction(), 0.03)
+    }
+
     @Test fun cardinalCameraCompassAndRenderedMarkerBothModes() {
         start()
         for (mode in NavigationMapOrientation.entries) {
@@ -141,7 +213,7 @@ class NavigationCameraTest {
                     assertEquals(if (mode == NavigationMapOrientation.HEADING_UP) 0f else degrees, layer.iconRotate.value!!, 0.5f)
                     assertEquals(16.0, native.cameraPosition.zoom, 0.001)
                 }
-                verifyArrowPixels(snapshot("$mode-${degrees.toInt()}"), if (mode == NavigationMapOrientation.HEADING_UP) 0.0 else degrees.toDouble())
+                awaitArrowPixels("$mode-${degrees.toInt()}", if (mode == NavigationMapOrientation.HEADING_UP) 0.0 else degrees.toDouble())
             }
         }
     }

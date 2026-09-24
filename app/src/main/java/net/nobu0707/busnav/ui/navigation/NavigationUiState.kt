@@ -48,6 +48,7 @@ data class NavigationUiState(
     val navigationMode: net.nobu0707.busnav.domain.prescribed.NavigationMode = net.nobu0707.busnav.domain.prescribed.NavigationMode.PRESCRIBED,
     val isNavigationStarted: Boolean = false,
     val freePlan: net.nobu0707.busnav.domain.navigation.FreeNavigationPlan? = null,
+    val freeStartPosition: net.nobu0707.busnav.domain.navigation.NavigationStartPosition? = null,
     val arrival: net.nobu0707.busnav.domain.navigation.ArrivalSnapshot = net.nobu0707.busnav.domain.navigation.ArrivalSnapshot(),
     val isRouteLoading: Boolean = true,
     val routeError: String? = null,
@@ -64,6 +65,8 @@ fun resolveNavigationLayout(widthDp: Float, heightDp: Float): NavigationLayoutMo
 /** Explicit start owns activation; stored-record identity is never a mode discriminator. */
 val NavigationUiState.navigationActive: Boolean
     get() = isNavigationStarted && activeRoute != null
+
+val NavigationUiState.keepScreenOn: Boolean get() = navigationActive
 
 val NavigationUiState.routeLabel: String
     get() = if (activeDetour != null) "迂回経路" else if (navigationMode == net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE) "案内経路" else "所定経路"

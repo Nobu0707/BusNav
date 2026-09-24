@@ -52,6 +52,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -67,6 +69,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -120,6 +123,7 @@ fun NavigationRoute(
     val orientation by orientationFlow.collectAsState(null)
     val preferenceScope = androidx.compose.runtime.rememberCoroutineScope()
     val uiState by stateHolder.uiState.collectAsState()
+
     SideEffect { if (!uiState.isNavigationStarted) navigationViewModel.hasNavigationCamera = false }
     val freeHolder = viewModel { FreeNavigationViewModel(routingEngine, stateHolder) }.holder
     val freeState by freeHolder.state.collectAsState()
@@ -155,6 +159,15 @@ fun NavigationRoute(
     var screen by rememberSaveable { mutableStateOf(BusNavScreen.NAVIGATION) }
     var routeMenu by rememberSaveable { mutableStateOf(false) }
     var pendingScreen by rememberSaveable { mutableStateOf<BusNavScreen?>(null) }
+    val showActiveNavigation = screen == BusNavScreen.NAVIGATION && !showConnections
+    DisposableEffect(context, uiState.keepScreenOn, showActiveNavigation) {
+        val window = (context as? android.app.Activity)?.window
+        val keepOn = uiState.keepScreenOn && showActiveNavigation
+        if (keepOn) window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            if (keepOn) window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
 
     LaunchedEffect(detourState.stage) {
         if (detourState.stage == DetourSessionState.COMPLETED) {
@@ -382,6 +395,7 @@ fun NavigationRoute(
                     androidx.compose.runtime.key(detourState.stage == DetourSessionState.PREVIEW) {
                         MapScreen(
                             trafficEvents = trafficState.activeEvents,
+                            deviceCompassEnabled = false,
                             location = uiState.location, isFollowingLocation = false, recenterRequestId = 0,
                             activeRoute = uiState.prescribedRouteSnapshot, routeOverviewRequestId = 0,
                             detourOverlay = DetourOverlayData(detourState.candidate?.route ?: uiState.activeDetour?.candidate?.route,
@@ -423,6 +437,7 @@ fun NavigationRoute(
                     androidx.compose.runtime.key(freeState.stage == FreeNavigationStage.PREVIEW) {
                         MapScreen(
                             trafficEvents = trafficState.activeEvents,
+                            deviceCompassEnabled = !uiState.navigationActive,
                             initialCamera = freeHolder.camera ?: uiState.location?.let { net.nobu0707.busnav.ui.routeplan.EditorCamera(it.point, 14.0) },
                             onCameraChanged = freeHolder::saveCamera,
                             basemapConfig = basemapConfig.withTheme(false),
@@ -762,7 +777,10 @@ private fun MapArea(
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.BottomEnd) {
-        mapContent(Modifier.fillMaxSize())
+        val bottomOcclusion = remember { mutableIntStateOf(0) }
+        CompositionLocalProvider(net.nobu0707.busnav.map.LocalNavigationMapBottomOcclusionPx provides bottomOcclusion.intValue) {
+            mapContent(Modifier.fillMaxSize())
+        }
 
         if (uiState.locationPermissionState != LocationPermissionState.Granted) {
             PermissionPrompt(
@@ -774,7 +792,7 @@ private fun MapArea(
         }
 
         Column(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.onSizeChanged { bottomOcclusion.intValue = it.height }.padding(12.dp),
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {

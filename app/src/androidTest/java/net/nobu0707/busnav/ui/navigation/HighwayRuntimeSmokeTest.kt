@@ -137,8 +137,6 @@ class HighwayRuntimeSmokeTest {
         rule.onNodeWithTag(RoutePlanEditorTestTags.POINT_LIST).performScrollToNode(hasTestTag(RoutePlanEditorTestTags.APPLY))
         rule.onNodeWithTag(RoutePlanEditorTestTags.APPLY).performClick()
         rule.waitUntil(10000) { rule.onAllNodesWithTag(NavigationTestTags.MAP).fetchSemanticsNodes().isNotEmpty() }
-            rule.onNodeWithContentDescription("ルートメニューを開く").performClick()
-            rule.onNodeWithText("案内開始").performClick()
         val calculator = NavigationProgressCalculator(route)
         val decisions = calculator.highwayCalculator.decisions
         assertTrue(decisions.isNotEmpty())
@@ -146,7 +144,12 @@ class HighwayRuntimeSmokeTest {
         assertTrue(decisions.all { it.distanceAlongRouteMeters.isFinite() })
         val decision = decisions.firstOrNull { it.sign.facilityNames.isNotEmpty() } ?: decisions.firstOrNull { it.sign.toward.isNotEmpty() } ?: decisions.first()
         val maneuver = requireNotNull(route.guidance).maneuvers[decision.maneuverIndex]
-        position(route.geometry.points[(maneuver.beginGeometryIndex - 1).coerceAtLeast(0)])
+        val startPoint = route.geometry.points[(maneuver.beginGeometryIndex - 1).coerceAtLeast(0)]
+        position(startPoint)
+        rule.waitUntil(10000) { holder().uiState.value.location?.point == startPoint }
+        rule.onNodeWithContentDescription("ルートメニューを開く").performClick()
+        rule.onNodeWithText("案内開始").performClick()
+        position(startPoint)
         awaitHighway()
         rule.onNodeWithTag("highway_schematic", useUnmergedTree = true).assertIsDisplayed()
         rule.onNodeWithTag(NavigationTestTags.MAP).assertIsDisplayed()
@@ -203,6 +206,8 @@ class HighwayRuntimeSmokeTest {
         rule.onNodeWithTag(RoutePlanEditorTestTags.POINT_LIST).performScrollToNode(hasTestTag(RoutePlanEditorTestTags.APPLY))
         rule.onNodeWithTag(RoutePlanEditorTestTags.APPLY).performClick()
         rule.waitUntil(10000) { rule.onAllNodesWithTag(NavigationTestTags.MAP).fetchSemanticsNodes().isNotEmpty() }
+        position(route.geometry.first)
+        rule.waitUntil(10000) { holder().uiState.value.location?.point == route.geometry.first }
             rule.onNodeWithContentDescription("ルートメニューを開く").performClick()
             rule.onNodeWithText("案内開始").performClick()
         rule.runOnIdle { assertEquals(2, calls) }

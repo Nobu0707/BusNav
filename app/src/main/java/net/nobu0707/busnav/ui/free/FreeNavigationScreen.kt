@@ -38,6 +38,9 @@ fun FreeNavigationScreen(
                 Text("安全な場所で操作してください", style = MaterialTheme.typography.bodySmall)
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("free_error")) }
                 if (state.stage == FreeNavigationStage.PREVIEW) {
+                    if ((state.startPosition?.snapDistanceMeters ?: 0.0) >
+                        net.nobu0707.busnav.domain.navigation.NavigationStartSnapConfig().preferredMaxSnapMeters)
+                        Text("最寄りの道路から案内を開始します")
                     startMessage?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("free_location_message")) }
                     if (degraded) Text("位置精度が低下しています。案内を控えめに表示します。", modifier = Modifier.testTag("free_degraded"))
                 }

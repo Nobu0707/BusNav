@@ -8,7 +8,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +43,8 @@ import net.nobu0707.busnav.ui.routeplan.EditorCamera
 import net.nobu0707.busnav.ui.routeplan.EditorCameraRequest
 import org.maplibre.android.maps.MapView
 
+val LocalNavigationMapBottomOcclusionPx = compositionLocalOf { 0 }
+
 @Composable
 fun MapScreen(
     location: LocationState?,
@@ -59,6 +63,8 @@ fun MapScreen(
         isDebug = BuildConfig.DEBUG,
     ),
     navigationCamera: net.nobu0707.busnav.domain.navigation.NavigationCameraState = net.nobu0707.busnav.domain.navigation.NavigationCameraState(),
+    deviceHeadingOverride: Double? = null,
+    deviceCompassEnabled: Boolean = !navigationCamera.active && deviceHeadingOverride == null,
     onToggleOrientation: (() -> Unit)? = null,
     initialCamera: EditorCamera? = null,
     initialNavigationCamera: Boolean = navigationCamera.active && initialCamera != null,
@@ -78,6 +84,7 @@ fun MapScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val routePaddingPx = with(LocalDensity.current) { 64.dp.roundToPx() }
+    val bottomOcclusionPx = LocalNavigationMapBottomOcclusionPx.current
     var basemapState by remember {
         mutableStateOf(
             if (basemapConfig.mode == BasemapMode.FALLBACK) {
@@ -94,6 +101,8 @@ fun MapScreen(
         MapView(context).also { it.onCreate(null) }
     }
     var cameraBearing by remember { mutableStateOf(initialCamera?.bearing ?: 0.0) }
+    var deviceHeading by remember { mutableStateOf<Double?>(null) }
+    val sensorLocation by rememberUpdatedState(location)
     val cameraCallback by androidx.compose.runtime.rememberUpdatedState(onCameraChanged)
     val initializedCallback by androidx.compose.runtime.rememberUpdatedState(onNavigationCameraInitialized)
     val controller = remember(mapView, routePaddingPx) {
@@ -179,9 +188,24 @@ fun MapScreen(
         }
     }
 
+    DisposableEffect(context, lifecycleOwner, mapView, deviceCompassEnabled) {
+        val sensor = DeviceHeadingSensor(context, { sensorLocation },
+            { mapView.display?.rotation ?: android.view.Surface.ROTATION_0 }) { deviceHeading = it }
+        fun sync() {
+            if (deviceCompassEnabled && lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+                sensor.start() else sensor.stop()
+        }
+        val observer = LifecycleEventObserver { _, _ -> sync() }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        if (!deviceCompassEnabled) deviceHeading = null
+        sync()
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer); sensor.stop() }
+    }
+
     SideEffect {
         controller.updateBasemap(basemapConfig)
-        controller.update(location, isFollowingLocation, recenterRequestId, navigationCamera)
+        controller.updateDeviceHeading(deviceHeadingOverride ?: if (deviceCompassEnabled) deviceHeading else null)
+        controller.update(location, isFollowingLocation, recenterRequestId, navigationCamera, bottomOcclusionPx)
         controller.updateRoute(activeRoute, routeOverviewRequestId)
         controller.updateDetour(detourOverlay)
         controller.updateTraffic(trafficEvents)

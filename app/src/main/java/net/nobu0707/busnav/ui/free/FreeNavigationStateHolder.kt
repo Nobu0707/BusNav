@@ -5,6 +5,9 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import net.nobu0707.busnav.domain.model.GeoPoint
 import net.nobu0707.busnav.domain.navigation.FreeNavigationPlan
+import net.nobu0707.busnav.domain.navigation.NavigationStartPosition
+import net.nobu0707.busnav.domain.navigation.NavigationStartSnapConfig
+import net.nobu0707.busnav.domain.navigation.freeNavigationStartPosition
 import net.nobu0707.busnav.domain.prescribed.NavigationMode
 import net.nobu0707.busnav.domain.route.ScheduledRoute
 import net.nobu0707.busnav.domain.routing.RoutingEngine
@@ -25,6 +28,7 @@ data class FreeNavigationUiState(
     val error: String? = null,
     val cameraRequest: EditorCameraRequest? = null,
     val vehicleProfile: VehicleProfile = VehicleProfile.DEVELOPMENT_LARGE_BUS,
+    val startPosition: NavigationStartPosition? = null,
 )
 
 /** One shared navigation location source; no location or library subscription of its own.
@@ -40,6 +44,8 @@ class FreeNavigationStateHolder(
     private val _state = MutableStateFlow(FreeNavigationUiState(vehicleProfile = profile))
     val state = _state.asStateFlow()
     private var revision = 0L
+    private var pendingRawStart: GeoPoint? = null
+    private val snapConfig = NavigationStartSnapConfig()
     var camera: EditorCamera? = null
         private set
 
@@ -51,12 +57,19 @@ class FreeNavigationStateHolder(
                 when (result) {
                     is RouteCalculationState.Success -> if (result.planRevision == revision) {
                         val route = result.route
-                        if (!current.isRecalculation && !navigation.previewFreeRoute(requireNotNull(current.plan), route)) {
+                        val start = pendingRawStart?.let { freeNavigationStartPosition(it, route, snapConfig) }
+                        if (start == null) {
+                            _state.value = current.copy(stage = FreeNavigationStage.SELECTING,
+                                error = "走行可能な道路を確認できません", calculation = RouteCalculationState.Idle)
+                            return@collect
+                        }
+                        if (!current.isRecalculation && !navigation.previewFreeRoute(requireNotNull(current.plan), route, start)) {
                             cancel()
                             return@collect
                         }
                         _state.value = current.copy(stage = FreeNavigationStage.PREVIEW, calculation = result,
-                            previewRoute = route, cameraRequest = EditorCameraRequest(revision, route.geometry.points))
+                            previewRoute = route, startPosition = start,
+                            cameraRequest = EditorCameraRequest(revision, route.geometry.points))
                     }
                     is RouteCalculationState.Failure -> if (result.planRevision == revision) {
                         _state.value = current.copy(stage = FreeNavigationStage.SELECTING, calculation = result, error = result.reason.userMessage())
@@ -92,6 +105,7 @@ class FreeNavigationStateHolder(
             return false
         }
         invalidate()
+        pendingRawStart = startFix.point
         _state.value = current.copy(stage = FreeNavigationStage.CALCULATING, error = null,
             calculation = RouteCalculationState.Calculating(revision), previewRoute = null)
         // ONLY raw LocationState.point is read here. Matched projections cannot become START.
@@ -150,5 +164,5 @@ class FreeNavigationStateHolder(
     fun cameraApplied(id: Long) {
         if (_state.value.cameraRequest?.id == id) _state.value = _state.value.copy(cameraRequest = null)
     }
-    private fun invalidate() { revision++; calculation.cancel() }
+    private fun invalidate() { revision++; pendingRawStart = null; calculation.cancel() }
 }

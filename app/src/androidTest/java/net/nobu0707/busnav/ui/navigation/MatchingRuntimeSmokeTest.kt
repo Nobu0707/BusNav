@@ -133,8 +133,10 @@ class MatchingRuntimeSmokeTest {
                     net.nobu0707.busnav.domain.routeplan.RoutePlanPoint(it.id,
                         net.nobu0707.busnav.domain.routeplan.RoutePlanPointType.valueOf(it.type.name), it.position, it.name)
                 }), route, VehicleProfile.DEVELOPMENT_LARGE_BUS, 0, 0))
-            holder().startNavigation()
         }
+        position(pair.first)
+        rule.waitUntil(10000) { holder().uiState.value.location?.point==pair.first }
+        rule.runOnIdle { assertTrue(holder().startNavigation()) }
         position(pair.first);await(RouteDeviationState.ON_ROUTE)
         rule.onNodeWithTag("deviation_banner").assertDoesNotExist()
         rule.runOnIdle { assertEquals(GuidanceStatus.RELIABLE,holder().uiState.value.guidance.status) }

@@ -59,6 +59,7 @@ class MapController(
     private var mapView: MapView? = null
     private var style: Style? = null
     private var latestLocation: LocationState? = null
+    private var deviceHeadingDegrees: Double? = null
     private var navigationCamera = NavigationCameraState()
     private var navigationInitialized = initialNavigationCamera
     private val headingConfig = NavigationHeadingConfig()
@@ -297,7 +298,7 @@ class MapController(
     }
 
     fun update(location: LocationState?, isFollowing: Boolean, recenterRequestId: Int,
-        cameraState: NavigationCameraState = NavigationCameraState()) {
+        cameraState: NavigationCameraState = NavigationCameraState(), bottomOcclusionPx: Int = 0) {
         val previous = navigationCamera
         navigationCamera = cameraState.copy(following = isFollowing)
         if (!cameraState.active) navigationInitialized = false
@@ -305,42 +306,51 @@ class MapController(
         if (recenter || (!previous.following && isFollowing)) gestureSuspended = false
         val fresh = !cameraState.active || headingFreshness.isFresh(location, android.os.SystemClock.elapsedRealtime())
         if (location == null || !fresh) {
-            // Only an active follow animation belongs to navigation. Editor camera
-            // updates also arrive without a location and must not cancel native gestures.
             if (cameraState.active && isFollowing && !gestureSuspended) map?.cancelTransitions()
             return
         }
+        if (!shouldApplyMapFrame(latestLocation?.elapsedRealtimeMillis, location.elapsedRealtimeMillis)) return
         latestLocation = location
-        renderLocation(location)
-        val native = map ?: return
-        if (!isFollowing || gestureSuspended) return
+        val native = map
+        if (native == null || !isFollowing || gestureSuspended) {
+            renderLocation(location)
+            return
+        }
         val changed = location.timestampMillis != lastFollowedTimestampMillis ||
             location.elapsedRealtimeMillis != lastFollowedElapsedMillis
         val initialNavigationFollow = navigationCamera.active && !navigationInitialized
-        if (initialNavigationFollow || !hasCenteredOnFirstLocation || recenter || changed || previous != navigationCamera) {
+        val expectedBottomPadding = if (navigationCamera.active && navigationCamera.orientation == NavigationMapOrientation.HEADING_UP)
+            bottomOcclusionPx else 0
+        if (initialNavigationFollow || !hasCenteredOnFirstLocation || recenter || changed || previous != navigationCamera ||
+            (navigationCamera.active && (native.cameraPosition.padding?.getOrNull(3)?.toInt() ?: 0) != expectedBottomPadding)) {
             val camera = native.cameraPosition
+            val frame = navigationMapFrame(location, navigationCamera, camera.bearing,
+                mapView?.height ?: 0, bottomOcclusionPx)
             val next = CameraPosition.Builder(camera)
-                .target(location.point.toLatLng())
-                .bearing(if (previous.active && !navigationCamera.active) 0.0 else navigationCamera.targetBearing(camera.bearing))
+                .target(frame.cameraTarget.toLatLng())
+                .bearing(if (previous.active && !navigationCamera.active) 0.0 else frame.cameraBearing)
                 .tilt(0.0)
                 .zoom(if (initialNavigationFollow || (!hasCenteredOnFirstLocation && initialCamera == null)) FOLLOW_ZOOM else camera.zoom)
+                .padding(0.0, frame.topPaddingPx, 0.0, frame.bottomPaddingPx)
                 .build()
-            val interval = location.elapsedRealtimeMillis?.let { time -> lastFollowedElapsedMillis?.let { time - it } }
-            val duration = interval?.takeIf { it > 0 }?.coerceIn(80, headingConfig.animationDurationMillis.toLong())?.toInt()
-                ?: headingConfig.animationDurationMillis
             native.cancelTransitions()
-            // Establish the first navigation zoom atomically, so recreation cannot save an
-            // intermediate overview zoom. Subsequent bearing/follow updates remain animated.
-            if (initialNavigationFollow) native.moveCamera(CameraUpdateFactory.newCameraPosition(next))
-            else native.easeCamera(CameraUpdateFactory.newCameraPosition(next), duration)
             if (navigationCamera.active) {
+                // A fix owns the marker and camera in the same UI frame. An older ease
+                // transition must never chase the next fix.
+                native.moveCamera(CameraUpdateFactory.newCameraPosition(next))
+                renderLocation(location, frame.markerScreenRotation)
                 navigationInitialized = true
                 onNavigationCameraInitialized()
+            } else {
+                renderLocation(location)
+                native.easeCamera(CameraUpdateFactory.newCameraPosition(next), RECENTER_ANIMATION_MILLIS)
             }
             hasCenteredOnFirstLocation = true
             lastRecenterRequestId = recenterRequestId
             lastFollowedTimestampMillis = location.timestampMillis
             lastFollowedElapsedMillis = location.elapsedRealtimeMillis
+        } else {
+            renderLocation(location)
         }
     }
 
@@ -432,19 +442,27 @@ class MapController(
         }
     }
 
-    private fun renderLocation(location: LocationState) {
+    fun updateDeviceHeading(heading: Double?) {
+        deviceHeadingDegrees = heading
+        if (!navigationCamera.active) latestLocation?.let(::renderVehicleRotation)
+    }
+
+    private fun renderLocation(location: LocationState, markerRotation: Double? = null) {
         val loadedStyle = style ?: return
         (loadedStyle.getSource(VEHICLE_SOURCE_ID) as? GeoJsonSource)?.setGeoJson(
             Feature.fromGeometry(Point.fromLngLat(location.point.longitude, location.point.latitude)),
         )
-        renderVehicleRotation(location)
+        if (markerRotation != null) style?.getLayer(VEHICLE_LAYER_ID)?.setProperties(iconRotate(markerRotation.toFloat()))
+        else renderVehicleRotation(location)
     }
 
     private fun renderVehicleRotation(location: LocationState) {
         val camera = map?.cameraPosition ?: return
         style?.getLayer(VEHICLE_LAYER_ID)?.setProperties(
             iconRotate(navigationCamera.copy(following = navigationCamera.following && !gestureSuspended)
-                .vehicleScreenRotation(camera.bearing, location.normalizedBearingDegrees?.toDouble()).toFloat()),
+                .vehicleScreenRotation(camera.bearing,
+                    if (navigationCamera.active) location.normalizedBearingDegrees?.toDouble()
+                    else deviceHeadingDegrees ?: location.normalizedBearingDegrees?.toDouble()).toFloat()),
         )
     }
 

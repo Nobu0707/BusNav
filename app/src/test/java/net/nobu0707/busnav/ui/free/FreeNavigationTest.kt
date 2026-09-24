@@ -331,4 +331,58 @@ class FreeNavigationTest {
         assertEquals(1, detector.update(first, fix(12000, destination), destination, 0.0, true, 12000).consecutiveFixes)
         assertEquals(0, detector.update(first, fix(2000, destination), destination, 0.0, true, 20000).consecutiveFixes)
     }
-}
+    @Test fun offRoadFreeRouteUsesOneRequestAndKeepsRawMarker() = runTest {
+        var requests = 0
+        val h = Harness(this, engineOverride = RoutingEngine { request ->
+            requests++
+            val snapped = GeoPoint(request.origin.latitude + 80.0 / 111_195.1, request.origin.longitude)
+            RoutingResult.Success(ScheduledRoute("snapped", "snapped",
+                RouteGeometry(listOf(snapped, request.destination)),
+                listOf(RoutePoint("start", RoutePointType.START, request.origin),
+                    RoutePoint("end", RoutePointType.DESTINATION, request.destination))),
+                RoutingSummary(1000.0, 120.0))
+        })
+        h.ready(); h.preview()
+        assertEquals(1, requests)
+        assertEquals(origin, h.nav.uiState.value.location!!.point)
+        val start = h.free.state.value.startPosition!!
+        assertEquals(origin, start.rawLocation)
+        assertEquals(NavigationStartSource.ROUTING_SNAPPED, start.source)
+        assertEquals(80.0, start.snapDistanceMeters, 0.2)
+        assertEquals(start, h.nav.uiState.value.freeStartPosition)
+        assertTrue(h.free.start())
+        assertEquals(origin, h.nav.uiState.value.location!!.point)
+    }
+
+    @Test fun distantFreeSnapIsBlockedWithRoadMessage() = runTest {
+        var requests = 0
+        val h = Harness(this, engineOverride = RoutingEngine { request ->
+            requests++
+            val distant = GeoPoint(request.origin.latitude + 350.0 / 111_195.1, request.origin.longitude)
+            RoutingResult.Success(ScheduledRoute("distant", "distant",
+                RouteGeometry(listOf(distant, request.destination)),
+                listOf(RoutePoint("start", RoutePointType.START, request.origin),
+                    RoutePoint("end", RoutePointType.DESTINATION, request.destination))),
+                RoutingSummary(1000.0, 120.0))
+        })
+        h.ready(); h.free.beginSelection(); h.free.selectDestination(destination)
+        assertTrue(h.free.calculate()); runCurrent()
+        assertEquals(1, requests)
+        assertEquals(FreeNavigationStage.SELECTING, h.free.state.value.stage)
+        assertEquals("走行可能な道路を確認できません", h.free.state.value.error)
+        assertNull(h.nav.uiState.value.activeRoute)
+    }
+
+    @Test fun prescribedStartsOffRouteWithoutInventingMatch() = runTest {
+        val h = Harness(this)
+        val record = prescribedFixture()
+        h.nav.setPermission(LocationPermissionState.Granted); runCurrent()
+        val offRoad = GeoPoint(record.route.geometry.first.latitude + 0.002,
+            record.route.geometry.first.longitude)
+        h.send(point = offRoad)
+        assertTrue(h.nav.openPrescribedRoute(record))
+        assertTrue(h.nav.startNavigation()); runCurrent()
+        assertEquals(offRoad, h.nav.uiState.value.location!!.point)
+        assertTrue(h.nav.uiState.value.navigationActive)
+        assertNotEquals(RouteMatchQuality.MATCHED, h.nav.uiState.value.deviationSnapshot.matchQuality)
+    }}

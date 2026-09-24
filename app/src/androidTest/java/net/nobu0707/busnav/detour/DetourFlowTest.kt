@@ -142,8 +142,11 @@ class DetourFlowTest {
         try {
             attach();waitTag(NavigationTestTags.MAP)
             val original=(runBlocking{library.getById(saved.id)} as PrescribedRouteLoad.Found).record
-            rule.runOnIdle {assertTrue(nav().openPrescribedRoute(original));nav().startNavigation()}
+            rule.runOnIdle {assertTrue(nav().openPrescribedRoute(original))}
             val start=if(live) original.route.geometry.first else point(100.0)
+            position(start)
+            rule.waitUntil(10000) {nav().uiState.value.location?.point==start}
+            rule.runOnIdle {assertTrue(nav().startNavigation())}
             position(start)
             rule.waitUntil(20000) {nav().uiState.value.lastReliablePrescribedProgress!=null}
             val rawStart=if(proactive) start else if(live) offRoutePoint(original.route,start) else GeoPoint(start.latitude+0.0009,start.longitude)

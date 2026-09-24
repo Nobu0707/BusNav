@@ -9,6 +9,10 @@ Detour用の逸脱判定と所定経路復帰判定は独立し、復帰確定�
 復帰はMATCHED・25m/精度30m・連続3fix/2秒、方向利用可能時45度以内。
 [Detour/Rejoin](detour-rejoin.md)に閾値・early rejoin・保持indexの詳細を記載。
 
+## Phase010.6C 開始条件
+
+FREE/PRESCRIBED の案内セッション開始は route MATCHED を要求しない。位置権限と新鮮で利用可能な raw fix が gate となり、FREE では routing 結果も必要。PRESCRIBED を経路外から開始しても近傍 segment を MATCHED に偽装しない。FREE の道路起点は Valhalla /route の geometry first point と raw START の距離で最大300mに制限する。詳細は [navigation runtime](navigation-runtime-location-camera.md)。
+
 ## 境界
 
 Projection は geometry への幾何学的投影。RouteProjector は従来どおり全 segment の最近傍を返し、

@@ -40,7 +40,8 @@ class DeveloperConnectionScreenTest {
         }
         rule.waitUntil(5_000) { rule.onAllNodes(hasText(defaults.valhallaBaseUrl)).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("basemap_region_kanto").performScrollTo().assertIsSelected()
-        rule.onNodeWithTag("basemap_region_chubu").performClick().assertIsSelected()
+        rule.onNodeWithTag("basemap_region_chubu").performScrollTo().performClick()
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag("basemap_region_chubu").fetchSemanticsNodes().any { it.config[androidx.compose.ui.semantics.SemanticsProperties.Selected] == true } }
         rule.onNodeWithTag("valhalla_url").performScrollTo().performTextReplacement("host:8002")
         rule.onNodeWithTag("valhalla_url").assertTextContains("host:8002")
         closeSoftKeyboard()

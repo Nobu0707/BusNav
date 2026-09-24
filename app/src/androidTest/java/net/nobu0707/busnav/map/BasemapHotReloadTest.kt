@@ -54,7 +54,7 @@ class BasemapHotReloadTest {
                 net.nobu0707.busnav.ui.navigation.DeviationUiState("所定経路から外れている可能性があります", true))
             MapScreen(location = net.nobu0707.busnav.location.LocationState(GeoPoint(35.18,136.90),5f,73f,0f,1L), isFollowingLocation = false, recenterRequestId = 0,
                 activeRoute = route, routeOverviewRequestId = 0, routePlan = plan,
-                basemapConfig = config.value, onMapReady = { ready = true },
+                basemapConfig = config.value, deviceHeadingOverride = 73.0, onMapReady = { ready = true },
                 onMapGesture = {}, onMapError = {})
             }
         }

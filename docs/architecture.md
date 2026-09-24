@@ -1,5 +1,9 @@
 # BusNav Phase009 アーキテクチャ
 
+## Phase010.6C runtime boundary
+
+`NavigationStateHolder` owns raw location, start quality, navigation session and resolved navigation heading. `FreeNavigationStateHolder` compares raw routing START to Valhalla's first geometry point, retaining a separate safe calculation start. `MapController` builds one `NavigationMapFrame` per accepted fix, places the HEADING_UP camera target at 72% of the measured visible map, and updates marker/camera in the same UI pass. `DeviceHeadingSensor` is scoped to a resumed inactive map; navigation heading never reads it. The Compose route owns the window `FLAG_KEEP_SCREEN_ON` for active sessions. See [runtime design](navigation-runtime-location-camera.md).
+
 ## Detour / Rejoinの境界
 
 PRESCRIBED sessionはprescribedRouteSnapshot / prescribedVehicleProfile / prescribedSessionTokenを保持する。

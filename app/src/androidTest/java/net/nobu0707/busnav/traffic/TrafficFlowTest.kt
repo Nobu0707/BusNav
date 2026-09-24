@@ -66,6 +66,8 @@ class TrafficFlowTest {
         rule.onNodeWithTag("traffic_source_fixture").performScrollTo().performClick()
         rule.onNodeWithText("受信情報に現在有効な規制はありません").assertExists()
         rule.onNodeWithText("閉じる").performClick()
+        position(100.0)
+        rule.waitUntil(10000){nav().uiState.value.location?.point==point(100.0)}
         rule.runOnIdle {
             if(free){nav().previewFreeRoute(FreeNavigationPlan(saved.route.geometry.last),saved.route);nav().startFreeNavigation()}
             else {nav().openPrescribedRoute(saved);nav().startNavigation()}

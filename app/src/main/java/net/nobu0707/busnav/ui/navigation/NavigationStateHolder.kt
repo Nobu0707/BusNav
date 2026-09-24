@@ -170,9 +170,10 @@ class NavigationStateHolder(
         return true
     }
 
-    fun previewFreeRoute(plan: FreeNavigationPlan, route: ScheduledRoute): Boolean {
+    fun previewFreeRoute(plan: FreeNavigationPlan, route: ScheduledRoute,
+        startPosition: NavigationStartPosition? = null): Boolean {
         if (_uiState.value.isNavigationStarted) return false
-        update { copy(activeRoute = route, freePlan = plan, activePrescribedRouteId = null,
+        update { copy(activeRoute = route, freePlan = plan, freeStartPosition = startPosition, activePrescribedRouteId = null,
             prescribedRouteSnapshot = null, prescribedVehicleProfile = null, activeDetour = null,
             lastReliablePrescribedProgress = null, rejoin = RejoinSnapshot(), prescribedSessionToken = prescribedSessionToken + 1,
             activePrescribedRouteName = null, navigationMode = net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE,
@@ -192,7 +193,8 @@ class NavigationStateHolder(
     fun replaceFreeRoute(plan: FreeNavigationPlan, route: ScheduledRoute): Boolean {
         if (!_uiState.value.navigationActive || _uiState.value.navigationMode != net.nobu0707.busnav.domain.prescribed.NavigationMode.FREE ||
             _uiState.value.freePlan != plan) return false
-        update { copy(activeRoute = route, isFollowingLocation = true, routeOverviewRequestId = routeOverviewRequestId + 1) }
+        update { copy(activeRoute = route, isFollowingLocation = true, freeStartPosition = null,
+            routeOverviewRequestId = routeOverviewRequestId + 1) }
         return true
     }
 
@@ -200,7 +202,8 @@ class NavigationStateHolder(
         if (_uiState.value.isNavigationStarted) return false
         update { copy(activeRoute = record.route, prescribedRouteSnapshot = record.route,
             prescribedVehicleProfile = record.vehicleProfile, prescribedSessionToken = prescribedSessionToken + 1,
-            lastReliablePrescribedProgress = null, activeDetour = null, rejoin = RejoinSnapshot(), freePlan = null, activePrescribedRouteId = record.id, activePrescribedRouteName = record.name,
+            lastReliablePrescribedProgress = null, activeDetour = null, rejoin = RejoinSnapshot(), freePlan = null,
+            freeStartPosition = null, activePrescribedRouteId = record.id, activePrescribedRouteName = record.name,
             navigationMode = net.nobu0707.busnav.domain.prescribed.NavigationMode.PRESCRIBED,
             isNavigationStarted = false, isFollowingLocation = false, isRouteLoading = false,
             routeError = null, routeOverviewRequestId = routeOverviewRequestId + 1) }
@@ -230,7 +233,8 @@ class NavigationStateHolder(
         routeGeneration++ // Invalidate even a pending initial load when activeRoute is already null.
         update { copy(activeRoute = null, prescribedRouteSnapshot = null, prescribedVehicleProfile = null,
             prescribedSessionToken = prescribedSessionToken + 1, lastReliablePrescribedProgress = null,
-            activeDetour = null, rejoin = RejoinSnapshot(), freePlan = null, arrival = ArrivalSnapshot(), activePrescribedRouteId = null,
+            activeDetour = null, rejoin = RejoinSnapshot(), freePlan = null, freeStartPosition = null,
+            arrival = ArrivalSnapshot(), activePrescribedRouteId = null,
             activePrescribedRouteName = null, isNavigationStarted = false, isRouteLoading = false) }
     }
 

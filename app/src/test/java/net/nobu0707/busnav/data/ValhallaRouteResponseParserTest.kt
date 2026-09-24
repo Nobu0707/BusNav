@@ -1,12 +1,14 @@
 package net.nobu0707.busnav.data.routing.valhalla
 
 import net.nobu0707.busnav.domain.model.GeoPoint
+import net.nobu0707.busnav.domain.navigation.freeNavigationStartPosition
 import net.nobu0707.busnav.domain.route.RoutePointType
 import net.nobu0707.busnav.domain.routeplan.RoutePlanPointType
 import net.nobu0707.busnav.domain.routeplan.RoutingRequest
 import net.nobu0707.busnav.domain.routeplan.RoutingRequestPoint
 import net.nobu0707.busnav.domain.routing.VehicleProfile
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -25,6 +27,12 @@ class ValhallaRouteResponseParserTest {
         })
         assertEquals(1, success.route.points.count { it.type == RoutePointType.START })
         assertEquals(1, success.route.points.count { it.type == RoutePointType.DESTINATION })
+        val rawStart = validRequest().points.first().position
+        assertEquals(rawStart, success.route.start.position)
+        val routedStart = freeNavigationStartPosition(rawStart, success.route)
+        assertNotNull(routedStart)
+        assertEquals(success.route.geometry.first, routedStart!!.navigationStartPoint)
+        assertTrue(routedStart.snapDistanceMeters in 100.0..300.0)
         assertTrue(diagnostics.debugEntries.any {
             it.event == "parse.shape" && it.details.contains("encodedLength=12208")
         })

@@ -177,6 +177,8 @@ class FreeNavigationFlowTest {
             assertEquals(selected, free().state.value.plan)
             rule.onNodeWithTag("free_calculate").assertIsDisplayed().performClick()
             waitTag("free_preview")
+            rule.runOnIdle { assertEquals(0, rule.activity.window.attributes.flags and
+                android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
             val preview = free().state.value.previewRoute!!
             assertEquals(start, preview.start.position)
             assertEquals(1, calls.get()); assertFalse(nav().uiState.value.isNavigationStarted); assertEquals(1,count())
@@ -196,6 +198,8 @@ class FreeNavigationFlowTest {
             assertSame(preview, free().state.value.previewRoute)
             rule.onNodeWithTag("free_start").assertIsDisplayed().performClick()
             waitTag(NavigationTestTags.MAP)
+            rule.runOnIdle { assertNotEquals(0, rule.activity.window.attributes.flags and
+                android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
             if (live) position(preview.geometry.first) // Public synthetic fix on the routed road, after asserting raw START.
             rule.waitUntil(15000) { nav().uiState.value.guidance.status == GuidanceStatus.RELIABLE }
             assertEquals(NavigationMode.FREE,nav().uiState.value.navigationMode)
@@ -242,6 +246,8 @@ class FreeNavigationFlowTest {
                 assertNull(nav().uiState.value.activeRoute)
                 assertNull(nav().uiState.value.freePlan)
                 assertFalse(nav().uiState.value.isNavigationStarted)
+                assertEquals(0, rule.activity.window.attributes.flags and
+                    android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
             assertEquals(1,count())
             assertEquals(saved, runBlocking { (library.getById(saved.id) as net.nobu0707.busnav.domain.prescribed.PrescribedRouteLoad.Found).record })

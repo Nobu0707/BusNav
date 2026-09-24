@@ -16,11 +16,11 @@ Circular deltas use the shortest arc: 359→1 is +2°, 1→359 is -2°. Changes 
 
 ## Camera, gestures and lifecycle
 
-MapController owns animation. HEADING_UP follows the resolved bearing; NORTH_UP follows location at 0°. The first navigation follow establishes the existing 16.5 zoom once; a recreated active navigation camera keeps its saved zoom. Toggle/recenter preserve zoom, and tilt stays at 0°. The target remains centered; lower-center placement and additional visible-map geometry belong to Phase010.5C.
+MapController owns animation. HEADING_UP follows the resolved bearing; NORTH_UP follows location at 0°. The first navigation follow establishes the existing 16.5 zoom once; a recreated active navigation camera keeps its saved zoom. Toggle/recenter preserve zoom, and tilt stays at 0°. HEADING_UP following places the raw marker at 72% of the visible map pane height, excluding measured bottom overlay controls. NORTH_UP stays centered. Both orientations use the same raw location for camera target and marker.
 
 Move/rotate/zoom gestures suspend follow immediately. The orientation preference remains unchanged. Current location restores follow and the selected orientation. The camera-start gesture reason also covers pinch, rotation and double-tap zoom. MapLibre's built-in compass is disabled to avoid a competing reset action.
 
-Each update replaces the previous camera transition; duration is at most 350 ms and decreases to the observed update interval (minimum 80 ms). No completion callback can restore an old target. Style changes reinstall overlays without resetting camera or selected mode. The navigation ViewModel retains its own camera across Activity recreation, separate from editor camera state. Traffic/settings dialogs hide the compass and suspend camera following while open; returning preserves preference and follow intent.
+Each active navigation fix cancels previous camera transitions and moves camera and marker in one UI update. No old easing transition can chase a newer fix. Manual camera interaction still stops following. Style changes reinstall overlays without resetting camera or selected mode. The navigation ViewModel retains its own camera across Activity recreation, separate from editor camera state. Traffic/settings dialogs hide the compass and suspend camera following while open; returning preserves preference and follow intent.
 
 ## Marker and compass
 
@@ -40,4 +40,4 @@ The 2,200m show / >2,600m hide shield hysteresis is unchanged. Top-center/bottom
 
 See [Review014b](reviews/014b-navigation-camera-marker.md) for commands and results. Unit coverage includes persistence across store reopening, invalid values, heading reliability, circular math, spikes, ordinary turns, camera policy and marker geometry. Native tests include camera cardinals, rendered pixels, north projection, stale/null fixes, drag/recenter, zoom preservation, reloads, navigation-only control, accessibility bounds and portrait/landscape.
 
-No device compass sensor, 3D tilt, automatic rerouting or new map data is added. GPS course requires movement; stationary initial heading may be unavailable until a reliable route match or moving fix arrives. The viewport target is centered in this phase. Field-driving comfort and very high-frequency GPS behavior remain limits of synthetic stationary testing.
+On an inactive map, TYPE_ROTATION_VECTOR supplies the marker heading with display-rotation remapping, declination correction where location is available, and circular smoothing. Navigation still uses GPS course or reliable route fallback. No 3D tilt, automatic rerouting, or new map data is added. Field-driving comfort and very high-frequency GPS behavior remain limits of synthetic stationary testing.

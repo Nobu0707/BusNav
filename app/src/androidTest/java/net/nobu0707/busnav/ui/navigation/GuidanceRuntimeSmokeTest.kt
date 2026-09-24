@@ -63,6 +63,10 @@ class GuidanceRuntimeSmokeTest {
             rule.onNodeWithTag(RoutePlanEditorTestTags.CALCULATE).performClick()
             rule.waitUntil(120_000) { rule.onAllNodesWithTag(RoutePlanEditorTestTags.APPLY).fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithTag(RoutePlanEditorTestTags.APPLY).performClick()
+            rule.waitUntil(10_000) {
+                val state = ViewModelProvider(rule.activity)[NavigationViewModel::class.java].stateHolder.uiState.value
+                state.activeRoute != null && state.location?.point == state.activeRoute?.geometry?.first && state.startLocationAllowed
+            }
             rule.onNodeWithContentDescription("ルートメニューを開く").performClick()
             rule.onNodeWithText("案内開始").performClick()
             rule.waitUntil(10_000) { rule.onAllNodesWithTag("guidance_distance").fetchSemanticsNodes().isNotEmpty() }

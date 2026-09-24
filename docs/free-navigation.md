@@ -26,8 +26,8 @@ FreeNavigationUiState が IDLE でも NavigationUiState が started なら案内
 FreeNavigationPlan は目的地と任意の名前のみを持ちます。START を保存せず、計算・再計算の度に共有 NavigationUiState.location.point を取得します。
 RouteMatch の projection や旧保存経路上の点を START として使用しません。GPS 購読は NavigationStateHolder の1本だけです。
 
-FreeNavigationConfig の初期値は取得後10秒以内、accuracy 50m以内。elapsedRealtimeMillis と SystemClock.elapsedRealtime() を用い、wall clock に依存しません。
-未許可・未取得・位置情報無効・古い位置・低精度に対応するメッセージを表示し、計算を発行しません。null/負値/非有限 accuracy と未来・不明 timestamp も拒否します。
+現行の FREE 計算・開始は共通の LocationQualityPolicy と RecentStartFixes を使用します。取得後15秒以内、accuracy 150m以内の raw fix が対象です。elapsedRealtimeMillis と SystemClock.elapsedRealtime() を用い、wall clock に依存しません。旧 FreeNavigationConfig の 10秒/50m helper は互換用で、production gate ではありません。
+未許可・未取得・位置情報無効・古い位置・低精度に対応するメッセージを表示し、計算を発行しません。null/負値/非有限 accuracy と未来・不明 timestamp も拒否します。道路上への match は開始条件ではありません。
 案内中の matcher は既存の40m accuracy 上限などの安全条件を維持します。
 
 既存 VehicleProfile.DEVELOPMENT_LARGE_BUS（全長12m・幅2.5m・高さ3.5m・重量16t・軸重10t）を使用します。
@@ -42,7 +42,7 @@ Route Editor と FREE 選択は別画面・別状態です。MapSelectionCursor 
 
 計算は RouteCalculationStateHolder を使用します。目的地変更・キャンセルで世代を更新し、遅延応答を適用しません。同じ revision で再要求した場合も request generation を検証します。
 FREE の RoutePlan ID は free-UUID。保存ライブラリの UUID と別で、自動保存はありません。
-結果は経路線・目的地 marker・raw 現在地・距離・時間・車両条件のプレビューです。既存 editor camera/padding ロジックで全体 fit します。横向きは地図と操作欄を左右に並べ、主操作は詳細のスクロール領域外に固定します。
+結果は経路線・目的地 marker・raw 現在地・距離・時間・車両条件のプレビューです。Valhalla の最初の形状点を navigation 計算上の snapped START とし、raw fix から300m超なら拒否、100m超なら最寄りの道路から開始する旨を表示します。marker は raw fix のままです。追加の /locate は呼びません。既存 editor camera/padding ロジックで全体 fit します。横向きは地図と操作欄を左右に並べ、主操作は詳細のスクロール領域外に固定します。
 
 成功だけで案内を開始しません。「案内開始」が必要です。案内情報のない route は「案内情報なし・経路線を表示します」を示し、経路線による案内を許可します。
 既存 editor の候補適用は previewEditorCandidate を使い、プレビューとして表示・保存できます。「ルート」→「案内開始」で明示開始できます。
