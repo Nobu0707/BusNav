@@ -47,4 +47,4 @@ The legacy regional server setup remains as historical tooling, but it is outsid
 
 ## 9. Commits and archives
 
-The implementation and review are committed as the Phase010.6D change; the final HEAD is recorded in the archive metadata and final report. Lightweight and full review archives are built from that HEAD after the verified checks are summarized, without rerunning successful connected suites. Archives exclude device serials, APK/build files, GPS traces, private addresses, local.properties, .env, PBF/MBTiles and secrets.
+Implementation and initial review commit: `a0841840128d9dfb1405dc971ce9e81ee01fe8e5` (`feat: unify Japan map controls and visible viewport`). This final result update is a separate documentation commit. The final HEAD is recorded in the archive metadata and final report. Lightweight and full review archives are built from that HEAD after the verified checks are summarized, without rerunning successful connected suites. Archives exclude device serials, APK/build files, GPS traces, private addresses, local.properties, .env, PBF/MBTiles and secrets.
