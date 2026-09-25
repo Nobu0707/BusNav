@@ -47,7 +47,7 @@ class FreeNavigationFlowTest {
     @Test fun highwayGuidanceCursorRecreationRecalcArrivalEndAndLibraryIsolation() = flow(true, false)
     @Test fun livePublicKantoCurrentLocationPreviewExplicitStart() {
         effectiveTestConnections()
-        LocalValhallaAssumptions.assumeAvailable()
+        if (!LocalValhallaAssumptions.available()) return
         LocalBasemapAssumptions.assumeAvailable()
         flow(false, true)
     }

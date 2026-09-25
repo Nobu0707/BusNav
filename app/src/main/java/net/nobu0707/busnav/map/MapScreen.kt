@@ -101,6 +101,8 @@ fun MapScreen(
         MapView(context).also { it.onCreate(null) }
     }
     var cameraBearing by remember { mutableStateOf(initialCamera?.bearing ?: 0.0) }
+    var scaleMode by remember { mutableStateOf(ScaleMode.CUSTOM) }
+    var ruler by remember { mutableStateOf<ScaleRulerReading?>(null) }
     var deviceHeading by remember { mutableStateOf<Double?>(null) }
     val sensorLocation by rememberUpdatedState(location)
     val cameraCallback by androidx.compose.runtime.rememberUpdatedState(onCameraChanged)
@@ -111,6 +113,8 @@ fun MapScreen(
             initialNavigationCamera = initialNavigationCamera,
             onNavigationCameraInitialized = { initializedCallback() },
             onCameraChanged = { camera -> cameraBearing = camera.bearing; cameraCallback(camera) },
+            onScaleGesture = { scaleMode = ScaleMode.CUSTOM },
+            onRulerChanged = { ruler = it },
             onReady = onMapReady,
             onGesture = onMapGesture,
             onError = onMapError,
@@ -222,10 +226,12 @@ fun MapScreen(
             factory = { mapView },
             modifier = Modifier.fillMaxSize(),
         )
-        if (navigationCamera.active && onToggleOrientation != null) {
-            NavigationCompass(navigationCamera.orientation, cameraBearing, onToggleOrientation,
-                Modifier.align(Alignment.TopEnd).padding(8.dp))
-        }
+        MapControls(navigationCamera, cameraBearing, onToggleOrientation, controller::resetNorth,
+            scaleMode, {
+                val preset = MapControlsPolicy.nextPreset(scaleMode)
+                scaleMode = ScaleMode.valueOf(preset.name)
+                controller.applyScalePreset(preset)
+            }, ruler, Modifier.align(Alignment.TopEnd).padding(8.dp))
         BasemapStatusOverlay(
             failureHint = basemapConfig.failureHint,
             state = basemapState,

@@ -15,15 +15,14 @@ class BasemapRegionTest {
 
     @Test fun defaultAndRegionalUrlsAreIndependentOfRouting() {
         val settings = DeveloperConnectionSettings("http://localhost:8002", "http://localhost:8080")
-        assertEquals(BasemapRegion.KANTO, settings.basemapRegion)
+        assertEquals(BasemapRegion.JAPAN, settings.basemapRegion)
         val chubu = settings.copy(basemapRegion = BasemapRegion.CHUBU)
-        assertEquals("http://localhost:8080/styles/busnav-kanto/style.json", settings.basemapConfig(true).styleUrl)
-        assertEquals("http://localhost:8080/styles/busnav-chubu/style.json", chubu.basemapConfig(true).styleUrl)
-        assertNotEquals(settings.basemapConfig(true), chubu.basemapConfig(true))
+        assertEquals("http://localhost:8080/styles/busnav/style.json", settings.basemapConfig(true).styleUrl)
+        assertEquals(settings.basemapConfig(true), chubu.basemapConfig(true))
         assertEquals(settings.valhallaBaseUrl, chubu.valhallaBaseUrl)
         assertEquals(BasemapMode.FALLBACK, chubu.basemapConfig(false).mode)
-        assertEquals(BasemapRegion.KANTO, BasemapRegion.fromId("unknown"))
-        assertEquals(BasemapRegion.KANTO, BasemapRegion.fromId(null))
+        assertEquals(BasemapRegion.JAPAN, BasemapRegion.fromId("unknown"))
+        assertEquals(BasemapRegion.JAPAN, BasemapRegion.fromId(null))
     }
 
     @Test fun invalidStoredRegionFallsBackAndResetRemovesRegion() = runBlocking {
@@ -34,9 +33,9 @@ class BasemapRegionTest {
             val repo = DataStoreDeveloperConnectionRepository(store, defaults)
             val key = stringPreferencesKey("basemapRegion")
             store.edit { it[key] = "unknown" }
-            assertEquals(BasemapRegion.KANTO, repo.settings.first().basemapRegion)
+            assertEquals(BasemapRegion.JAPAN, repo.settings.first().basemapRegion)
             repo.update(defaults.copy(basemapRegion = BasemapRegion.CHUBU))
-            assertEquals("chubu", store.data.first()[key])
+            assertEquals("japan", store.data.first()[key])
             repo.reset()
             assertNull(store.data.first()[key])
             assertEquals(defaults, repo.settings.first())

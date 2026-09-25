@@ -153,14 +153,15 @@ fun RoutePlanEditorScreen(
                 return Velocity.Zero
             }
         }
-        LaunchedEffect(height, level, density) { onSheetHeightChanged(level, with(density) { height.roundToPx() }) }
+        androidx.compose.runtime.SideEffect { onSheetHeightChanged(level, with(density) { height.roundToPx() }) }
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().height(headerHeight).padding(horizontal = 8.dp)) {
                 EditorHeader(onBack, onOpenConnections)
             }
             Box(Modifier.fillMaxWidth().weight(1f).testTag(RoutePlanEditorTestTags.MAP)) {
                 mapContent(Modifier.fillMaxSize())
-                net.nobu0707.busnav.map.MapSelectionCursor(net.nobu0707.busnav.map.MapSelectionMode.ROUTE_POINT)
+                net.nobu0707.busnav.map.MapSelectionCursor(net.nobu0707.busnav.map.MapSelectionMode.ROUTE_POINT,
+                    bottomInsetPx = with(density) { height.roundToPx() })
                 Card(Modifier.align(Alignment.TopStart).padding(8.dp)) {
                     Text(if (calculationState is RouteCalculationState.Success && calculationState.planRevision == uiState.revision)
                         "探索結果（道路沿いルート）" else "仮ルート（経路探索前プレビュー）",

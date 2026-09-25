@@ -1,6 +1,8 @@
 package net.nobu0707.busnav.domain.navigation
 
 import net.nobu0707.busnav.domain.model.GeoPoint
+import net.nobu0707.busnav.domain.model.MapViewportInsets
+import net.nobu0707.busnav.domain.model.VisibleMapViewport
 import net.nobu0707.busnav.location.LocationState
 
 data class NavigationMapFrame(
@@ -24,10 +26,14 @@ fun navigationMapFrame(
     bottomOcclusionPx: Int,
 ): NavigationMapFrame {
     val bearing = camera.targetBearing(currentBearing)
-    val occlusion = bottomOcclusionPx.coerceIn(0, (mapHeightPx - 1).coerceAtLeast(0))
-    val visibleHeight = (mapHeightPx - occlusion).coerceAtLeast(1)
+    val viewport = VisibleMapViewport(1, mapHeightPx,
+        MapViewportInsets(bottom = bottomOcclusionPx))
+    val occlusion = mapHeightPx.coerceAtLeast(1) - viewport.rect.bottom.toInt()
+    val visibleHeight = viewport.rect.height.toDouble()
     val lowerAnchor = camera.active && camera.following && camera.orientation == NavigationMapOrientation.HEADING_UP
-    val topPadding = if (lowerAnchor) visibleHeight * 0.44 else 0.0
+    // MapLibre centers the target between its top and bottom camera padding.
+    // 0.70 * visible height places it at 0.85 of the visible viewport.
+    val topPadding = if (lowerAnchor) visibleHeight * 0.70 else 0.0
     val bottomPadding = if (lowerAnchor) occlusion.toDouble() else 0.0
     return NavigationMapFrame(location, location.point, bearing,
         camera.vehicleScreenRotation(bearing, location.normalizedBearingDegrees?.toDouble()),

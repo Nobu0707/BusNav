@@ -2,7 +2,7 @@
 
 Developer Connections (debug builds) offers Local Emulator, Local LAN, Remote Test,
 and Custom. Select a profile, then **保存** to apply it. Selection alone is a draft.
-During active FREE or PRESCRIBED navigation, profile selection, URL/region editing,
+During active FREE or PRESCRIBED navigation, profile selection, URL editing,
 save, and reset are disabled. End navigation before changing connections.
 
 ## Remote Test
@@ -32,27 +32,11 @@ marks the map unavailable without replacing the source or reloading the style.
 Android loads the server style JSON directly; it does not reconstruct a style from
 TileJSON. The Japan connection check requests the canonical dark style.
 
-## Existing local settings and migration
+## Phase 010.6D: Japan-only migration and live policy
 
-- Local Emulator retains `http://10.0.2.2:8002` and `http://10.0.2.2:8080` and saved
-  local region behavior. When no local region exists, it uses KANTO.
-- Local LAN restores its saved endpoints/region; on the first use it can inherit
-  existing Custom/legacy values. Enter and save LAN URLs if none have been saved.
-- Custom restores saved manual endpoints. Non-remote snapshots survive a remote
-  round trip and app restart. Reset clears the selected profile and its snapshots.
-- Missing or unknown `selectedConnectionEnvironment` decodes as CUSTOM, preserving
-  existing routing/map URLs and region. Merely reading a legacy record does not
-  rewrite it or opt it into REMOTE_TEST.
-- `kanto`/`chubu` remain valid persisted IDs. Unknown region IDs retain the existing
-  KANTO fallback. An explicitly remote persisted record always resolves to the
-  canonical JAPAN snapshot, even if its other stored fields are inconsistent.
-- Local region style paths stay `/styles/busnav-kanto/style.json` and
-  `/styles/busnav-chubu/style.json` with their `-light` counterparts.
+JAPAN is the only user-facing basemap. The regional selector is removed from Developer Connections. `kanto` and `chubu` enum values remain for decoding old DataStore records; a read migrates the active and saved profile region to `japan` and persists it. Local Emulator, Local LAN and Custom URL support remains for development, but their map style is the national `/styles/busnav/style.json`. Debug build defaults now use the remote nationwide routing and map endpoints. Release DataStore isolation and `usesCleartextTraffic="false"` remain.
 
-Debug/release build defaults and release DataStore isolation are unchanged. This
-phase does not promote Remote Test into the production default. Release continues
-to use its fixed build configuration and `usesCleartextTraffic="false"`; local
-debug HTTP remains permitted. There is no certificate pinning or custom IPv6 socket.
+Live infrastructure acceptance uses **REMOTE_TEST only** on emulator and physical Android. The connected suite's shared live test settings select the canonical remote profile, without instrumentation URL overrides. Do not start or probe local Valhalla, TileServer, LAN or Nominatim for acceptance. If IPv6 reachability is missing, record the network limitation and do not substitute local results. A successful connected suite is run once per device for the final APK; only failure or a code fix permits another attempt. Future Search server live integration must also use its production-like remote service.
 
 ## Presentation and retained state
 

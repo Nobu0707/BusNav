@@ -27,6 +27,7 @@ import net.nobu0707.busnav.location.*
 import net.nobu0707.busnav.map.basemap.BasemapConfig
 import net.nobu0707.busnav.test.LocalBasemapAssumptions
 import net.nobu0707.busnav.test.LocalValhallaAssumptions
+import net.nobu0707.busnav.test.effectiveTestConnections
 import net.nobu0707.busnav.ui.routeplan.*
 import net.nobu0707.busnav.ui.theme.BusNavTheme
 import org.junit.Assert.*
@@ -44,24 +45,8 @@ class HighwayRuntimeSmokeTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val arguments = InstrumentationRegistry.getArguments()
         val connectionRepository = createConnectionRepository(instrumentation.targetContext)
-        val valhallaOverride = arguments.getString("highwayValhallaBaseUrl")
-        val basemapOverride = arguments.getString("highwayBasemapBaseUrl")
-        if (valhallaOverride != null && basemapOverride != null) {
-            rule.runOnUiThread { rule.activity.setContent { BusNavTheme { DeveloperConnectionScreen(connectionRepository, {}) } } }
-            rule.waitUntil(5000) { rule.onAllNodes(hasTestTag("valhalla_url") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-            rule.onNodeWithTag("valhalla_url").performScrollTo().performTextReplacement(valhallaOverride)
-            rule.onNodeWithTag("basemap_url").performScrollTo().performTextReplacement(basemapOverride)
-            closeSoftKeyboard()
-            rule.onNodeWithTag("connections_save").performScrollTo().performClick()
-            rule.waitUntil(5000) { runBlocking { connectionRepository.settings.first().valhallaBaseUrl == valhallaOverride } }
-            assertEquals(basemapOverride, runBlocking { connectionRepository.settings.first().basemapBaseUrl })
-        }
-        runBlocking {
-            connectionRepository.update(connectionRepository.settings.first().copy(
-                basemapRegion = if (kanto) net.nobu0707.busnav.map.basemap.BasemapRegion.KANTO
-                    else net.nobu0707.busnav.map.basemap.BasemapRegion.CHUBU))
-        }
-        LocalValhallaAssumptions.assumeAvailable()
+        effectiveTestConnections()
+        if (!LocalValhallaAssumptions.available()) return
         LocalBasemapAssumptions.assumeAvailable()
         listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION).forEach {
             instrumentation.uiAutomation.grantRuntimePermission(rule.activity.packageName, it)

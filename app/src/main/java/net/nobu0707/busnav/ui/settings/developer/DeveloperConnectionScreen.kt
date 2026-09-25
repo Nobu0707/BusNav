@@ -30,7 +30,7 @@ fun DeveloperConnectionScreen(
     val check = checkConnection ?: checker::check
     var valhalla by rememberSaveable { mutableStateOf("") }
     var basemap by rememberSaveable { mutableStateOf("") }
-    var region by rememberSaveable { mutableStateOf(BasemapRegion.KANTO) }
+    var region by rememberSaveable { mutableStateOf(BasemapRegion.JAPAN) }
     var environment by rememberSaveable { mutableStateOf(ConnectionEnvironment.CUSTOM) }
     val activeNavigation by rememberUpdatedState(navigationActive)
     val editable = ConnectionSwitchPolicy.canEdit(navigationActive)
@@ -108,27 +108,13 @@ fun DeveloperConnectionScreen(
                 enabled = editable && environment != ConnectionEnvironment.REMOTE_TEST && loaded && !busy && !basemapChecking, isError = basemapError != null,
                 supportingText = { basemapError?.let { Text(it) } },
                 modifier = Modifier.fillMaxWidth().testTag("basemap_url"))
-            Text("地図地域 / Basemap region")
-            Column {
-                BasemapRegion.entries.forEach { choice ->
-                    FilterChip(selected = region == choice,
-                        onClick = { region = choice; basemapStatus = null },
-                        enabled = editable && environment != ConnectionEnvironment.REMOTE_TEST && loaded && !busy && !basemapChecking,
-                        label = { Text(choice.label) },
-                        modifier = Modifier.testTag("basemap_region_" + choice.id))
-                }
-            }
             OutlinedButton(onClick = {
                 basemapChecking = true
                 scope.launch {
                     try {
-                        val service = when (region) {
-                            BasemapRegion.JAPAN -> ConnectionService.JAPAN
-                            BasemapRegion.KANTO -> ConnectionService.KANTO
-                            BasemapRegion.CHUBU -> ConnectionService.CHUBU
-                        }
+                        val service = ConnectionService.JAPAN
                         val result = check(basemap, service)
-                        basemapStatus = result.message(environment) + if (result.httpCode == 404) "：選択した地域の地図データがありません" else ""
+                        basemapStatus = result.message(environment) + if (result.httpCode == 404) "：全国地図データがありません" else ""
                     }
                     finally { basemapChecking = false }
                 }

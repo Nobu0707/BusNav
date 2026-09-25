@@ -20,7 +20,7 @@ class BasemapRuntimeSmokeTest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun localStyleVectorTileAndJapaneseGlyphLoadWhenServerIsAvailable() {
+    fun remoteJapanStyleTileJsonAndJapaneseGlyphLoadWhenServerIsAvailable() {
         LocalBasemapAssumptions.assumeAvailable()
         composeRule.runOnUiThread { org.maplibre.android.MapLibre.getInstance(composeRule.activity.applicationContext) }
         composeRule.setContent {
@@ -33,12 +33,8 @@ class BasemapRuntimeSmokeTest {
         }
         val client = LocalBasemapAssumptions.client()
 
-        for (region in listOf("kanto", "chubu")) {
-            assertResource(client, "/styles/busnav-$region/style.json", minimumBytes = 1_000)
-            assertResource(client, "/data/$region.json", minimumBytes = 100)
-        }
-        assertResource(client, "/data/kanto/10/909/403.pbf", minimumBytes = 100)
-        assertResource(client, "/data/chubu/10/906/404.pbf", minimumBytes = 100)
+        assertResource(client, "/styles/busnav/style.json", minimumBytes = 1_000)
+        assertResource(client, "/data/japan.json", minimumBytes = 100)
         assertResource(
             client,
             "/fonts/Klokantech%20Noto%20Sans%20CJK%20Regular/12288-12543.pbf",

@@ -16,7 +16,7 @@ Circular deltas use the shortest arc: 359→1 is +2°, 1→359 is -2°. Changes 
 
 ## Camera, gestures and lifecycle
 
-MapController owns animation. HEADING_UP follows the resolved bearing; NORTH_UP follows location at 0°. The first navigation follow establishes the existing 16.5 zoom once; a recreated active navigation camera keeps its saved zoom. Toggle/recenter preserve zoom, and tilt stays at 0°. HEADING_UP following places the raw marker at 72% of the visible map pane height, excluding measured bottom overlay controls. NORTH_UP stays centered. Both orientations use the same raw location for camera target and marker.
+MapController owns animation. HEADING_UP follows the resolved bearing; NORTH_UP follows location at 0°. The first navigation follow establishes the existing 16.5 zoom once; a recreated active navigation camera keeps its saved zoom. Toggle/recenter preserve zoom, and tilt stays at 0°. HEADING_UP following places the raw marker at 85% of the visible map pane height, 15% from its bottom, excluding measured bottom overlay controls. NORTH_UP stays centered. Both orientations use the same raw location for camera target and marker. See [Visible map viewport](map-visible-viewport.md).
 
 Move/rotate/zoom gestures suspend follow immediately. The orientation preference remains unchanged. Current location restores follow and the selected orientation. The camera-start gesture reason also covers pinch, rotation and double-tap zoom. MapLibre's built-in compass is disabled to avoid a competing reset action.
 
@@ -34,7 +34,7 @@ The independently designed 64×80dp map-edge control has a rotating N/needle and
 
 ## Map details and regression
 
-The 2,200m show / >2,600m hide shield hysteresis is unchanged. Top-center/bottom-center are projected through MapLibre's actual bearing, so great-circle distance remains meaningful when rotated. Facility, intersection and shield labels already use viewport alignment; route lines remain beneath shields and traffic overlays above them. Kanto/Chubu and Light/Dark styles and tiles are unchanged.
+The 2,200m show / >2,600m hide shield hysteresis is unchanged. The actual visible rectangle is projected through MapLibre's bearing, so great-circle distance remains meaningful when rotated. Facility, intersection and shield labels use viewport alignment; route lines remain beneath shields and traffic overlays above them. JAPAN is the official basemap, with Light/Dark styles.
 
 ## Validation and limitations
 

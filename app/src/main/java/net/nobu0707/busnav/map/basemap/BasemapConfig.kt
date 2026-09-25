@@ -36,7 +36,7 @@ data class BasemapConfig(
             "/styles/busnav/style.json" else "/styles/busnav-" + region.id + "/style.json"
 
         fun forRegion(baseUrl: String, region: BasemapRegion, isDebug: Boolean): BasemapConfig =
-            fromBuildValue(if (baseUrl.isBlank()) "" else baseUrl.trimEnd('/') + regionStylePath(region), isDebug)
+            fromBuildValue(if (baseUrl.isBlank()) "" else baseUrl.trimEnd('/') + regionStylePath(BasemapRegion.official(region)), isDebug)
 
         fun fromBuildValue(styleUrl: String, isDebug: Boolean): BasemapConfig {
             val normalized = styleUrl.trim().takeIf(String::isNotEmpty)

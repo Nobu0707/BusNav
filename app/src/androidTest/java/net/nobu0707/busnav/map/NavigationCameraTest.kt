@@ -40,12 +40,7 @@ class NavigationCameraTest {
     private val config = mutableStateOf(BasemapConfig(null, BasemapMode.FALLBACK).withTheme(false))
     private var ready = false
 
-    private fun start(live: Boolean = false) {
-        if (live) {
-            effectiveTestConnections()
-            LocalBasemapAssumptions.assumeAvailable()
-            config.value = BasemapConfig.forRegion(LocalBasemapAssumptions.BASE_URL, BasemapRegion.KANTO, true).withTheme(false)
-        }
+    private fun start() {
         rule.runOnUiThread { MapLibre.getInstance(rule.activity) }
         rule.setContent {
             BusNavTheme {
@@ -192,8 +187,8 @@ class NavigationCameraTest {
             rule.runOnUiThread { result = native.projection.toScreenLocation(point).y / view.height.toDouble() }
             return result
         }
-        rule.waitUntil(10_000) { abs(fraction() - 0.72) < 0.03 }
-        assertEquals(0.72, fraction(), 0.03)
+        rule.waitUntil(10_000) { abs(fraction() - 0.85) < 0.03 }
+        assertEquals(0.85, fraction(), 0.03)
         rule.runOnIdle { camera.value = camera.value.copy(orientation = NavigationMapOrientation.NORTH_UP) }
         rule.waitUntil(10_000) { abs(fraction() - 0.5) < 0.03 }
         assertEquals(0.5, fraction(), 0.03)
@@ -260,40 +255,6 @@ class NavigationCameraTest {
         rule.onNodeWithTag("navigation_compass").assertDoesNotExist()
     }
 
-    @Test fun liveRotatedStylesRegionsLabelsAndSpan() {
-        start(live = true)
-        send(90f); awaitBearing(90.0)
-        for (mode in NavigationMapOrientation.entries) {
-            rule.runOnIdle { camera.value = camera.value.copy(orientation = mode) }
-            send(90f); awaitBearing(if (mode == NavigationMapOrientation.HEADING_UP) 90.0 else 0.0)
-            // This local server fixture only provisions the two regional datasets.
-            for (region in listOf(BasemapRegion.KANTO, BasemapRegion.CHUBU)) for (dark in listOf(false, true, false)) {
-                rule.runOnIdle { config.value = BasemapConfig.forRegion(LocalBasemapAssumptions.BASE_URL, region, true).withTheme(dark) }
-                rule.waitUntil(30_000) {
-                    var loaded = false
-                    rule.runOnUiThread { loaded = native.style?.uri == config.value.styleUrl && native.style?.isFullyLoaded == true &&
-                        native.style?.getLayer(OverlayLayerOrder.VEHICLE) != null }
-                    loaded
-                }
-                awaitBearing(if (mode == NavigationMapOrientation.HEADING_UP) 90.0 else 0.0)
-                verifyNorthProjection()
-                rule.runOnUiThread {
-                    val style = requireNotNull(native.style)
-                    for (id in listOf("route-shield-urban_expressway", "route-shield-expressway", "facility-junction-label", "intersection-major")) {
-                        val layer = style.getLayer(id) as? SymbolLayer
-                        if (layer != null) assertEquals("viewport", layer.textRotationAlignment.value)
-                    }
-                    val span = VisibleMapSpanCalculator.measure(VisibleMapSpanCalculator.Rect(0f, 0f, view.width.toFloat(), view.height.toFloat())) {
-                        val point = native.projection.fromScreenLocation(android.graphics.PointF(it.x, it.y))
-                        GeoPoint(point.latitude, point.longitude)
-                    }
-                    assertTrue(span > 0 && span < 2200)
-                    assertEquals(16.0, native.cameraPosition.zoom, 0.001)
-                }
-                snapshot("live-${region.name}-$mode-$dark")
-            }
-        }
-    }
     private fun findMap(view: View): MapView? {
         if (view is MapView) return view
         if (view is ViewGroup) for (i in 0 until view.childCount) findMap(view.getChildAt(i))?.let { return it }

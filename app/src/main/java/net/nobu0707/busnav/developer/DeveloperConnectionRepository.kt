@@ -43,7 +43,22 @@ class DataStoreDeveloperConnectionRepository(
             environment,
         )
     }
-    override val settings = store.data.map(::decode)
+    override val settings = store.data.map { prefs ->
+        val decoded = decode(prefs).copy(basemapRegion = BasemapRegion.JAPAN)
+        if (prefs[REGION] != BasemapRegion.JAPAN.id ||
+            ConnectionEnvironment.entries.any { env ->
+                prefs[profileKey(env, "region")]?.let { it != BasemapRegion.JAPAN.id } == true
+            }) {
+            store.edit { current ->
+                current[REGION] = BasemapRegion.JAPAN.id
+                ConnectionEnvironment.entries.forEach { env ->
+                    val key = profileKey(env, "region")
+                    if (current[key] != null) current[key] = BasemapRegion.JAPAN.id
+                }
+            }
+        }
+        decoded
+    }
 
     override suspend fun profile(environment: ConnectionEnvironment): DeveloperConnectionSettings {
         val prefs = store.data.first()
@@ -81,7 +96,7 @@ class DataStoreDeveloperConnectionRepository(
         if (environment == ConnectionEnvironment.REMOTE_TEST) return
         prefs[profileKey(environment, "routing")] = value.valhallaBaseUrl
         prefs[profileKey(environment, "map")] = value.basemapBaseUrl
-        prefs[profileKey(environment, "region")] = value.basemapRegion.id
+        prefs[profileKey(environment, "region")] = BasemapRegion.JAPAN.id
     }
 
     private fun readProfile(prefs: Preferences, environment: ConnectionEnvironment): DeveloperConnectionSettings? {

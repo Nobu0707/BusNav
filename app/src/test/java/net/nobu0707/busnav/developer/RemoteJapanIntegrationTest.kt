@@ -27,8 +27,8 @@ class RemoteJapanIntegrationTest {
         assertEquals(BasemapRegion.JAPAN, BasemapRegion.fromId("japan"))
         assertEquals(BasemapRegion.KANTO, BasemapRegion.fromId("kanto"))
         assertEquals(BasemapRegion.CHUBU, BasemapRegion.fromId("chubu"))
-        assertEquals(BasemapRegion.KANTO, BasemapRegion.fromId("future"))
-        assertEquals(BasemapRegion.KANTO, BasemapRegion.fromId(null))
+        assertEquals(BasemapRegion.JAPAN, BasemapRegion.fromId("future"))
+        assertEquals(BasemapRegion.JAPAN, BasemapRegion.fromId(null))
     }
 
     @Test fun environmentDecodeNeverOptsLegacyIntoRemote() {
@@ -63,18 +63,18 @@ class RemoteJapanIntegrationTest {
         }
     }
 
-    @Test fun localAndCustomUrlsAndRegionsRemainCompatible() {
+    @Test fun localAndCustomUrlsUseNationwideBasemap() {
         val emulator = lan.forEnvironment(ConnectionEnvironment.LOCAL_EMULATOR)
         assertEquals(local.valhallaBaseUrl, emulator.valhallaBaseUrl)
         assertEquals(local.basemapBaseUrl, emulator.basemapBaseUrl)
-        assertEquals(BasemapRegion.CHUBU, emulator.basemapRegion)
+        assertEquals(BasemapRegion.JAPAN, emulator.basemapRegion)
         for (environment in listOf(ConnectionEnvironment.CUSTOM, ConnectionEnvironment.LOCAL_LAN)) {
-            assertEquals(lan.copy(selectedConnectionEnvironment = environment), lan.forEnvironment(environment))
+            assertEquals(lan.copy(selectedConnectionEnvironment = environment, basemapRegion = BasemapRegion.JAPAN),
+                lan.forEnvironment(environment))
         }
-        assertEquals("http://10.0.2.2:8080/styles/busnav-kanto/style.json", local.basemapConfig(true).styleUrl)
-        assertEquals("http://192.168.1.100:8080/styles/busnav-chubu-light/style.json", lan.basemapConfig(true).withTheme(false).styleUrl)
-        // The legacy unqualified build-time style keeps its original local region default.
-        assertEquals(BasemapRegion.KANTO, DeveloperConnectionSettings.defaults(local.valhallaBaseUrl,
+        assertEquals("http://10.0.2.2:8080/styles/busnav/style.json", local.basemapConfig(true).styleUrl)
+        assertEquals("http://192.168.1.100:8080/styles/busnav-light/style.json", lan.basemapConfig(true).withTheme(false).styleUrl)
+        assertEquals(BasemapRegion.JAPAN, DeveloperConnectionSettings.defaults(local.valhallaBaseUrl,
             local.basemapBaseUrl + "/styles/busnav/style.json").basemapRegion)
     }
 
@@ -85,14 +85,15 @@ class RemoteJapanIntegrationTest {
         var repo = repository()
         try {
             repo.update(lan)
-            val savedLan = lan.copy(selectedConnectionEnvironment = ConnectionEnvironment.LOCAL_LAN)
+            val savedLan = lan.copy(selectedConnectionEnvironment = ConnectionEnvironment.LOCAL_LAN,
+                basemapRegion = BasemapRegion.JAPAN)
             repo.update(savedLan)
             repo.update(repo.profile(ConnectionEnvironment.REMOTE_TEST))
             job.cancelAndJoin(); job = SupervisorJob(); repo = repository()
             assertEquals(RemoteTestEndpoints.settings(), repo.settings.first())
             assertEquals(savedLan, repo.profile(ConnectionEnvironment.LOCAL_LAN))
-            assertEquals(lan, repo.profile(ConnectionEnvironment.CUSTOM))
-            assertEquals(BasemapRegion.CHUBU, repo.profile(ConnectionEnvironment.LOCAL_EMULATOR).basemapRegion)
+            assertEquals(lan.copy(basemapRegion = BasemapRegion.JAPAN), repo.profile(ConnectionEnvironment.CUSTOM))
+            assertEquals(BasemapRegion.JAPAN, repo.profile(ConnectionEnvironment.LOCAL_EMULATOR).basemapRegion)
             repo.update(repo.profile(ConnectionEnvironment.LOCAL_LAN))
             assertEquals(savedLan, repo.settings.first())
             repo.reset()
@@ -112,11 +113,13 @@ class RemoteJapanIntegrationTest {
                 it[stringPreferencesKey("basemapRegion")] = "kanto"
             }
             val repo = DataStoreDeveloperConnectionRepository(store, local)
-            assertEquals(legacy, repo.settings.first())
+            assertEquals(legacy.copy(basemapRegion = BasemapRegion.JAPAN), repo.settings.first())
+            assertEquals("japan", store.data.first()[stringPreferencesKey("basemapRegion")])
             assertNull(store.data.first()[stringPreferencesKey("selectedConnectionEnvironment")])
             repo.update(repo.profile(ConnectionEnvironment.REMOTE_TEST))
-            assertEquals(legacy.copy(selectedConnectionEnvironment = ConnectionEnvironment.LOCAL_LAN), repo.profile(ConnectionEnvironment.LOCAL_LAN))
-            assertEquals(legacy, repo.profile(ConnectionEnvironment.CUSTOM))
+            assertEquals(legacy.copy(selectedConnectionEnvironment = ConnectionEnvironment.LOCAL_LAN,
+                basemapRegion = BasemapRegion.JAPAN), repo.profile(ConnectionEnvironment.LOCAL_LAN))
+            assertEquals(legacy.copy(basemapRegion = BasemapRegion.JAPAN), repo.profile(ConnectionEnvironment.CUSTOM))
         } finally { job.cancelAndJoin() }
     }
 

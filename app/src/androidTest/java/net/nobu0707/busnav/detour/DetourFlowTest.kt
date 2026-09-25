@@ -53,7 +53,10 @@ class DetourFlowTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         effectiveTestConnections()
-        if (live) { LocalValhallaAssumptions.assumeAvailable(); LocalBasemapAssumptions.assumeAvailable() }
+        if (live) {
+            if (!LocalValhallaAssumptions.available()) return
+            LocalBasemapAssumptions.assumeAvailable()
+        }
         val db = Room.inMemoryDatabaseBuilder(context, PrescribedRouteDatabase::class.java).build()
         val library = RoomPrescribedRouteRepository(db)
         val connections = createConnectionRepository(context)

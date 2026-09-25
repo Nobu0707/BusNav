@@ -16,9 +16,9 @@ object LocalBasemapAssumptions {
         val reachable = runCatching {
             client().newCall(Request.Builder().url(BASE_URL + "/fonts.json").build()).execute().use { true }
         }.getOrDefault(false)
-        assumeTrue("Local TileServer is unavailable", reachable)
+        assumeTrue("Remote Japan map is unreachable", reachable)
         client().newCall(Request.Builder().url(STYLE_URL).build()).execute().use {
-            org.junit.Assert.assertTrue("Selected basemap region is unavailable: HTTP " + it.code, it.isSuccessful)
+            org.junit.Assert.assertTrue("Remote Japan style is unavailable: HTTP " + it.code, it.isSuccessful)
         }
     }
 

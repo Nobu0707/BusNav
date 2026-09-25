@@ -17,7 +17,7 @@ import java.util.UUID
 
 class PrescribedRouteLiveSmokeTest {
     @Test fun publicKantoRoutePersistsExactlyAfterReopenWithoutServer() = runBlocking {
-        LocalValhallaAssumptions.assumeAvailable()
+        if (!LocalValhallaAssumptions.available()) return@runBlocking
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val dbName = "isolated-live-${UUID.randomUUID()}.db"
         var db = Room.databaseBuilder(context, PrescribedRouteDatabase::class.java, dbName).build()

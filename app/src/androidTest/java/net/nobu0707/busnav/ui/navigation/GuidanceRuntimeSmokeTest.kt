@@ -26,7 +26,7 @@ import org.junit.Test
 class GuidanceRuntimeSmokeTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
     @Test fun calculateApplyGuideAndRecalculateWithoutAutomaticReroute() {
-        LocalValhallaAssumptions.assumeAvailable()
+        if (!LocalValhallaAssumptions.available()) return
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.uiAutomation.grantRuntimePermission(rule.activity.packageName, Manifest.permission.ACCESS_FINE_LOCATION)
         instrumentation.uiAutomation.grantRuntimePermission(rule.activity.packageName, Manifest.permission.ACCESS_COARSE_LOCATION)

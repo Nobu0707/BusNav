@@ -22,8 +22,6 @@ import org.maplibre.android.maps.MapLibreMap
 class BasemapHotReloadTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
     @Test fun fallbackToDetailedStyleKeepsRouteAllPointTypesAndCamera() { exercise(null) }
-    @Test fun kantoToChubuKeepsRouteAllPointTypesAndCamera() { exercise(BasemapRegion.KANTO) }
-    @Test fun chubuToKantoKeepsRouteAllPointTypesAndCamera() { exercise(BasemapRegion.CHUBU) }
 
     @Test fun kantoDarkToLightKeepsAllOverlays() { exercise(BasemapRegion.KANTO, false) }
     @Test fun kantoLightToDarkKeepsAllOverlays() { exercise(BasemapRegion.KANTO, true) }

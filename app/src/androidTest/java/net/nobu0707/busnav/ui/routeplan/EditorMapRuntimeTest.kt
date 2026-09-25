@@ -94,7 +94,7 @@ class EditorMapRuntimeTest {
         rule.runOnUiThread {
             assertTrue(native.cameraPosition.zoom > 8.0)
             assertTrue(native.cameraPosition.padding?.all { it == 0.0 } != false)
-            val bottom = view.height - sheetHeight - 60 * view.resources.displayMetrics.density
+            val bottom = view.height - sheetHeight
             points.forEach { point ->
                 val pixel = native.projection.toScreenLocation(LatLng(point.latitude, point.longitude))
                 assertTrue("Point outside visible map: " + pixel + " bottom=" + bottom, pixel.y >= -1 && pixel.y <= bottom + 2)
@@ -111,8 +111,9 @@ class EditorMapRuntimeTest {
             assertEquals(saved.center.latitude, native.cameraPosition.target!!.latitude, .00000001)
         }
         var cursor: GeoPoint? = null
+        val sheetHeight = rule.onNodeWithTag(RoutePlanEditorTestTags.SHEET).fetchSemanticsNode().boundsInRoot.height
         rule.runOnUiThread {
-            val p = native.projection.fromScreenLocation(PointF(view.width / 2f, view.height / 2f))
+            val p = native.projection.fromScreenLocation(PointF(view.width / 2f, (view.height - sheetHeight) / 2f))
             cursor = GeoPoint(p.latitude, p.longitude)
         }
         rule.onNodeWithTag(RoutePlanEditorTestTags.REGISTER).performClick()
@@ -123,8 +124,8 @@ class EditorMapRuntimeTest {
         enter()
         rule.runOnUiThread {
             assertEquals(15.0, native.cameraPosition.zoom, .000001)
-            assertEquals(cursor!!.latitude, native.cameraPosition.target!!.latitude, .000001)
-            assertEquals(cursor!!.longitude, native.cameraPosition.target!!.longitude, .000001)
+            val registered = holder.uiState.value.currentPlan.points.single().position
+            assertEquals(cursor, registered)
         }
     }
     @Test fun kantoFitPanCursorLongListSheetCalculateAndFinish() {

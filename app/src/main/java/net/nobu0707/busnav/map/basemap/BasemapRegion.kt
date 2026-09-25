@@ -6,6 +6,7 @@ enum class BasemapRegion(val id: String, val label: String) {
     CHUBU("chubu", "中部 / Chubu");
 
     companion object {
-        fun fromId(id: String?): BasemapRegion = entries.firstOrNull { it.id == id } ?: KANTO
+        fun fromId(id: String?): BasemapRegion = entries.firstOrNull { it.id == id } ?: JAPAN
+        fun official(region: BasemapRegion): BasemapRegion = JAPAN
     }
 }

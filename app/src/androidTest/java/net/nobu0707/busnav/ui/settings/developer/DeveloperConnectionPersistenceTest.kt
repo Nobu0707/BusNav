@@ -21,7 +21,7 @@ class DeveloperConnectionPersistenceTest {
         try {
             repository.update(lan)
             job.cancelAndJoin(); job = SupervisorJob(); repository = repo()
-            assertEquals(lan, repository.settings.first())
+            assertEquals(lan.copy(basemapRegion = net.nobu0707.busnav.map.basemap.BasemapRegion.JAPAN), repository.settings.first())
             repository.reset()
             assertEquals(defaults, repository.settings.first())
         } finally { job.cancelAndJoin(); file.delete() }

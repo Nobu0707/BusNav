@@ -34,6 +34,8 @@ import org.maplibre.geojson.Point
 import net.nobu0707.busnav.location.LocationState
 import net.nobu0707.busnav.domain.route.ScheduledRoute
 import net.nobu0707.busnav.domain.model.GeoPoint
+import net.nobu0707.busnav.domain.model.MapViewportInsets
+import net.nobu0707.busnav.domain.model.VisibleMapViewport
 import net.nobu0707.busnav.domain.routeplan.RoutePlan
 import net.nobu0707.busnav.map.basemap.BasemapConfig
 import net.nobu0707.busnav.map.basemap.BasemapController
@@ -54,6 +56,8 @@ class MapController(
     private val initialNavigationCamera: Boolean = false,
     private val onNavigationCameraInitialized: () -> Unit = {},
     private val onCameraChanged: (EditorCamera) -> Unit = {},
+    private val onScaleGesture: () -> Unit = {},
+    private val onRulerChanged: (ScaleRulerReading?) -> Unit = {},
 ) {
     private var map: MapLibreMap? = null
     private var mapView: MapView? = null
@@ -66,9 +70,13 @@ class MapController(
     private val headingFreshness = NavigationHeadingResolver(headingConfig)
     private var gestureSuspended = false
     private var lastFollowedElapsedMillis: Long? = null
+    private var gestureZoomAtStart: Double? = null
+    private var lastRuler: ScaleRulerReading? = null
+    private var navigationBottomOcclusionPx = 0
     private val cameraStartedListener = MapLibreMap.OnCameraMoveStartedListener { reason ->
         if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
             gestureSuspended = true
+            gestureZoomAtStart = map?.cameraPosition?.zoom
             onGesture()
         }
     }
@@ -114,6 +122,10 @@ class MapController(
     private fun saveCamera() {
         val camera = map?.cameraPosition ?: return
         val target = camera.target ?: return
+        if (gestureZoomAtStart?.let { kotlin.math.abs(it - camera.zoom) > 0.01 } == true) {
+            gestureZoomAtStart = null
+            onScaleGesture()
+        }
         latestLocation?.let(::renderVehicleRotation)
         onCameraChanged(EditorCamera(GeoPoint(target.latitude, target.longitude), camera.zoom, camera.bearing, camera.tilt))
     }
@@ -121,8 +133,41 @@ class MapController(
     fun cursorPosition(): GeoPoint? {
         val view = mapView ?: return null
         if (view.width == 0 || view.height == 0) return null
-        val point = map?.projection?.fromScreenLocation(PointF(view.width / 2f, view.height / 2f)) ?: return null
+        val rect = visibleViewport().rect
+        val point = map?.projection?.fromScreenLocation(PointF(rect.centerX, rect.centerY)) ?: return null
         return GeoPoint(point.latitude, point.longitude)
+    }
+
+    private fun visibleViewport(): VisibleMapViewport {
+        val view = mapView
+        val bottom = if (navigationCamera.active) navigationBottomOcclusionPx else editorBottomPadding ?: 0
+        return VisibleMapViewport(view?.width ?: 0, view?.height ?: 0,
+            MapViewportInsets(bottom = bottom))
+    }
+
+    private fun visibleSpan(): Double {
+        val native = map ?: return Double.NaN
+        val rect = visibleViewport().rect
+        return VisibleMapSpanCalculator.measure(
+            VisibleMapSpanCalculator.Rect(rect.left, rect.top, rect.right, rect.bottom)) {
+            val point = native.projection.fromScreenLocation(PointF(it.x, it.y))
+            GeoPoint(point.latitude, point.longitude)
+        }
+    }
+
+    fun resetNorth() {
+        val native = map ?: return
+        val current = native.cameraPosition
+        native.easeCamera(CameraUpdateFactory.newCameraPosition(
+            CameraPosition.Builder(current).bearing(0.0).build()), RECENTER_ANIMATION_MILLIS)
+    }
+
+    fun applyScalePreset(preset: ScalePreset) {
+        val native = map ?: return
+        val camera = native.cameraPosition
+        val zoom = MapControlsPolicy.zoomForSpan(camera.zoom, visibleSpan(), preset.spanMeters)
+        native.easeCamera(CameraUpdateFactory.newCameraPosition(
+            CameraPosition.Builder(camera).zoom(zoom).build()), RECENTER_ANIMATION_MILLIS)
     }
 
     fun updateEditorCamera(request: EditorCameraRequest?, bottomPadding: Int?, onApplied: (Long) -> Unit) {
@@ -155,10 +200,10 @@ class MapController(
         // physical viewport center: the crosshair and subsequent pan/zoom use that center,
         // and a restored camera must not depend on the previous sheet dimensions.
         val fitted = native.cameraPosition
-        val viewportCenter = cursorPosition()
-        if (viewportCenter != null && fitted.padding?.any { it != 0.0 } == true) {
+        val physicalCenter = native.projection.fromScreenLocation(PointF(view.width / 2f, view.height / 2f))
+        if (fitted.padding?.any { it != 0.0 } == true) {
             native.moveCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.Builder(fitted)
-                .target(viewportCenter.toLatLng()).padding(0.0, 0.0, 0.0, 0.0).build()))
+                .target(physicalCenter).padding(0.0, 0.0, 0.0, 0.0).build()))
         }
         lastEditorRequestId = request.id
         saveCamera()
@@ -182,10 +227,17 @@ class MapController(
         val native = map ?: return
         val view = mapView ?: return
         val loaded = style ?: return
-        val bottom = (view.height - (editorBottomPadding ?: 0)).coerceAtLeast(0).toFloat()
-        val span = VisibleMapSpanCalculator.measure(VisibleMapSpanCalculator.Rect(0f, 0f, view.width.toFloat(), bottom)) {
-            val point = native.projection.fromScreenLocation(PointF(it.x, it.y))
-            GeoPoint(point.latitude, point.longitude)
+        val rect = visibleViewport().rect
+        val span = visibleSpan()
+        val sampleWidth = (100f * view.resources.displayMetrics.density).coerceAtMost(rect.width * 0.6f)
+        if (sampleWidth > 0f) {
+            val left = native.projection.fromScreenLocation(PointF(rect.centerX - sampleWidth / 2f, rect.centerY))
+            val right = native.projection.fromScreenLocation(PointF(rect.centerX + sampleWidth / 2f, rect.centerY))
+            val distance = VisibleMapSpanCalculator.distance(
+                GeoPoint(left.latitude, left.longitude), GeoPoint(right.latitude, right.longitude))
+            val density = view.resources.displayMetrics.density
+            val next = ScaleRulerPolicy.choose(distance / sampleWidth, 80f * density, 140f * density, lastRuler)
+            if (next != lastRuler) { lastRuler = next; onRulerChanged(next) }
         }
         val shields = shieldSpanPolicy.update(span)
         loaded.layers.forEach { layer ->
@@ -301,6 +353,10 @@ class MapController(
         cameraState: NavigationCameraState = NavigationCameraState(), bottomOcclusionPx: Int = 0) {
         val previous = navigationCamera
         navigationCamera = cameraState.copy(following = isFollowing)
+        if (navigationBottomOcclusionPx != bottomOcclusionPx) {
+            navigationBottomOcclusionPx = bottomOcclusionPx
+            scheduleMapDetails()
+        }
         if (!cameraState.active) navigationInitialized = false
         val recenter = recenterRequestId != lastRecenterRequestId
         if (recenter || (!previous.following && isFollowing)) gestureSuspended = false

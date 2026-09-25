@@ -26,9 +26,9 @@ android {
 
     buildTypes {
         debug {
-            val debugUrl = valhallaBaseUrl.orElse("http://10.0.2.2:8002").get()
+            val debugUrl = valhallaBaseUrl.orElse("https://routing-busnav.nobu0707.net").get()
             val debugBasemapUrl = basemapStyleUrl
-                .orElse("http://10.0.2.2:8080/styles/busnav-kanto/style.json")
+                .orElse("https://maps-busnav.nobu0707.net/styles/busnav/style.json")
                 .get()
             require(debugBasemapUrl.isEmpty() || listOf("busnav", "busnav-kanto", "busnav-chubu").any {
                 debugBasemapUrl.endsWith("/styles/$it/style.json")

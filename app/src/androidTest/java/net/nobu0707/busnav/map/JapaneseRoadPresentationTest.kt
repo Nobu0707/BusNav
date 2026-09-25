@@ -126,7 +126,7 @@ class JapaneseRoadPresentationTest {
     @Test fun syntheticDynamicNumbersUseAllOriginalBackgrounds() {
         start()
         val json = LocalBasemapAssumptions.client().newCall(Request.Builder().url(
-            LocalBasemapAssumptions.BASE_URL + "/styles/busnav-kanto-light/style.json").build()).execute().use { JSONObject(it.body!!.string()) }
+            LocalBasemapAssumptions.BASE_URL + "/styles/busnav-light/style.json").build()).execute().use { JSONObject(it.body!!.string()) }
         val cases = listOf("national" to "1", "national" to "12", "national" to "246", "expressway" to "E1",
             "expressway" to "E20", "expressway" to "C4", "urban_expressway" to "C1", "urban_expressway" to "B", "urban_expressway" to "K1", "prefectural" to "12", "prefectural" to "34", "prefectural" to "300")
         val features = cases.mapIndexed { i, (kind, ref) ->

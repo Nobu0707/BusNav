@@ -558,7 +558,7 @@ fun NavigationRoute(
                         activeRoute = candidateRoute ?: libraryState?.draft?.route ?: uiState.activeRoute,
                         routeOverviewRequestId = 0,
                         editorCameraRequest = routePlanUiState.cameraRequest.takeIf { editorViewport?.first == routePlanUiState.sheetState },
-                        editorBottomPadding = editorViewport?.second?.plus(with(androidx.compose.ui.platform.LocalDensity.current) { 60.dp.roundToPx() }),
+                        editorBottomPadding = editorViewport?.second,
                         onEditorCameraApplied = routePlanHolder::cameraApplied,
                         onCursorReader = { cursorReader = it },
                         routePlan = routePlanUiState.currentPlan.takeIf { candidateRoute == null },

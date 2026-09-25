@@ -22,9 +22,9 @@ class DeveloperConnectionRepositoryTest {
         try {
             assertEquals(defaults, repository.settings.first())
             repository.update(DeveloperConnectionSettings(" http://192.168.1.100:8002/ ", "https://dev.example.com/", BasemapRegion.CHUBU))
-            val saved = DeveloperConnectionSettings("http://192.168.1.100:8002", "https://dev.example.com", BasemapRegion.CHUBU)
+            val saved = DeveloperConnectionSettings("http://192.168.1.100:8002", "https://dev.example.com", BasemapRegion.JAPAN)
             assertEquals(saved, repository.settings.first())
-            assertEquals("https://dev.example.com/styles/busnav-chubu/style.json", saved.basemapConfig(true).styleUrl)
+            assertEquals("https://dev.example.com/styles/busnav/style.json", saved.basemapConfig(true).styleUrl)
             job.cancelAndJoin()
             job = SupervisorJob()
             repository = repo()

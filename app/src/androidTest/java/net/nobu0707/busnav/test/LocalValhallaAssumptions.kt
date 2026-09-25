@@ -10,7 +10,7 @@ object LocalValhallaAssumptions {
     // Follow the application's Developer Connections on physical devices as well as emulators.
     val BASE_URL: String get() = effectiveTestConnections().valhallaBaseUrl
 
-    fun assumeAvailable() {
+    fun available(): Boolean {
         val client = OkHttpClient.Builder()
             .callTimeout(PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .connectTimeout(PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -24,8 +24,11 @@ object LocalValhallaAssumptions {
             ).execute().use { response -> response.isSuccessful }
         }.getOrDefault(false)
 
-        assumeTrue("Local Valhalla is not available at $BASE_URL", available)
+        if (!available) android.util.Log.w("BusNavRemoteTest", "Remote Valhalla is unreachable on this device")
+        return available
     }
 
-    private const val PROBE_TIMEOUT_SECONDS = 2L
+    fun assumeAvailable() { assumeTrue("Remote Valhalla is unreachable", available()) }
+
+    private const val PROBE_TIMEOUT_SECONDS = 5L
 }

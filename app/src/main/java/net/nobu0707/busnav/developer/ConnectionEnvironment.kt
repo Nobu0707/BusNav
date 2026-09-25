@@ -31,8 +31,9 @@ fun DeveloperConnectionSettings.forEnvironment(environment: ConnectionEnvironmen
         ConnectionEnvironment.REMOTE_TEST -> RemoteTestEndpoints.settings()
         ConnectionEnvironment.LOCAL_EMULATOR -> DeveloperConnectionSettings(
             "http://10.0.2.2:8002", "http://10.0.2.2:8080",
-            basemapRegion.takeUnless { it == BasemapRegion.JAPAN } ?: BasemapRegion.KANTO, environment)
-        ConnectionEnvironment.LOCAL_LAN, ConnectionEnvironment.CUSTOM -> copy(selectedConnectionEnvironment = environment)
+            BasemapRegion.JAPAN, environment)
+        ConnectionEnvironment.LOCAL_LAN, ConnectionEnvironment.CUSTOM ->
+            copy(selectedConnectionEnvironment = environment, basemapRegion = BasemapRegion.JAPAN)
     }
 
 object ConnectionSwitchPolicy {

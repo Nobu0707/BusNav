@@ -80,11 +80,11 @@ class PresentationPolicyTest {
         assertTrue(h.update(TunnelObservation.TUNNEL,24000))
         assertFalse(h.update(TunnelObservation.TUNNEL,10))
     }
-    @Test fun regionalThemesRoundTripAndFallback() {
+    @Test fun japanThemesRoundTripAndFallback() {
         BasemapRegion.entries.forEach {
             val base=BasemapConfig.forRegion("http://localhost:8080",it,true)
             val light=base.withTheme(false)
-            assertTrue(light.styleUrl!!.contains(if (it == BasemapRegion.JAPAN) "busnav-light" else it.id+"-light"))
+            assertTrue(light.styleUrl!!.contains("/styles/busnav-light/style.json"))
             assertEquals(base,light.withTheme(true))
             assertEquals(light,light.withTheme(false))
         }
