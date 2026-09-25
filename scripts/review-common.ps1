@@ -665,6 +665,22 @@ function Assert-ReviewArchive {
             throw "Archive contains prohibited entries:`n$($prohibited -join [Environment]::NewLine)"
         }
 
+        foreach ($entry in $archive.Entries) {
+            if ($entry.Length -gt 5000000 -or $entry.FullName -match '(?i)\.(jar|png|jpe?g|webp)$') {
+                continue
+            }
+            $reader = [System.IO.StreamReader]::new($entry.Open())
+            try {
+                $content = $reader.ReadToEnd()
+                if ($content -match '\b(?:10\.(?:\d{1,3}\.){2}\d{1,3}|192\.168\.(?:\d{1,3}\.)\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.(?:\d{1,3}\.)\d{1,3})\b') {
+                    throw "Archive contains a private IPv4 address in $($entry.FullName)"
+                }
+            }
+            finally {
+                $reader.Dispose()
+            }
+        }
+
         if (($Kind -eq "full") -and (-not ($entryNames -contains "repo/gradle/wrapper/gradle-wrapper.jar"))) {
             throw "Full archive is missing repo/gradle/wrapper/gradle-wrapper.jar"
         }
@@ -710,6 +726,7 @@ function New-ZipFromDirectory {
                 if (-not (Test-BinaryFile -Path $_.FullName)) {
                     $content = [System.IO.File]::ReadAllText($_.FullName)
                     $redacted = $content -replace '\bemulator-\d{4,5}\b', '[device-id-redacted]'
+                    $redacted = $redacted -replace '\b(?:10\.(?:\d{1,3}\.){2}\d{1,3}|192\.168\.(?:\d{1,3}\.)\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.(?:\d{1,3}\.)\d{1,3})\b', '[private-address-redacted]'
                     if ($redacted -cne $content) {
                         $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($redacted)
                         $outputStream.Write($bytes, 0, $bytes.Length)
