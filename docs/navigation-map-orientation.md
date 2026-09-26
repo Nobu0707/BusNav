@@ -28,7 +28,7 @@ The original Canvas marker is 56dp square with a 22.4dp radius ring, dark outlin
 
 Viewport alignment avoids double rotation. While following HEADING_UP, iconRotate=0 throughout camera animation. NORTH_UP displays resolved heading; manual exploration displays heading minus actual camera bearing. At rest, unreliable raw bearings do not rotate the navigation marker.
 
-The independently designed 64×80dp map-edge control has a rotating N/needle and a mode caption. North is `normalize(-cameraBearing)`. Instrumentation verifies this against actual MapLibre projections of a geographic north point at 0/90/180/270°, and separately checks rendered arrow pixels in both modes. Japanese content descriptions name the current mode and the tap action. The control is inside the map pane, away from guidance and operation panels.
+The independently designed 64×80dp map-edge control has a rotating N/needle and a mode caption. North is `normalize(-cameraBearing)`. Instrumentation verifies this against actual MapLibre projections of a geographic north point at 0/90/180/270°, and separately checks rendered arrow pixels in both modes. Japanese content descriptions name the current mode and the tap action. The control is inside the map pane, below the measured full-width guidance/warning overlay.
 
 `images/reference_navigation_heading_up.jpg` was viewed for **marker reference only**. Camera behavior, compass, layout and UI are independent BusNav designs. No reference pixels, logos or screenshot crops are runtime assets.
 
@@ -41,3 +41,26 @@ The 2,200m show / >2,600m hide shield hysteresis is unchanged. The actual visibl
 See [Review014b](reviews/014b-navigation-camera-marker.md) for commands and results. Unit coverage includes persistence across store reopening, invalid values, heading reliability, circular math, spikes, ordinary turns, camera policy and marker geometry. Native tests include camera cardinals, rendered pixels, north projection, stale/null fixes, drag/recenter, zoom preservation, reloads, navigation-only control, accessibility bounds and portrait/landscape.
 
 On an inactive map, TYPE_ROTATION_VECTOR supplies the marker heading with display-rotation remapping, declination correction where location is available, and circular smoothing. Navigation still uses GPS course or reliable route fallback. No 3D tilt, automatic rerouting, or new map data is added. Field-driving comfort and very high-frequency GPS behavior remain limits of synthetic stationary testing.
+
+## Phase010.6F overlay and lower-anchor update
+
+Both orientations use the same full-width MapArea overlay; operations panels and the
+landscape guidance side column are removed. Map controls follow the measured overlay
+height. Wide map panes use horizontal corner actions, reducing the measured bottom
+occlusion from the normal 136dp to 80dp while preserving attribution clearance.
+
+The lower anchor is visibleBottom - 33.9dp; the visibleHeight/2 fallback is removed.
+Negative anchor offsets use additional native bottom padding. NORTH_UP centering, raw
+GPS, freshness gating, heading resolution, follow/gesture semantics and native resize
+remain unchanged. A short pane alone no longer selects the centered fallback.
+
+The reference landscape's near-middle physical position is consistent with subtracting
+a tall bottom action group, even when the projected point is already bottom-aligned
+within the usable rectangle. An extremely short viewport was a separate formula edge
+case. Synthetic runtime evidence must not be claimed as a diagnosis of the exact
+stale-location/follow state in the user's screenshot.
+
+[Review015f](reviews/015f-navigation-overlay-landscape.md) records actual projected
+positions against measured Compose corner groups, rotation, full-width overlays,
+control placement and native bounds/isotropy. For impossible viewport sizes, bottom
+safety takes precedence; small control regions scroll and top cards cap at 30%.

@@ -12,7 +12,7 @@ PRESCRIBED session start uses the same location quality gate and does not requir
 
 ## Following camera and marker
 
-`NavigationMapFrame` takes one accepted fix and one camera state. Its target is the same raw point used by the marker; its bearing comes from `NavigationHeadingResolver` through `NavigationCameraState`. While following in HEADING_UP, the target is 33.9dp above the **visible map bottom**, with an outer-marker-radius + 8dp safety margin. Bottom occlusion is the maximum of the measured left FREE actions and right location controls. Portrait guidance is overlaid without resizing the map. MapLibre camera padding is refreshed on map-height changes as well as accepted location updates. NORTH_UP remains centered at bearing zero. Both orientations use their own map pane and density.
+`NavigationMapFrame` takes one accepted fix and one camera state. Its target is the same raw point used by the marker; its bearing comes from `NavigationHeadingResolver` through `NavigationCameraState`. While following in HEADING_UP, the target is 33.9dp above the **visible map bottom**, with an outer-marker-radius + 8dp safety margin. Bottom occlusion is the maximum of the measured left FREE actions and right location controls. Portrait and landscape guidance are overlaid without resizing the map. MapLibre camera padding is refreshed on map-height changes as well as accepted location updates. NORTH_UP remains centered at bearing zero. Both orientations use their own map pane and density.
 
 An active navigation fix cancels older MapLibre transitions, calls `moveCamera`, then sets marker source and rotation in the same UI update. There is no independent position smoothing for either. Stale controller frames are ignored, and `NavigationStateHolder` already rejects duplicate/older raw fixes. Manual gestures still suspend follow. The existing `NavigationHeadingResolver` remains the navigation heading source: moving GPS course, reliable matched route fallback, low speed hold and circular turn handling. HEADING_UP arrow rotation is zero; NORTH_UP and manual camera rotation subtract camera bearing once.
 
@@ -25,3 +25,26 @@ With a visible inactive map and resumed lifecycle, `DeviceHeadingSensor` registe
 ## Boundaries
 
 The snap limit does not validate road access, lane, elevation, or private entrance connectivity. A fix whose accuracy or monotonic timestamp is unusable still blocks start even near a road. Manual on-road behavior and short screen timeout need device observation; synthetic location and orientation checks only establish software behavior. Phase 010.6D owns the non-navigation north-reset compass and scale controls.
+
+## Phase010.6F overlay and lower-anchor update
+
+Both orientations use the same full-width MapArea overlay; operations panels and the
+landscape guidance side column are removed. Map controls follow the measured overlay
+height. Wide map panes use horizontal corner actions, reducing the measured bottom
+occlusion from the normal 136dp to 80dp while preserving attribution clearance.
+
+The lower anchor is visibleBottom - 33.9dp; the visibleHeight/2 fallback is removed.
+Negative anchor offsets use additional native bottom padding. NORTH_UP centering, raw
+GPS, freshness gating, heading resolution, follow/gesture semantics and native resize
+remain unchanged. A short pane alone no longer selects the centered fallback.
+
+The reference landscape's near-middle physical position is consistent with subtracting
+a tall bottom action group, even when the projected point is already bottom-aligned
+within the usable rectangle. An extremely short viewport was a separate formula edge
+case. Synthetic runtime evidence must not be claimed as a diagnosis of the exact
+stale-location/follow state in the user's screenshot.
+
+[Review015f](reviews/015f-navigation-overlay-landscape.md) records actual projected
+positions against measured Compose corner groups, rotation, full-width overlays,
+control placement and native bounds/isotropy. For impossible viewport sizes, bottom
+safety takes precedence; small control regions scroll and top cards cap at 30%.

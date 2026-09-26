@@ -1,106 +1,57 @@
 # ナビゲーション画面レイアウト
 
-## Phase009 迂回操作
+## Phase010.6F: 縦横共通の地図 overlay
 
-単一行の下部「迂回」は保存済みPRESCRIBED案内中のみ有効。
-OFF_ROUTE時は「迂回を検討」、ACTIVE時は「迂回を再設定」「迂回案内を終了」を表示する。
-専用画面で復帰候補→任意経由地点→preview→明示採用の順に操作する。
-縦は地図上部・操作下部、横は地図左・操作右。詳細はスクロールし、計算/採用操作を固定する。
-既知速度2m/s超では詳細操作をlockする。通常FREEの手動再計算は維持する。
-元所定線・太い迂回線・番号候補・選択枠・raw GPSを同時表示し、LIGHT/DARK reloadと回転で保持する。
-[操作・制約](../detour-rejoin.md)。
+NavigationScreen は縦横とも MapArea を主領域にする。運行情報 / PlaceholderPanel は表示しない。
+警告・案内を地図外の別列や行へ重複表示しない。幅600dp以上かつ幅が高さを超える場合は横画面。
+既存の状態識別子 LandscapeThreeColumn は互換性のため残すが、実際の構成は地図と補助操作の2領域。
 
-Phase 003 の Navigation 画面は走行表示に集中し、RoutePlan の複雑編集を専用画面へ分離します。
+縦画面: Column(MapArea weight=1, AuxiliaryControls 72dp)。運行情報64dpと間隔分を地図へ戻す。
+横画面: Row(MapArea weight=1, AuxiliaryControls 88dp)。旧左列の24%割当を廃止。
+補助操作は「ルート / 迂回 / 規制 / 音声 / 表示」の5個。横は88dpの親、80dpのボタン、
+1行ラベル、48dp以上のtouch targetを維持する。
 
-## レイアウト判定
+## 上部の警告と案内
 
-`resolveNavigationLayout(widthDp, heightDp)` は orientation 名ではなく、Compose が実際に利用できる幅と高さを使います。
+NavigationTopOverlay はMapAreaの左右8dpを除く全幅。方位操作用の84dp空白は廃止。
+警告、到着、交通警告、compact案内、迂回の一時操作を縦積みにする。
+案内と警告は同じ幅。記号・距離・主案内を同じ行にしたcompact表示とし、高速道路の標識・アクセシビリティ情報も保持。
+高さ上限は地図高の30%、超過は縦スクロール。透明領域全体にclickableは付けない。
 
-- 幅が 600dp 未満、または幅が高さ以下: `PortraitMap`
-- 幅が 600dp 以上かつ幅が高さより大きい: `LandscapeThreeColumn`
+MapAreaが上部overlayの実測高さをLocalNavigationMapTopOverlayPxでMapScreenへ渡す。
+方位 / ＋ / − / rulerは実測overlay下端の下に配置し、警告の出入りや回転でも追従する。
+固定カード高は使わない。通常は縦積み。高さ260dp未満の操作領域では従来のcompact配置
+（方位の横に縦並び＋/−/ruler）を保持し、さらに短い領域はその操作群だけスクロールする。
+地図全体はスクロール領域に含めない。rulerの最大68dp幅、実距離計算は変更しない。
 
-この純粋関数は単体テストされており、将来 WindowSizeClass へ置き換える場合も表示 Composable への影響を限定できます。小型端末を無理に 3 カラム化しない判断です。
+## 地図下部の操作と自車位置
 
-## 縦画面 / map-first（Phase010.6E）
+FREEは左下に案内終了・現在地から再計算、ARRIVEDでは再計算を隠す。
+PRESCRIBEDにはFREE操作を表示しない。右下に経路全体・現在地/追従中。
+左右とも共通のMapActionGroupを使い、地図幅560dp以上なら各群を横並びにする。
+広い横画面では下端遮蔽が136dpから80dpになり、自車の表示位置が56dp下へ移る。
+狭い画面は従来の縦並びを保持する。左右ボタンのtouch targetは48dp以上。
 
-Column は MapArea(weight=1)、運行情報、下部5操作。警告・案内・交通警告・迂回の一時操作は地図上へ重ね、独立した行で地図を押し下げない。
-上部overlayは右端84dpを方位/zoom用に空け、地図高30%を上限として内容が多いとスクロールする。
-優先順は位置/deviation、到着、交通警告、compact案内、迂回操作。交通情報の接続状態だけの表示は規制パネルで確認する。
+bottom occlusionは左右群の実測高さの最大値。双方とも32dpのattribution余白を含む。
+非表示のFREE群の古い高さは使わない。旧左列の高さは計算に入れない。
+HEADING_UPは可視下端から外周半径25.9dp＋余白8dp、計33.9dp上に自車中心を配置する。
+物理画面の下端と、下部操作を差し引いた可視下端は区別する。
+短い領域でもvisibleHeight/2への強制フォールバックは行わない。
 
-FREE の左下は上が「案内終了」outlined、下が「現在地から再計算」primary pill。各48dp以上。
-ARRIVEDは再計算を隠し、上部に「目的地周辺です」。PRESCRIBEDにはFREE操作を出さない。
-右下は従来の経路全体/現在地。左右群の最大実測高さをbottom occlusionとして共有する。
-下端32dpはattribution用。運行情報は70→64dpへ縮小し、所定経路Library入口を保持。
-Library入口が無いactive画面では重複情報パネルを省略する。下部5ボタンは従来通り72dp。
+## 機能入口
 
-## 横画面 / 3-column（Phase010.6E）
+下部「ルート」メニューから「現在地からナビ」「所定経路・一覧と保存」「経路編集」へ進む。
+案内中のモード切替確認とキャンセル動作は維持する。運行情報パネル専用のcallbackは削除。
+開発接続設定は既存の専用画面から利用できる。詳細操作は専用画面へ分離する。
 
-案内左列、地図、補助操作右列を維持。右列の0.18 weightを廃止し、内容幅に合わせ72〜110dpに制限。
-残り幅を左0.24/地図0.76へ配分する。実際の操作列は88dp（ボタン80dp）、水平padding12dp、1行、48dp以上のtouch target。文字はこのcompact親幅内で測定する。
-FREE操作は横画面でも地図左下。短い地図では方位を縦並びzoom/rulerの横に置き、現在地群との重なりを避ける。
+PRESCRIBED案内中のみ「迂回」が有効。OFF_ROUTE時の「迂回を検討」、ACTIVE時の
+再設定・終了は上部overlayに表示する。復帰候補、preview、明示採用、速度制限は変更しない。
+[迂回操作](../detour-rejoin.md)、[RoutePlan editor](route-plan-editor.md)を参照。
 
-## 4 領域 UI の拡張
+## 検証
 
-現在の主要領域には安定したテストタグを付けています。
-
-1. 次案内: 次の分岐、距離、車線/JCT 情報
-2. 地図: 所定経路、自車、規制、迂回候補
-3. 運行情報: 遅延、規制、運行管理メッセージ
-4. 補助操作: ルート編集入口、迂回、規制、音声、表示
-
-運行情報には `所定経路：<route name>`、未選択時は `所定経路：未選択`、地点があれば `編集プランあり` を表示します。将来機能は無効なプレースホルダですが、「ルート編集」だけが専用 editor への安全な入口です。詳細リストや並べ替えは走行画面へ置きません。
-
-## RoutePlan editor への遷移
-
-「ルート編集」は専用 `RoutePlanEditorScreen` へ切り替えます。Android back/「戻る」で Navigation へ戻り、「編集完了」は in-memory plan を確定します。「経路探索」でcandidateを計算し、「このルートを使用」でScheduledRouteへ採用します。「編集完了」だけでは再計算・採用しません。Editor の縦横設計は [RoutePlan editor](route-plan-editor.md) を参照してください。
-
-## 地図上の操作
-
-Phase010.6E は方位、縦並び＋/−、最大68dpの距離目盛。HEADING_UPは実可視下端から33.9dpの安全余白。詳細は[地図操作](../map-controls.md)、[可視領域](../map-visible-viewport.md)。
-
-- `現在地へ戻る`: 現在位置がある場合だけ有効で、位置追従を ON にして再センタします。
-- `経路全体`: active route がある場合だけ有効で、位置追従を OFF にして geometry bounds を 64dp 相当の余白付きで fit します。
-
-両操作は独立したテストタグと content description を持ちます。MapView 自体が各レイアウトの地図領域内に収まるため、bounds fit は案内・運行情報・補助操作の外側 UI に隠れません。
-
-詳細地図が利用できない場合は地図上端に「詳細地図サーバー未接続」を小さく重ねます。MapView は埋め込み dark fallback のまま残り、長押し、地点編集、route/candidate overlay、bounds fit は停止しません。OSM/OpenMapTiles attribution はNavigationでは地図左下、Editorではシートに隠れない地図左上に表示します。
-
-## JCT 接近専用表示
-
-将来は通常の次案内データに `presentationMode` を追加し、JCT 接近時だけ専用模式図を地図の上へ重ねる方針です。レイアウト全体を別 Activity に切り替えず、次案内領域の強調と中央領域の overlay として実装します。これにより縦横レイアウト、追従状態、MapView のライフサイクルを維持できます。
-
-## セーフエリアとテーマ
-
-ルートは `WindowInsets.safeDrawing` を使用し、ディスプレイカットアウトとシステムバーを避けます。夜間の眩しさを抑える濃紺/濃灰の背景、低輝度の本文色、青系アクセントを標準とし、警告色は theme package に分離しています。
-
-
-## Phase005 案内カード
-
-縦画面の上部プレースホルダーを GuidanceCard に置換し、横画面は左列の上段を案内に使用します。大きな主案内と残距離、操作記号、道路/方面、その次の案内を表示します。位置未取得は「位置情報待ち」、不確実時は「経路付近の位置を確認中」として距離・操作・next-nextを抑制します。地図の詳細道路と経路線は維持します。画面回転後も NavigationViewModel が適用済み route/guidance を保持します。
-
-## Phase006 高速カード
-
-5 km 以内の対象分岐は HighwayGuidanceCard を表示します。縦は地図上のcompact表示（上部overlay全体が地図高30%以下）、横は左列、中央地図を維持します。方向／距離／施設／方面／badge／その次の順で表示し、overflow は内部スクロールと省略、完全な読み上げ説明で対応します。不確実時は模式図と距離を抑制します。[高速案内](../highway-guidance.md)。
-
-## Phase008 deviation banner
-
-縦はguide card上、横は左guide column先頭にDeviationBannerを表示します。ON_ROUTEでは非表示、SUSPECTEDは位置関係確認中、OFF_ROUTEは所定経路から外れている可能性、RECOVERINGは復帰確認中。UNKNOWN/UNRELIABLEは位置情報確認中です。文字とpolite live regionで状態を伝え、OFF_ROUTEのみ強調色。dismiss/確認buttonはありません。高速cardの方向・sign・模式図は不確実時に抑制し、地図とroute lineは維持します。
-
-## Phase008.5A 配色と補助ボタン
-
-基本ライト。案内付き採用経路の表示中だけ、日の出前/日の入り以降または検知済みトンネルでダーク。
-編集・設定は夜間もライト。[テーマ・地図表示](../theme-map-presentation.md) を参照。
-
-下部は「ルート / 迂回 / 規制 / 音声 / 表示」。ルートの accessibility 説明は
-「ルート編集画面を開く」を維持する。固定幅88/72dpを廃止し、portraitではweight配分、
-landscapeでは列幅に合わせる。TextはmaxLines=1、softWrap=false、中央配置、最小ボタン高48dp。
-320dp画面相当の304dpバー（画面左右8dp）と狭い横画面列をComposeテストで確認する。
-
-## Phase008.5D ルートメニュー
-
-下部5項目を維持し、「ルート」は「現在地からナビ」「所定経路・一覧と保存」「経路編集」のメニューを開きます。active session 中に別画面の設定へ入る場合は「終了して続ける」の確認が必要です。
-FREE の地図中央カーソル・目的地設定・車両条件付き preview と「案内開始」は独立画面です。案内画面には「現在地から再計算」「案内終了」、到着確認時には「目的地周辺です」を表示します。詳細は [Free Navigation](../free-navigation.md)。
-
-## Phase010 規制操作
-
-単一行の下部「規制」を有効化し、情報源・受信時刻・鮮度・経路影響・周辺情報・予告規制を scrollable dialog で表示します。イベントを tap して有効期間・出典・一致の信頼度を確認できます。警告は記号 + 文章 + contentDescription を備え、前方の閉鎖は強調します。PRESCRIBED のみ「迂回を検討」から既存 planner へ進みます。地図は ×/工/!/≋ と破線/面で表現し、light/dark reload 後も維持します。[詳細](../traffic-road-restrictions.md)。
+実端末のprojection.toScreenLocationで自車中心と実測bottom occlusionからの距離を比較する。
+MapArea、Android MapView、Surface/Textureとbufferの寸法一致、100m南北/東西投影比を検証。
+Portrait → Landscape → Portrait、警告出入り、縮小領域、FREE/PRESCRIBED/ARRIVEDを含む。
+運行情報不存在、全幅カード、カード下の操作、compact補助操作の既存テストを維持する。
+結果と制限は[Review015f](../reviews/015f-navigation-overlay-landscape.md)を参照。
