@@ -24,12 +24,7 @@ internal fun MapControls(navigationCamera: NavigationCameraState, cameraBearing:
         if (navigationCamera.active && onToggleOrientation != null) {
             NavigationCompass(navigationCamera.orientation, cameraBearing, onToggleOrientation)
         } else if (MapControlsPolicy.generalCompassVisible(navigationCamera.active, cameraBearing)) {
-            FilledTonalButton(onClick = onResetNorth,
-                modifier = Modifier.size(64.dp, 56.dp).testTag("general_north_compass")
-                    .semantics { contentDescription = "北を上に戻す" },
-                contentPadding = PaddingValues(0.dp), shape = RoundedCornerShape(16.dp)) {
-                Text("N ↑", style = MaterialTheme.typography.titleMedium)
-            }
+            GeneralNorthCompass(cameraBearing, onResetNorth)
         }
         FilledTonalButton(onClick = onScale,
             modifier = Modifier.size(64.dp, 56.dp).testTag("map_scale_preset")

@@ -159,7 +159,7 @@ class MapController(
         val native = map ?: return
         val current = native.cameraPosition
         native.easeCamera(CameraUpdateFactory.newCameraPosition(
-            CameraPosition.Builder(current).bearing(0.0).build()), RECENTER_ANIMATION_MILLIS)
+            northUpCamera(current)), RECENTER_ANIMATION_MILLIS)
     }
 
     fun applyScalePreset(preset: ScalePreset) {
