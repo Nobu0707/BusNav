@@ -900,9 +900,9 @@ internal fun AuxiliaryControls(
 ) {
     Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         if (vertical) {
-            Column(Modifier.fillMaxHeight().padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceEvenly) {
-                BottomControl("ルート", true, onEditRoute, Modifier.widthIn(min = 64.dp).wrapContentWidth(), compact = true)
-                BottomLabelLayout.secondaryLabels.forEach { BottomControl(it, it == "規制" || it == "迂回" && detourEnabled, if (it == "規制") onTraffic else if (it == "迂回") onDetour else ({}), Modifier.widthIn(min = 64.dp).wrapContentWidth(), compact = true) }
+            Column(Modifier.width(88.dp).fillMaxHeight().padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceEvenly) {
+                BottomControl("ルート", true, onEditRoute, Modifier.fillMaxWidth(), compact = true)
+                BottomLabelLayout.secondaryLabels.forEach { BottomControl(it, it == "規制" || it == "迂回" && detourEnabled, if (it == "規制") onTraffic else if (it == "迂回") onDetour else ({}), Modifier.fillMaxWidth(), compact = true) }
             }
         } else {
             Row(Modifier.fillMaxSize().padding(4.dp), verticalAlignment = Alignment.CenterVertically,
@@ -923,7 +923,7 @@ private fun BottomControl(label: String, enabled: Boolean, onClick: () -> Unit, 
             .testTag(if (label == "ルート") NavigationTestTags.ROUTE_EDIT else "bottom_$label")
             .semantics { if (label == "ルート") contentDescription = "ルートメニューを開く" },
     ) {
-        Text(label, modifier = if (compact) Modifier else Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        Text(label, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             maxLines = BottomLabelLayout.maxLines, softWrap = false,
             style = MaterialTheme.typography.labelMedium)
     }

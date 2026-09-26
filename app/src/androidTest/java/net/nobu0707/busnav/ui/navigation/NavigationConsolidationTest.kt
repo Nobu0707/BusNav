@@ -135,7 +135,7 @@ class NavigationConsolidationTest {
                 assertEquals("$label bottom margin", 33.9 * view.resources.displayMetrics.density, visibleBottom - y, 3.0)
             }
             val ruler = rule.onNodeWithTag("map_scale_ruler").fetchSemanticsNode().boundsInRoot
-            assertTrue(ruler.width <= 68.1 * rule.density.density)
+            assertTrue("$label ruler width=${ruler.width}, density=${view.resources.displayMetrics.density}", ruler.width <= 68 * view.resources.displayMetrics.density + 1f)
             val zoom = rule.onNodeWithTag("map_zoom_out").fetchSemanticsNode().boundsInRoot
             val current = rule.onNodeWithTag(NavigationTestTags.CURRENT_LOCATION).fetchSemanticsNode().boundsInRoot
             assertFalse("$label controls overlap", zoom.overlaps(current))
