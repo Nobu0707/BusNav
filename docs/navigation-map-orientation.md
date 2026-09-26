@@ -16,7 +16,7 @@ Circular deltas use the shortest arc: 359→1 is +2°, 1→359 is -2°. Changes 
 
 ## Camera, gestures and lifecycle
 
-MapController owns animation. HEADING_UP follows the resolved bearing; NORTH_UP follows location at 0°. The first navigation follow establishes the existing 16.5 zoom once; a recreated active navigation camera keeps its saved zoom. Toggle/recenter preserve zoom, and tilt stays at 0°. HEADING_UP following places the raw marker at 85% of the visible map pane height, 15% from its bottom, excluding measured bottom overlay controls. NORTH_UP stays centered. Both orientations use the same raw location for camera target and marker. See [Visible map viewport](map-visible-viewport.md).
+MapController owns animation. HEADING_UP follows the resolved bearing; NORTH_UP follows location at 0°. The first navigation follow establishes the existing 16.5 zoom once; a recreated active navigation camera keeps its saved zoom. Toggle/recenter preserve zoom, and tilt stays at 0°. HEADING_UP following places the raw marker 33.9dp above the visible bottom, excluding the maximum measured left/right bottom overlay height. The margin includes the ring outer stroke plus 8dp clearance. Tiny viewports prioritize safety. NORTH_UP stays centered. Both orientations use the same raw location for camera target and marker. See [Visible map viewport](map-visible-viewport.md).
 
 Move/rotate/zoom gestures suspend follow immediately. The orientation preference remains unchanged. Current location restores follow and the selected orientation. The camera-start gesture reason also covers pinch, rotation and double-tap zoom. MapLibre's built-in compass is disabled to avoid a competing reset action.
 

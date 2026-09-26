@@ -19,7 +19,7 @@ fun DeviationBanner(state: DeviationUiState, modifier: Modifier = Modifier) {
     val message = state.message ?: return
     Card(modifier.fillMaxWidth().testTag("deviation_banner").semantics { liveRegion = LiveRegionMode.Polite },
         colors = CardDefaults.cardColors(
-            containerColor = if (state.isProminent) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = if (state.isProminent) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.94f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f),
             contentColor = if (state.isProminent) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
         )) {
         Text(message, Modifier.padding(10.dp), style = MaterialTheme.typography.bodyMedium)

@@ -40,6 +40,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -682,23 +686,23 @@ private fun PortraitNavigationLayout(
         modifier = Modifier.fillMaxSize().padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        DeviationBanner(uiState.deviation)
-        DetourNavigationActions(uiState, onDetour, onEndDetour, detourMessage)
-        FreeNavigationActions(uiState, onFreeRecalculate, onEndNavigation)
-        TrafficAlert(trafficState, uiState.navigationActive && uiState.navigationMode == NavigationMode.PRESCRIBED && uiState.activeDetour == null, onConsiderTraffic, onTraffic)
-        NavigationGuidanceCard(uiState, Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.35f).dp))
         MapArea(
             uiState = uiState,
             onRequestPermission = onRequestPermission,
             onCurrentLocation = onCurrentLocation,
             onRouteOverview = onRouteOverview,
             modifier = Modifier.fillMaxWidth().weight(1f).testTag(NavigationTestTags.MAP),
+            onFreeRecalculate = onFreeRecalculate, onEndNavigation = onEndNavigation,
+            topOverlay = {
+                NavigationTopOverlay(uiState, trafficState, onConsiderTraffic, onTraffic,
+                    onDetour, onEndDetour, detourMessage)
+            },
             mapContent = mapContent,
         )
-        PlaceholderPanel(
+        if (!uiState.navigationActive || onOpenLibrary != null) PlaceholderPanel(
             title = if (uiState.navigationMode == NavigationMode.FREE) "現在地からナビ" else if (onOpenLibrary != null) "所定経路 • 一覧・保存" else "運行情報",
             detail = operationsSummary(uiState, hasRoutePlan),
-            modifier = Modifier.fillMaxWidth().height(70.dp).testTag(NavigationTestTags.OPERATIONS)
+            modifier = Modifier.fillMaxWidth().height(64.dp).testTag(NavigationTestTags.OPERATIONS)
                 .then(if (onOpenLibrary != null) Modifier.clickable(onClick = onOpenLibrary).semantics { contentDescription = "所定経路一覧を開く" } else Modifier),
         )
         AuxiliaryControls(
@@ -738,8 +742,9 @@ private fun LandscapeNavigationLayout(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             DeviationBanner(uiState.deviation)
+            if (uiState.navigationMode == NavigationMode.FREE && uiState.arrival.state == ArrivalState.ARRIVED)
+                Text("目的地周辺です", Modifier.testTag("free_arrived"))
             DetourNavigationActions(uiState, onDetour, onEndDetour, detourMessage)
-        FreeNavigationActions(uiState, onFreeRecalculate, onEndNavigation)
             TrafficAlert(trafficState, uiState.navigationActive && uiState.navigationMode == NavigationMode.PRESCRIBED && uiState.activeDetour == null, onConsiderTraffic, onTraffic)
             NavigationGuidanceCard(uiState, Modifier.fillMaxWidth().weight(2f))
             PlaceholderPanel(
@@ -754,7 +759,8 @@ private fun LandscapeNavigationLayout(
             onRequestPermission = onRequestPermission,
             onCurrentLocation = onCurrentLocation,
             onRouteOverview = onRouteOverview,
-            modifier = Modifier.fillMaxHeight().weight(0.58f).testTag(NavigationTestTags.MAP),
+            modifier = Modifier.fillMaxHeight().weight(0.76f).testTag(NavigationTestTags.MAP),
+            onFreeRecalculate = onFreeRecalculate, onEndNavigation = onEndNavigation,
             mapContent = mapContent,
         )
         AuxiliaryControls(
@@ -762,7 +768,7 @@ private fun LandscapeNavigationLayout(
             onTraffic = onTraffic,
             onDetour = onDetour, detourEnabled = uiState.navigationActive && uiState.navigationMode == NavigationMode.PRESCRIBED,
             vertical = true,
-            modifier = Modifier.fillMaxHeight().weight(0.18f).testTag(NavigationTestTags.AUXILIARY),
+            modifier = Modifier.fillMaxHeight().widthIn(min = 72.dp, max = 110.dp).wrapContentWidth().testTag(NavigationTestTags.AUXILIARY),
         )
     }
 }
@@ -774,14 +780,32 @@ private fun MapArea(
     onCurrentLocation: () -> Unit,
     onRouteOverview: () -> Unit,
     modifier: Modifier,
+    onFreeRecalculate: () -> Unit,
+    onEndNavigation: () -> Unit,
+    topOverlay: (@Composable () -> Unit)? = null,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
-    Box(modifier = modifier, contentAlignment = Alignment.BottomEnd) {
-        val bottomOcclusion = remember { mutableIntStateOf(0) }
-        CompositionLocalProvider(net.nobu0707.busnav.map.LocalNavigationMapBottomOcclusionPx provides bottomOcclusion.intValue) {
+    BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.BottomEnd) {
+        val leftHeight = remember { mutableIntStateOf(0) }
+        val rightHeight = remember { mutableIntStateOf(0) }
+        val freeActions = uiState.navigationActive && uiState.navigationMode == NavigationMode.FREE
+        val bottomOcclusion = maxOf(if (freeActions) leftHeight.intValue else 0, rightHeight.intValue)
+        CompositionLocalProvider(net.nobu0707.busnav.map.LocalNavigationMapBottomOcclusionPx provides bottomOcclusion) {
             mapContent(Modifier.fillMaxSize())
         }
 
+        if (topOverlay != null) {
+            Column(Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = 8.dp, end = 84.dp)
+                .heightIn(max = maxHeight * 0.30f).verticalScroll(rememberScrollState())
+                .testTag("navigation_top_overlay"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                topOverlay()
+            }
+        }
+        if (freeActions) {
+            FreeNavigationActions(uiState, onFreeRecalculate, onEndNavigation,
+                Modifier.align(Alignment.BottomStart).widthIn(max = (maxWidth - 152.dp).coerceAtLeast(140.dp))
+                    .onSizeChanged { leftHeight.intValue = it.height }.padding(start = 8.dp, bottom = 32.dp))
+        }
         if (uiState.locationPermissionState != LocationPermissionState.Granted) {
             PermissionPrompt(
                 denied = uiState.locationPermissionState == LocationPermissionState.Denied,
@@ -792,7 +816,7 @@ private fun MapArea(
         }
 
         Column(
-            modifier = Modifier.onSizeChanged { bottomOcclusion.intValue = it.height }.padding(12.dp),
+            modifier = Modifier.onSizeChanged { rightHeight.intValue = it.height }.padding(start = 4.dp, end = 8.dp, bottom = 32.dp),
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -800,7 +824,7 @@ private fun MapArea(
                 onClick = onRouteOverview,
                 enabled = uiState.activeRoute != null,
                 modifier = Modifier
-                    .testTag(NavigationTestTags.ROUTE_OVERVIEW)
+                    .heightIn(min = 48.dp).testTag(NavigationTestTags.ROUTE_OVERVIEW)
                     .semantics { contentDescription = uiState.routeLabel + "全体を表示" },
             ) {
                 Text("経路全体")
@@ -809,7 +833,7 @@ private fun MapArea(
                 onClick = onCurrentLocation,
                 enabled = uiState.location != null,
                 modifier = Modifier
-                    .testTag(NavigationTestTags.CURRENT_LOCATION)
+                    .heightIn(min = 48.dp).testTag(NavigationTestTags.CURRENT_LOCATION)
                     .semantics { contentDescription = "現在地へ戻る" },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
@@ -876,9 +900,9 @@ internal fun AuxiliaryControls(
 ) {
     Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         if (vertical) {
-            Column(Modifier.fillMaxSize().padding(4.dp), verticalArrangement = Arrangement.SpaceEvenly) {
-                BottomControl("ルート", true, onEditRoute, Modifier.fillMaxWidth())
-                BottomLabelLayout.secondaryLabels.forEach { BottomControl(it, it == "規制" || it == "迂回" && detourEnabled, if (it == "規制") onTraffic else if (it == "迂回") onDetour else ({}), Modifier.fillMaxWidth()) }
+            Column(Modifier.fillMaxHeight().padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceEvenly) {
+                BottomControl("ルート", true, onEditRoute, Modifier.widthIn(min = 64.dp).wrapContentWidth(), compact = true)
+                BottomLabelLayout.secondaryLabels.forEach { BottomControl(it, it == "規制" || it == "迂回" && detourEnabled, if (it == "規制") onTraffic else if (it == "迂回") onDetour else ({}), Modifier.widthIn(min = 64.dp).wrapContentWidth(), compact = true) }
             }
         } else {
             Row(Modifier.fillMaxSize().padding(4.dp), verticalAlignment = Alignment.CenterVertically,
@@ -891,15 +915,15 @@ internal fun AuxiliaryControls(
 }
 
 @Composable
-private fun BottomControl(label: String, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
+private fun BottomControl(label: String, enabled: Boolean, onClick: () -> Unit, modifier: Modifier, compact: Boolean = false) {
     OutlinedButton(
         onClick = onClick, enabled = enabled,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 2.dp, vertical = 8.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = if (compact) 12.dp else 2.dp, vertical = 8.dp),
         modifier = modifier.heightIn(min = 48.dp)
             .testTag(if (label == "ルート") NavigationTestTags.ROUTE_EDIT else "bottom_$label")
             .semantics { if (label == "ルート") contentDescription = "ルートメニューを開く" },
     ) {
-        Text(label, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        Text(label, modifier = if (compact) Modifier else Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             maxLines = BottomLabelLayout.maxLines, softWrap = false,
             style = MaterialTheme.typography.labelMedium)
     }
@@ -981,14 +1005,34 @@ private fun DetourNavigationActions(state: NavigationUiState, begin: () -> Unit,
 }
 
 @Composable
-private fun FreeNavigationActions(state: NavigationUiState, recalculate: () -> Unit, end: () -> Unit) {
+private fun FreeNavigationActions(state: NavigationUiState, recalculate: () -> Unit, end: () -> Unit,
+    modifier: Modifier = Modifier) {
     if (!state.navigationActive || state.navigationMode != NavigationMode.FREE) return
-    Column {
-        if (state.arrival.state == ArrivalState.ARRIVED) Text("目的地周辺です", Modifier.testTag("free_arrived"))
-        Row {
-            if (state.arrival.state != ArrivalState.ARRIVED)
-                TextButton(onClick = recalculate, modifier = Modifier.testTag("free_recalculate")) { Text("現在地から再計算") }
-            TextButton(onClick = end, modifier = Modifier.testTag("free_end")) { Text("案内終了") }
+    Column(modifier.testTag("free_map_actions"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = end, modifier = Modifier.heightIn(min = 48.dp).testTag("free_end"),
+            colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                contentColor = MaterialTheme.colorScheme.error)) { Text("案内終了", maxLines = 1) }
+        if (state.arrival.state != ArrivalState.ARRIVED)
+            Button(onClick = recalculate, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp),
+                modifier = Modifier.heightIn(min = 48.dp).testTag("free_recalculate")) {
+                Text("現在地から再計算", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            }
+    }
+}
+
+@Composable
+private fun NavigationTopOverlay(state: NavigationUiState, traffic: TrafficUiState,
+    onConsider: (TrafficRouteImpact) -> Unit, onTraffic: () -> Unit,
+    onDetour: () -> Unit, onEndDetour: () -> Unit, detourMessage: String?) {
+    DeviationBanner(state.deviation)
+    if (state.arrival.state == ArrivalState.ARRIVED && state.navigationMode == NavigationMode.FREE) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f))) {
+            Text("目的地周辺です", Modifier.padding(8.dp).testTag("free_arrived"))
         }
     }
+    if (traffic.alert != null || traffic.highwayWarning != null)
+        TrafficAlert(traffic, state.navigationActive && state.navigationMode == NavigationMode.PRESCRIBED && state.activeDetour == null,
+            onConsider, onTraffic)
+    NavigationGuidanceCard(state, Modifier.fillMaxWidth(), compact = true)
+    DetourNavigationActions(state, onDetour, onEndDetour, detourMessage)
 }

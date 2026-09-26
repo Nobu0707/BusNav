@@ -19,9 +19,49 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun NavigationGuidanceCard(state: NavigationUiState, modifier: Modifier = Modifier) {
+fun NavigationGuidanceCard(state: NavigationUiState, modifier: Modifier = Modifier, compact: Boolean = false) {
     val highway = state.highwayGuidance
-    if (highway == null) GuidanceCard(state.guidance, modifier) else HighwayGuidanceCard(highway, modifier)
+    if (!compact) {
+        if (highway == null) GuidanceCard(state.guidance, modifier) else HighwayGuidanceCard(highway, modifier)
+        return
+    }
+    val primary = highway?.primaryText ?: state.guidance.primaryText
+    val distance = if (highway != null) highway.distanceText else state.guidance.distanceText
+    Card(modifier.testTag(if (highway == null) NavigationTestTags.NEXT_GUIDANCE else "highway_guidance")
+        .semantics { if (highway != null) contentDescription = highway.contentDescription },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f))) {
+        Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (highway?.schematic != null) JunctionSchematic(highway.schematic, Modifier.size(36.dp))
+                else if (highway == null) Text(state.guidance.symbol, style = MaterialTheme.typography.titleMedium)
+                distance?.let { Text(it, fontWeight = FontWeight.Bold, modifier = Modifier.testTag(
+                    if (highway == null) "guidance_distance" else "highway_distance")) }
+            }
+            Text(primary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("guidance_instruction"))
+            if (highway != null) {
+                val facility = listOfNotNull(highway.sign.exitNumber?.let { "出口 $it" },
+                    highway.sign.facilityNames.joinToString(" / ").ifEmpty { null }).joinToString(" · ")
+                if (facility.isNotEmpty()) Text(facility, style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (highway.sign.toward.isNotEmpty()) Text(highway.sign.toward.joinToString(" / "),
+                    style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    highway.sign.routeRefs.take(3).forEach { ref ->
+                        Text(ref, style = MaterialTheme.typography.labelMedium, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    }
+                }
+            }
+            (if (highway != null) highway.secondaryText else state.guidance.secondaryText)?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            (if (highway != null) highway.nextText else state.guidance.nextNextInstruction)?.let {
+                Text("その次: $it", style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag(if (highway == null) "guidance_next_next" else "highway_next"))
+            }
+        }
+    }
 }
 
 @Composable

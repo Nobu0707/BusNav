@@ -98,10 +98,13 @@ fun MapScreen(
         if (BuildConfig.DEBUG) AndroidLogMapDiagnostics() else NoOpMapDiagnostics
     }
     val mapView = remember(context) {
-        MapView(context).also { it.onCreate(null) }
+        MapView(context).also {
+            it.layoutParams = android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+            it.onCreate(null)
+        }
     }
     var cameraBearing by remember { mutableStateOf(initialCamera?.bearing ?: 0.0) }
-    var scaleMode by remember { mutableStateOf(ScaleMode.CUSTOM) }
     var ruler by remember { mutableStateOf<ScaleRulerReading?>(null) }
     var deviceHeading by remember { mutableStateOf<Double?>(null) }
     val sensorLocation by rememberUpdatedState(location)
@@ -113,7 +116,6 @@ fun MapScreen(
             initialNavigationCamera = initialNavigationCamera,
             onNavigationCameraInitialized = { initializedCallback() },
             onCameraChanged = { camera -> cameraBearing = camera.bearing; cameraCallback(camera) },
-            onScaleGesture = { scaleMode = ScaleMode.CUSTOM },
             onRulerChanged = { ruler = it },
             onReady = onMapReady,
             onGesture = onMapGesture,
@@ -227,11 +229,8 @@ fun MapScreen(
             modifier = Modifier.fillMaxSize(),
         )
         MapControls(navigationCamera, cameraBearing, onToggleOrientation, controller::resetNorth,
-            scaleMode, {
-                val preset = MapControlsPolicy.nextPreset(scaleMode)
-                scaleMode = ScaleMode.valueOf(preset.name)
-                controller.applyScalePreset(preset)
-            }, ruler, Modifier.align(Alignment.TopEnd).padding(8.dp))
+            controller::zoomBy, ruler, Modifier.align(Alignment.TopEnd)
+                .padding(bottom = with(LocalDensity.current) { bottomOcclusionPx.toDp() }).padding(8.dp))
         BasemapStatusOverlay(
             failureHint = basemapConfig.failureHint,
             state = basemapState,

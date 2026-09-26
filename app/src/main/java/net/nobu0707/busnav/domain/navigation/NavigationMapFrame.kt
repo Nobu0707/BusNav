@@ -24,6 +24,8 @@ fun navigationMapFrame(
     currentBearing: Double,
     mapHeightPx: Int,
     bottomOcclusionPx: Int,
+    density: Float = 1f,
+    vehicleOuterRadiusDp: Float = 25.9f,
 ): NavigationMapFrame {
     val bearing = camera.targetBearing(currentBearing)
     val viewport = VisibleMapViewport(1, mapHeightPx,
@@ -31,9 +33,10 @@ fun navigationMapFrame(
     val occlusion = mapHeightPx.coerceAtLeast(1) - viewport.rect.bottom.toInt()
     val visibleHeight = viewport.rect.height.toDouble()
     val lowerAnchor = camera.active && camera.following && camera.orientation == NavigationMapOrientation.HEADING_UP
-    // MapLibre centers the target between its top and bottom camera padding.
-    // 0.70 * visible height places it at 0.85 of the visible viewport.
-    val topPadding = if (lowerAnchor) visibleHeight * 0.70 else 0.0
+    // Outer marker stroke radius + 8 dp clearance. Safety wins for tiny viewports.
+    val margin = maxOf(vehicleOuterRadiusDp + 8f, 24f) * density
+    val centerY = (visibleHeight - margin).coerceAtLeast(visibleHeight / 2)
+    val topPadding = if (lowerAnchor) 2 * centerY - visibleHeight else 0.0
     val bottomPadding = if (lowerAnchor) occlusion.toDouble() else 0.0
     return NavigationMapFrame(location, location.point, bearing,
         camera.vehicleScreenRotation(bearing, location.normalizedBearingDegrees?.toDouble()),

@@ -1,9 +1,26 @@
-# Visible map viewport (Phase 010.6D)
+# Visible map viewport (Phase 010.6E)
 
-`MapViewportInsets`, `VisibleMapRect`, and `VisibleMapViewport` describe the MapView's unobscured rectangle in **MapView-local pixels**. Insets are clamped to leave at least one pixel. The Route Editor passes its current bottom sheet height, including drag positions, as the bottom inset. Navigation passes the measured bottom overlay occlusion. The map pane itself already excludes guidance and side panels.
+MapViewportInsets / VisibleMapRect / VisibleMapViewport use MapView-local pixels.
+Insets clamp to leave at least one pixel. Editor cursor registration and the projected
+ruler/shield span use the same rectangle; the editor bottom inset follows its sheet.
 
-The Route Editor cursor is drawn at `rect.centerX, rect.centerY`. Registration calls `projection.fromScreenLocation` on that same pixel through `MapController.cursorPosition()`. Sheet movement updates the inset without panning the camera. Route fit uses the sheet inset in MapLibre bounds padding, then removes persistent camera padding while preserving the physical map transform. Shield/facility span, preset zoom and ruler sampling all read the same viewport rectangle.
+Navigation bottom occlusion is max(measured FREE left group, measured right location group).
+Both groups include 32dp bottom spacing for attribution, and at least 48dp buttons.
+When FREE actions disappear their old measurement is ignored. Portrait guidance/warnings
+are overlays, so their appearance does not resize the underlying map. Landscape keeps
+its guidance side column outside the map. The top overlay does not shift the lower anchor.
 
-HEADING_UP uses the raw location as both the marker GeoPoint and camera target. MapLibre camera top padding is 0.70 × visible height and bottom padding is the bottom occlusion. Because the padded camera target lies halfway between the padded top and bottom, the marker appears at `top + 0.85 × visible height`: 85% from the visible top, 15% from the visible bottom. Portrait and landscape use the same formula. NORTH_UP keeps the existing centered camera policy. One accepted location fix continues to own the camera and marker update in the same map frame.
+HEADING_UP follows the same raw GPS point for marker and target. Its center is
+visibleBottom − max(markerOuterRadius + 8dp, 24dp). The ring radius is 22.4dp plus
+3.5dp outer half-stroke, giving a 33.9dp margin. Camera top padding is
+2 × max(visibleHeight − margin, visibleHeight / 2) − visibleHeight; bottom padding
+is the measured occlusion. NORTH_UP retains zero padding and physical centering.
+Typical 672dp/272dp usable heights give fractions 0.9496/0.8754, compared with 0.85.
+Tiny viewports prioritize marker safety; they cannot guarantee a fraction above 0.85.
 
-The model also applies when map width is reduced by a landscape side pane. FREE and Detour selection have no sheet inset today and therefore use the same viewport center with zero insets.
+MapScreen uses fillMaxSize AndroidView and MATCH_PARENT MapView layout parameters.
+No bitmap stretching or fixed aspect ratio is used. MapLibre 13.6.1 onSizeChanged calls
+NativeMap.resizeView. The controller now reapplies anchor padding on map-height changes
+even if a still-fresh GPS fix has not changed. Editor fit already cleared temporary
+padding; route/plan overview now clears padding on animation completion while preserving
+the physical center. See Review015e for measured surface bounds and local projection tests.

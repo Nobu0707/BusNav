@@ -187,8 +187,9 @@ class NavigationCameraTest {
             rule.runOnUiThread { result = native.projection.toScreenLocation(point).y / view.height.toDouble() }
             return result
         }
-        rule.waitUntil(10_000) { abs(fraction() - 0.85) < 0.03 }
-        assertEquals(0.85, fraction(), 0.03)
+        val expected = 1.0 - 33.9 * rule.activity.resources.displayMetrics.density / view.height
+        rule.waitUntil(10_000) { abs(fraction() - expected) < 0.03 }
+        assertEquals(expected, fraction(), 0.03)
         rule.runOnIdle { camera.value = camera.value.copy(orientation = NavigationMapOrientation.NORTH_UP) }
         rule.waitUntil(10_000) { abs(fraction() - 0.5) < 0.03 }
         assertEquals(0.5, fraction(), 0.03)

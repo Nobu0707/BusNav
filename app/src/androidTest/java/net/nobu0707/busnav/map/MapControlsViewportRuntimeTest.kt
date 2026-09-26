@@ -48,8 +48,9 @@ class MapControlsViewportRuntimeTest {
         rule.onNodeWithTag("general_north_compass").assertExists().performClick()
         rule.waitUntil(10_000) { rule.onAllNodesWithTag("general_north_compass").fetchSemanticsNodes().isEmpty() }
         rule.onNodeWithTag("map_scale_ruler").assertExists()
-        rule.onNodeWithTag("map_scale_preset").performClick()
-        rule.onNodeWithText("標準").assertExists()
+        rule.onNodeWithTag("map_zoom_in").performClick()
+        rule.onNodeWithTag("map_zoom_out").performClick()
+        rule.onNodeWithTag("map_scale_preset").assertDoesNotExist()
         val view = findMap(rule.activity.window.decorView)!!
         fun cursorY(): Float {
             var y = Float.NaN

@@ -1,9 +1,24 @@
-# Map controls (Phase 010.6D)
+# Map controls (Phase 010.6E)
 
-The map's right edge holds one compass, the scale preset button, and a projected scale ruler. Active navigation uses `NavigationCompass`; all other map modes show the general north button only after the camera is at least 4° from north. Tapping it eases bearing to 0° with the current target, zoom, and tilt. The touch target is 64×56dp and its description is `北を上に戻す`.
+The map right edge contains the existing mutually exclusive navigation/general compass,
+vertical + / − buttons and a projected ruler. General north rotation and the 4° neutral
+zone are unchanged. The general compass is 64×56dp; navigation is 64×80dp.
 
-The preset button cycles NEAR (500m visible vertical span), NORMAL (1.8km), and WIDE (5km). Pinch zoom changes the mode to CUSTOM; the next tap selects NORMAL. The zoom calculation compares the current projected visible span with the preset target. It changes only zoom, so navigation follow, bearing, orientation and camera padding remain intact. NORMAL is below the existing 2.2km road shield show threshold; the 2.2/2.6km hysteresis is unchanged.
+Each zoom tap applies ZOOM_STEP = 1.0 and clamps to MapLibre's minZoomLevel/maxZoomLevel.
+CameraPosition.Builder retains target, bearing, tilt and padding. The controller does
+not call the gesture callback or change follow/orientation. Immediate camera updates
+accumulate rapid taps. Pinch and other manual gestures retain their previous behavior.
+Unused ScaleMode/ScalePreset state and the preset cycle were removed after auditing all callers.
 
-The ruler samples two MapLibre screen points around the **visible viewport center**, converts both with `projection.fromScreenLocation`, and measures geodesic distance. It selects a 10/20/50 × power-of-ten distance near 80–140dp and formats m/km. The existing 75ms map detail update coalesces camera movement; a 10% width band retains the previous label around nice-value boundaries. Projection sampling works while the map is rotated.
+Ruler card width is 68dp, horizontal padding 6dp each side, bar maximum 56dp and preferred
+minimum 28dp. It keeps the 10/20/50/100/200/500m and 1/2/5/10km labels. Projection at the
+visible viewport center supplies meters/pixel. The bar is exactly distance / metersPerPixel;
+it is never visually clamped independently of its label. The previous value can remain
+within the lower hysteresis band, but may never exceed the maximum. At gaps between nice
+values a shorter bar is allowed. At extreme close zoom where 10m cannot fit, or when the
+bar would be subpixel, the ruler is hidden. Labels use single-line labelSmall typography.
 
-The built-in MapLibre compass remains disabled. The general button and navigation compass are mutually exclusive. The control stack is inside each map pane in portrait and landscape; navigation's separate current-location action remains available.
+Controls use 48dp or larger touch targets. At less than 260dp available map height,
+the compass sits beside the vertical zoom/ruler column to avoid the bottom-right location
+group. Current-location and route-overview controls remain bottom-right; FREE actions
+are bottom-left. Built-in MapLibre compass remains disabled.

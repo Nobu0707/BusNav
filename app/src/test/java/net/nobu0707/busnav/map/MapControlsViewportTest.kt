@@ -28,12 +28,8 @@ class MapControlsViewportTest {
         assertFalse(MapControlsPolicy.generalCompassVisible(false, 359.0))
         assertTrue(MapControlsPolicy.generalCompassVisible(false, 30.0))
         assertFalse(MapControlsPolicy.generalCompassVisible(true, 30.0))
-        assertEquals(ScalePreset.NORMAL, MapControlsPolicy.nextPreset(ScaleMode.CUSTOM))
-        assertEquals(ScalePreset.WIDE, MapControlsPolicy.nextPreset(ScaleMode.NORMAL))
-        assertEquals(ScalePreset.NEAR, MapControlsPolicy.nextPreset(ScaleMode.WIDE))
-        assertTrue(ScalePreset.NEAR.spanMeters < ScalePreset.NORMAL.spanMeters)
-        assertTrue(ScalePreset.NORMAL.spanMeters < ScalePreset.WIDE.spanMeters)
-        assertEquals(16.0, MapControlsPolicy.zoomForSpan(15.0, 2000.0, 1000.0), 0.001)
+        assertEquals(16.0, MapControlsPolicy.steppedZoom(15.0, 1, 2.0, 20.0), 0.001)
+        assertEquals(14.0, MapControlsPolicy.steppedZoom(15.0, -1, 2.0, 20.0), 0.001)
     }
 
     @Test fun rulerUsesNiceProjectedDistanceAndHysteresis() {

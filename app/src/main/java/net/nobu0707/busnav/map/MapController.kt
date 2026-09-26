@@ -56,7 +56,6 @@ class MapController(
     private val initialNavigationCamera: Boolean = false,
     private val onNavigationCameraInitialized: () -> Unit = {},
     private val onCameraChanged: (EditorCamera) -> Unit = {},
-    private val onScaleGesture: () -> Unit = {},
     private val onRulerChanged: (ScaleRulerReading?) -> Unit = {},
 ) {
     private var map: MapLibreMap? = null
@@ -70,13 +69,11 @@ class MapController(
     private val headingFreshness = NavigationHeadingResolver(headingConfig)
     private var gestureSuspended = false
     private var lastFollowedElapsedMillis: Long? = null
-    private var gestureZoomAtStart: Double? = null
     private var lastRuler: ScaleRulerReading? = null
     private var navigationBottomOcclusionPx = 0
     private val cameraStartedListener = MapLibreMap.OnCameraMoveStartedListener { reason ->
         if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
             gestureSuspended = true
-            gestureZoomAtStart = map?.cameraPosition?.zoom
             onGesture()
         }
     }
@@ -117,15 +114,18 @@ class MapController(
     private var onEditorCameraApplied: (Long) -> Unit = {}
     private var lastEditorRequestId: Long? = null
     private val cameraListener = MapLibreMap.OnCameraMoveListener { saveCamera(); scheduleMapDetails() }
-    private val layoutListener = android.view.View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fitEditorIfRequested(); scheduleMapDetails() }
+    private var lastFrameHeight = -1
+    private val layoutListener = android.view.View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+        fitEditorIfRequested()
+        if (navigationCamera.active && navigationCamera.following && !gestureSuspended) {
+            update(latestLocation, true, lastRecenterRequestId, navigationCamera, navigationBottomOcclusionPx)
+        }
+        scheduleMapDetails()
+    }
 
     private fun saveCamera() {
         val camera = map?.cameraPosition ?: return
         val target = camera.target ?: return
-        if (gestureZoomAtStart?.let { kotlin.math.abs(it - camera.zoom) > 0.01 } == true) {
-            gestureZoomAtStart = null
-            onScaleGesture()
-        }
         latestLocation?.let(::renderVehicleRotation)
         onCameraChanged(EditorCamera(GeoPoint(target.latitude, target.longitude), camera.zoom, camera.bearing, camera.tilt))
     }
@@ -162,12 +162,12 @@ class MapController(
             northUpCamera(current)), RECENTER_ANIMATION_MILLIS)
     }
 
-    fun applyScalePreset(preset: ScalePreset) {
+    fun zoomBy(direction: Int) {
         val native = map ?: return
-        val camera = native.cameraPosition
-        val zoom = MapControlsPolicy.zoomForSpan(camera.zoom, visibleSpan(), preset.spanMeters)
-        native.easeCamera(CameraUpdateFactory.newCameraPosition(
-            CameraPosition.Builder(camera).zoom(zoom).build()), RECENTER_ANIMATION_MILLIS)
+        // Immediate updates accumulate rapid taps and retain the padded anchor.
+        native.cancelTransitions()
+        native.moveCamera(CameraUpdateFactory.newCameraPosition(
+            zoomOnlyCamera(native.cameraPosition, direction, native.minZoomLevel, native.maxZoomLevel)))
     }
 
     fun updateEditorCamera(request: EditorCameraRequest?, bottomPadding: Int?, onApplied: (Long) -> Unit) {
@@ -236,7 +236,7 @@ class MapController(
             val distance = VisibleMapSpanCalculator.distance(
                 GeoPoint(left.latitude, left.longitude), GeoPoint(right.latitude, right.longitude))
             val density = view.resources.displayMetrics.density
-            val next = ScaleRulerPolicy.choose(distance / sampleWidth, 80f * density, 140f * density, lastRuler)
+            val next = ScaleRulerPolicy.choose(distance / sampleWidth, MapControlsPolicy.RULER_MIN_BAR_DP * density, MapControlsPolicy.RULER_MAX_BAR_DP * density, lastRuler)
             if (next != lastRuler) { lastRuler = next; onRulerChanged(next) }
         }
         val shields = shieldSpanPolicy.update(span)
@@ -378,10 +378,13 @@ class MapController(
         val expectedBottomPadding = if (navigationCamera.active && navigationCamera.orientation == NavigationMapOrientation.HEADING_UP)
             bottomOcclusionPx else 0
         if (initialNavigationFollow || !hasCenteredOnFirstLocation || recenter || changed || previous != navigationCamera ||
+            (navigationCamera.active && lastFrameHeight != mapView?.height) ||
             (navigationCamera.active && (native.cameraPosition.padding?.getOrNull(3)?.toInt() ?: 0) != expectedBottomPadding)) {
             val camera = native.cameraPosition
             val frame = navigationMapFrame(location, navigationCamera, camera.bearing,
-                mapView?.height ?: 0, bottomOcclusionPx)
+                mapView?.height ?: 0, bottomOcclusionPx,
+                mapView?.resources?.displayMetrics?.density ?: 1f, VehicleMarkerGeometry().radius + 3.5f)
+            lastFrameHeight = mapView?.height ?: 0
             val next = CameraPosition.Builder(camera)
                 .target(frame.cameraTarget.toLatLng())
                 .bearing(if (previous.active && !navigationCamera.active) 0.0 else frame.cameraBearing)
@@ -523,13 +526,26 @@ class MapController(
     }
 
 
+    private val clearOverviewPadding = object : MapLibreMap.CancelableCallback {
+        override fun onCancel() = Unit
+        override fun onFinish() {
+            val native = map ?: return
+            val view = mapView ?: return
+            val camera = native.cameraPosition
+            if (camera.padding?.any { it != 0.0 } != true) return
+            val center = native.projection.fromScreenLocation(PointF(view.width / 2f, view.height / 2f))
+            native.moveCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.Builder(camera)
+                .target(center).padding(0.0, 0.0, 0.0, 0.0).build()))
+        }
+    }
+
     private fun fitRoute(route: ScheduledRoute) {
         val bounds = LatLngBounds.Builder().apply {
             route.geometry.points.forEach { include(it.toLatLng()) }
         }.build()
         map?.easeCamera(
             CameraUpdateFactory.newLatLngBounds(bounds, routePaddingPx),
-            RECENTER_ANIMATION_MILLIS,
+            RECENTER_ANIMATION_MILLIS, clearOverviewPadding,
         )
     }
 
@@ -567,7 +583,7 @@ class MapController(
                 }.build()
                 map?.easeCamera(
                     CameraUpdateFactory.newLatLngBounds(bounds, routePaddingPx),
-                    RECENTER_ANIMATION_MILLIS,
+                    RECENTER_ANIMATION_MILLIS, clearOverviewPadding,
                 )
             }.onFailure { error -> Log.w(TAG, "Unable to fit route plan bounds", error) }
         }
