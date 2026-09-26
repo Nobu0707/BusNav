@@ -62,4 +62,37 @@ class NavigationControlsRefinementTest {
         val tiny = navigationMapFrame(location, camera, 90.0, 50, 40)
         assertTrue(tiny.topPaddingPx >= 0.0)
     }
+    @Test fun shortLandscapeDoesNotFallBackToVisibleCenter() {
+        val fix = LocationState(GeoPoint(35.68, 139.76), 5f, 90f, 8f, 1, 1)
+        val camera = NavigationCameraState(true, true, NavigationMapOrientation.HEADING_UP, 90.0)
+        // 62px usable: old max(desired, height/2) forced the point to 31px.
+        val frame = navigationMapFrame(fix, camera, 90.0, 190, 128)
+        val y = (frame.topPaddingPx + 190 - frame.bottomPaddingPx) / 2
+        assertEquals(62.0 - 33.9, y, 0.001)
+        assertTrue(y < 31.0)
+        assertTrue(frame.topPaddingPx >= 0 && frame.bottomPaddingPx >= 0)
+    }
+
+    @Test fun northUpAndNonFollowingKeepPhysicalCenter() {
+        val fix = LocationState(GeoPoint(35.68, 139.76), 5f, 90f, 8f, 1, 1)
+        val heading = NavigationCameraState(true, true, NavigationMapOrientation.HEADING_UP, 90.0)
+        for (camera in listOf(heading.copy(orientation = NavigationMapOrientation.NORTH_UP),
+            heading.copy(following = false), heading.copy(active = false))) {
+            val frame = navigationMapFrame(fix, camera, 90.0, 360, 80, topOverlayBottomPx = 90)
+            assertEquals(0.0, frame.topPaddingPx, 0.0)
+            assertEquals(0.0, frame.bottomPaddingPx, 0.0)
+        }
+    }
+
+    @Test fun bottomAnchorClearsTopOverlayWhenTheMarkerFits() {
+        val fix = LocationState(GeoPoint(35.68, 139.76), 5f, 90f, 8f, 1, 1)
+        val camera = NavigationCameraState(true, true, NavigationMapOrientation.HEADING_UP, 90.0)
+        for (height in listOf(360, 800)) {
+            val frame = navigationMapFrame(fix, camera, 90.0, height, 80, topOverlayBottomPx = 90)
+            val y = (frame.topPaddingPx + height - frame.bottomPaddingPx) / 2
+            assertEquals(height - 80 - 33.9, y, 0.001)
+            assertTrue(y - 25.9 >= 90 + 8)
+        }
+    }
+
 }

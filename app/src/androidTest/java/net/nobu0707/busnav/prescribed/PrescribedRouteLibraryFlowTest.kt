@@ -61,7 +61,7 @@ class PrescribedRouteLibraryFlowTest {
         fun nav() = ViewModelProvider(rule.activity)[NavigationViewModel::class.java].stateHolder
         fun library() = ViewModelProvider(rule.activity)[PrescribedRouteLibraryViewModel::class.java].holder
         fun waitTag(tag: String) = rule.waitUntil(20000) { rule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
-        fun openLibrary() { waitTag(NavigationTestTags.OPERATIONS); rule.onNodeWithTag(NavigationTestTags.OPERATIONS).performClick(); waitTag("prescribed_library") }
+        fun openLibrary() { waitTag(NavigationTestTags.ROUTE_EDIT); rule.onNodeWithTag(NavigationTestTags.ROUTE_EDIT).performClick(); rule.onNodeWithText("所定経路・一覧と保存").performClick(); waitTag("prescribed_library") }
         fun records() = runBlocking { repo.observeAll().first() }
         fun record(id: String) = runBlocking { (repo.getById(id) as PrescribedRouteLoad.Found).record }
         fun calculateApply() {

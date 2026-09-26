@@ -39,13 +39,13 @@ class NavigationScreenTest {
 
         composeRule.onNodeWithTag(NavigationTestTags.NEXT_GUIDANCE).assertIsDisplayed()
         composeRule.onNodeWithTag(NavigationTestTags.MAP).assertIsDisplayed()
-        composeRule.onNodeWithTag(NavigationTestTags.OPERATIONS).assertIsDisplayed()
+        composeRule.onNodeWithTag(NavigationTestTags.OPERATIONS).assertDoesNotExist()
         composeRule.onNodeWithTag(NavigationTestTags.AUXILIARY).assertIsDisplayed()
         composeRule.onNodeWithTag(NavigationTestTags.PERMISSION).assertIsDisplayed()
     }
 
     @Test
-    fun landscapeLayoutShowsThreeColumns() {
+    fun landscapeLayoutUsesFullWidthMapOverlay() {
         composeRule.setContent {
             BusNavTheme {
                 NavigationScreen(
@@ -60,7 +60,11 @@ class NavigationScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag(NavigationTestTags.NEXT_GUIDANCE).fetchSemanticsNode()
+        composeRule.onNodeWithTag(NavigationTestTags.OPERATIONS).assertDoesNotExist()
+        val guidance = composeRule.onNodeWithTag(NavigationTestTags.NEXT_GUIDANCE).fetchSemanticsNode().boundsInRoot
+        val map = composeRule.onNodeWithTag(NavigationTestTags.MAP).fetchSemanticsNode().boundsInRoot
+        assertTrue(map.contains(guidance.center))
+        assertTrue(guidance.width > map.width * 0.9f)
         composeRule.onNodeWithTag(NavigationTestTags.MAP).assertIsDisplayed()
         composeRule.onNodeWithTag(NavigationTestTags.AUXILIARY).fetchSemanticsNode()
     }
@@ -96,7 +100,7 @@ class NavigationScreenTest {
     }
 
     @Test
-    fun routeNameAndOverviewActionAreAvailable() {
+    fun overviewActionRemainsAvailableWithoutOperationsPanel() {
         var clicked = false
         val route = createDevelopmentSampleRoute()
         composeRule.setContent {
@@ -117,7 +121,7 @@ class NavigationScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("所定経路：開発用サンプルルート", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag(NavigationTestTags.OPERATIONS).assertDoesNotExist()
         composeRule.onNodeWithTag(NavigationTestTags.ROUTE_OVERVIEW).performClick()
         composeRule.runOnIdle { assertTrue(clicked) }
     }

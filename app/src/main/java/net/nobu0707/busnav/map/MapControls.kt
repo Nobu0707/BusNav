@@ -1,6 +1,8 @@
 package net.nobu0707.busnav.map
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -44,7 +46,7 @@ internal fun MapControls(navigationCamera: NavigationCameraState, cameraBearing:
         // Short landscape maps keep the vertical zoom pair beside the compass,
         // so this group stays above the bottom-right location controls.
         if (maxHeight < 260.dp) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) { compass(); zoom() }
+            Row(Modifier.verticalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) { compass(); zoom() }
         } else {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 compass(); zoom()

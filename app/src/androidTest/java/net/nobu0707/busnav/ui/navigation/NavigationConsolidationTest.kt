@@ -47,7 +47,7 @@ class NavigationConsolidationTest {
         rule.setContent { BusNavTheme {
             NavigationScreen(state.value, {}, {}, {}, {},
                 onFreeRecalculate = { recalculated++ }, onEndNavigation = { ended++ },
-                onOpenLibrary = {}, modifier = Modifier.requiredSize(400.dp, 800.dp), mapContent = { Box(it) })
+                modifier = Modifier.requiredSize(400.dp, 800.dp), mapContent = { Box(it) })
         } }
         fun bounds(tag: String) = rule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
         val map = bounds(NavigationTestTags.MAP)
@@ -69,7 +69,7 @@ class NavigationConsolidationTest {
         rule.runOnIdle { state.value = state.value.copy(navigationMode = NavigationMode.PRESCRIBED) }
         rule.onNodeWithTag("free_map_actions").assertDoesNotExist()
         assertEquals(map, bounds(NavigationTestTags.MAP))
-        rule.onNodeWithTag(NavigationTestTags.OPERATIONS).assertExists()
+        rule.onNodeWithTag(NavigationTestTags.OPERATIONS).assertDoesNotExist()
     }
 
     @Test fun nativeBoundsSurfaceProjectionAndFollowSurviveResizeAndRotation() {
@@ -85,7 +85,7 @@ class NavigationConsolidationTest {
         rule.runOnUiThread { MapLibre.getInstance(rule.activity) }
         fun content() = rule.activity.setContent { BusNavTheme {
             Box(Modifier.fillMaxSize().padding(bottom = if (reduced.value) 60.dp else 0.dp)) {
-                NavigationScreen(state.value, {}, {}, {}, {}, onOpenLibrary = {}, mapContent = { modifier ->
+                NavigationScreen(state.value, {}, {}, {}, {}, mapContent = { modifier ->
                     MapScreen(state.value.location, true, 0, null, 0, modifier = modifier,
                         initialCamera = EditorCamera(point, 16.0, 90.0, 0.0),
                         navigationCamera = NavigationCameraState(true, true, NavigationMapOrientation.HEADING_UP, 90.0),
@@ -118,6 +118,10 @@ class NavigationConsolidationTest {
                 }
                 match
             }
+            val right = rule.onNodeWithTag("navigation_right_actions").fetchSemanticsNode().boundsInRoot
+            val left = rule.onAllNodesWithTag("free_map_actions").fetchSemanticsNodes().firstOrNull()?.boundsInRoot
+            val occlusion = maxOf(right.height, left?.height ?: 0f)
+            val topBounds = rule.onNodeWithTag("navigation_top_overlay").fetchSemanticsNode().boundsInRoot
             rule.runOnUiThread {
                 val map = requireNotNull(native)
                 val center = map.cameraPosition.target!!
@@ -130,18 +134,48 @@ class NavigationConsolidationTest {
                 assertTrue("$label projection ratio=$ratio", ratio in 0.9f..1.1f)
                 val camera = map.cameraPosition
                 val padding = requireNotNull(camera.padding)
-                val visibleBottom = view.height - padding[3]
+
+                val visibleBottom = view.height - occlusion
                 val y = map.projection.toScreenLocation(LatLng(point.latitude, point.longitude)).y
-                assertEquals("$label bottom margin", 33.9 * view.resources.displayMetrics.density, visibleBottom - y, 3.0)
+                assertEquals("$label bottom margin", 33.9 * view.resources.displayMetrics.density, (visibleBottom - y).toDouble(), 3.0)
+                val evidence = "$label orientation=HEADING_UP following=true active=true mapHeight=${view.height} " +
+                    "bottomOcclusion=$occlusion topOverlay=$topBounds " +
+                    "padding=${padding.toList()} pointY=$y visibleBottom=$visibleBottom bottomDistance=${visibleBottom-y} isotropy=$ratio"
+                android.util.Log.i("NavigationOverlayEvidence", evidence)
+                val evidenceDir = File(rule.activity.getExternalFilesDir(null), "phase0106f").apply { mkdirs() }
+                File(evidenceDir, "projection.txt").appendText(evidence + "\n")
             }
+            fun bounds(tag: String) = rule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+            val mapBounds = bounds(NavigationTestTags.MAP)
+            assertEquals(mapBounds, container)
+            val overlay = bounds("navigation_top_overlay")
+            val margin = 8 * rule.density.density
+            assertEquals(mapBounds.left + margin, overlay.left, 1f)
+            assertEquals(mapBounds.right - margin, overlay.right, 1f)
+            val guidance = bounds(NavigationTestTags.NEXT_GUIDANCE)
+            assertEquals(overlay.left, guidance.left, 1f)
+            assertEquals(overlay.right, guidance.right, 1f)
+            rule.onAllNodesWithTag("deviation_banner").fetchSemanticsNodes().firstOrNull()?.let {
+                assertEquals(overlay.left, it.boundsInRoot.left, 1f)
+                assertEquals(overlay.right, it.boundsInRoot.right, 1f)
+            }
+            for (tag in listOf("navigation_compass", "map_zoom_in", "map_zoom_out", "map_scale_ruler")) {
+                val node = rule.onNodeWithTag(tag)
+                if (container.height / rule.density.density < 420) node.performScrollTo()
+                node.assertIsDisplayed()
+                assertTrue("$label $tag below overlay", bounds(tag).top >= overlay.bottom + margin - 1f)
+            }
+            rule.onNodeWithTag(NavigationTestTags.OPERATIONS).assertDoesNotExist()
             val ruler = rule.onNodeWithTag("map_scale_ruler").fetchSemanticsNode().boundsInRoot
             assertTrue("$label ruler width=${ruler.width}, density=${view.resources.displayMetrics.density}", ruler.width <= 68 * view.resources.displayMetrics.density + 1f)
             val zoom = rule.onNodeWithTag("map_zoom_out").fetchSemanticsNode().boundsInRoot
             val current = rule.onNodeWithTag(NavigationTestTags.CURRENT_LOCATION).fetchSemanticsNode().boundsInRoot
             assertFalse("$label controls overlap", zoom.overlaps(current))
             val instrumentation = InstrumentationRegistry.getInstrumentation()
+            // Semantics can settle before the GL frame reaches the display.
+            SystemClock.sleep(500)
             val bitmap = instrumentation.uiAutomation.takeScreenshot()
-            val dir = File(rule.activity.getExternalFilesDir(null), "phase0106e").apply { mkdirs() }
+            val dir = File(rule.activity.getExternalFilesDir(null), "phase0106f").apply { mkdirs() }
             File(dir, "$label.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
         try {
@@ -158,6 +192,8 @@ class NavigationConsolidationTest {
                 verify("orientation-$orientation")
                 var before = org.maplibre.android.camera.CameraPosition.Builder().build()
                 rule.runOnUiThread { before = native!!.cameraPosition }
+                if (orientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
+                    rule.onNodeWithTag("map_zoom_in").performScrollTo()
                 rule.onNodeWithTag("map_zoom_in").performClick()
                 rule.runOnUiThread {
                     val after = native!!.cameraPosition
@@ -167,6 +203,8 @@ class NavigationConsolidationTest {
                     assertEquals(before.bearing, after.bearing, 0.001)
                     assertArrayEquals(before.padding, after.padding, 0.01)
                 }
+                if (orientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
+                    rule.onNodeWithTag("map_zoom_out").performScrollTo()
                 rule.onNodeWithTag("map_zoom_out").performClick()
                 assertEquals(0, gestures)
                 rule.runOnIdle {

@@ -211,7 +211,7 @@ class FreeNavigationFlowTest {
             assertSame(preview, nav().uiState.value.activeRoute)
             assertTrue(nav().uiState.value.isNavigationStarted)
             // A UI switch needs confirmation, and dismissal leaves the active session intact.
-            rule.onNodeWithTag(NavigationTestTags.OPERATIONS).performClick()
+            rule.onNodeWithTag(NavigationTestTags.ROUTE_EDIT).performClick(); rule.onNodeWithText("所定経路・一覧と保存").performClick()
             waitTag("session_switch_confirm")
             rule.onNodeWithText("キャンセル").performClick()
             assertSame(preview, nav().uiState.value.activeRoute)
@@ -252,7 +252,7 @@ class FreeNavigationFlowTest {
             assertEquals(1,count())
             assertEquals(saved, runBlocking { (library.getById(saved.id) as net.nobu0707.busnav.domain.prescribed.PrescribedRouteLoad.Found).record })
             // Existing library open/start works after ending FREE without another routing request.
-            rule.onNodeWithTag(NavigationTestTags.OPERATIONS).performClick()
+            rule.onNodeWithTag(NavigationTestTags.ROUTE_EDIT).performClick(); rule.onNodeWithText("所定経路・一覧と保存").performClick()
             waitTag("prescribed_library")
             rule.onNodeWithText("その他").performClick()
             rule.onNodeWithText("ナビに使用").performClick()

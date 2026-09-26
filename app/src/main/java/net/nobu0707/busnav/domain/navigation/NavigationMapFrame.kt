@@ -15,9 +15,7 @@ data class NavigationMapFrame(
     val bottomPaddingPx: Double,
 )
 
-/** The map view already excludes the guidance and operations panels. Only controls
- * drawn over that view are subtracted from its visible rectangle.
- */
+/** Overlay measurements are local to the full-size MapView, in physical pixels. */
 fun navigationMapFrame(
     location: LocationState,
     camera: NavigationCameraState,
@@ -26,6 +24,7 @@ fun navigationMapFrame(
     bottomOcclusionPx: Int,
     density: Float = 1f,
     vehicleOuterRadiusDp: Float = 25.9f,
+    topOverlayBottomPx: Int = 0,
 ): NavigationMapFrame {
     val bearing = camera.targetBearing(currentBearing)
     val viewport = VisibleMapViewport(1, mapHeightPx,
@@ -35,9 +34,17 @@ fun navigationMapFrame(
     val lowerAnchor = camera.active && camera.following && camera.orientation == NavigationMapOrientation.HEADING_UP
     // Outer marker stroke radius + 8 dp clearance. Safety wins for tiny viewports.
     val margin = maxOf(vehicleOuterRadiusDp + 8f, 24f) * density
-    val centerY = (visibleHeight - margin).coerceAtLeast(visibleHeight / 2)
-    val topPadding = if (lowerAnchor) 2 * centerY - visibleHeight else 0.0
-    val bottomPadding = if (lowerAnchor) occlusion.toDouble() else 0.0
+    val desiredCenterY = (viewport.rect.bottom - margin).coerceAtLeast(0f).toDouble()
+    val minimumAllowedY = topOverlayBottomPx + margin
+    // If overlays leave insufficient room, bottom safety takes priority. There is
+    // no collision-free point in that case; never substitute the viewport center.
+    val centerY = if (minimumAllowedY <= desiredCenterY) desiredCenterY.coerceAtLeast(minimumAllowedY.toDouble())
+        else desiredCenterY
+    val offset = 2 * centerY - visibleHeight
+    // Native padding is non-negative. Negative offsets use additional bottom
+    // padding instead of forcing a centered fallback in a short viewport.
+    val topPadding = if (lowerAnchor) offset.coerceAtLeast(0.0) else 0.0
+    val bottomPadding = if (lowerAnchor) occlusion - offset.coerceAtMost(0.0) else 0.0
     return NavigationMapFrame(location, location.point, bearing,
         camera.vehicleScreenRotation(bearing, location.normalizedBearingDegrees?.toDouble()),
         location.elapsedRealtimeMillis, topPadding, bottomPadding)

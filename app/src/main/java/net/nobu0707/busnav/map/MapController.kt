@@ -71,6 +71,7 @@ class MapController(
     private var lastFollowedElapsedMillis: Long? = null
     private var lastRuler: ScaleRulerReading? = null
     private var navigationBottomOcclusionPx = 0
+    private var navigationTopOverlayPx = 0
     private val cameraStartedListener = MapLibreMap.OnCameraMoveStartedListener { reason ->
         if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
             gestureSuspended = true
@@ -118,7 +119,7 @@ class MapController(
     private val layoutListener = android.view.View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
         fitEditorIfRequested()
         if (navigationCamera.active && navigationCamera.following && !gestureSuspended) {
-            update(latestLocation, true, lastRecenterRequestId, navigationCamera, navigationBottomOcclusionPx)
+            update(latestLocation, true, lastRecenterRequestId, navigationCamera, navigationBottomOcclusionPx, navigationTopOverlayPx)
         }
         scheduleMapDetails()
     }
@@ -350,7 +351,9 @@ class MapController(
     }
 
     fun update(location: LocationState?, isFollowing: Boolean, recenterRequestId: Int,
-        cameraState: NavigationCameraState = NavigationCameraState(), bottomOcclusionPx: Int = 0) {
+        cameraState: NavigationCameraState = NavigationCameraState(), bottomOcclusionPx: Int = 0, topOverlayPx: Int = 0) {
+        val overlayChanged = navigationTopOverlayPx != topOverlayPx
+        navigationTopOverlayPx = topOverlayPx
         val previous = navigationCamera
         navigationCamera = cameraState.copy(following = isFollowing)
         if (navigationBottomOcclusionPx != bottomOcclusionPx) {
@@ -375,15 +378,14 @@ class MapController(
         val changed = location.timestampMillis != lastFollowedTimestampMillis ||
             location.elapsedRealtimeMillis != lastFollowedElapsedMillis
         val initialNavigationFollow = navigationCamera.active && !navigationInitialized
-        val expectedBottomPadding = if (navigationCamera.active && navigationCamera.orientation == NavigationMapOrientation.HEADING_UP)
-            bottomOcclusionPx else 0
+        val camera = native.cameraPosition
+        val frame = navigationMapFrame(location, navigationCamera, camera.bearing,
+            mapView?.height ?: 0, bottomOcclusionPx,
+            mapView?.resources?.displayMetrics?.density ?: 1f, VehicleMarkerGeometry().radius + 3.5f,
+            topOverlayPx)
         if (initialNavigationFollow || !hasCenteredOnFirstLocation || recenter || changed || previous != navigationCamera ||
-            (navigationCamera.active && lastFrameHeight != mapView?.height) ||
-            (navigationCamera.active && (native.cameraPosition.padding?.getOrNull(3)?.toInt() ?: 0) != expectedBottomPadding)) {
-            val camera = native.cameraPosition
-            val frame = navigationMapFrame(location, navigationCamera, camera.bearing,
-                mapView?.height ?: 0, bottomOcclusionPx,
-                mapView?.resources?.displayMetrics?.density ?: 1f, VehicleMarkerGeometry().radius + 3.5f)
+            (navigationCamera.active && (lastFrameHeight != mapView?.height || overlayChanged)) ||
+            (navigationCamera.active && (native.cameraPosition.padding?.getOrNull(3) ?: 0.0) != frame.bottomPaddingPx)) {
             lastFrameHeight = mapView?.height ?: 0
             val next = CameraPosition.Builder(camera)
                 .target(frame.cameraTarget.toLatLng())

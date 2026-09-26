@@ -44,6 +44,7 @@ import net.nobu0707.busnav.ui.routeplan.EditorCameraRequest
 import org.maplibre.android.maps.MapView
 
 val LocalNavigationMapBottomOcclusionPx = compositionLocalOf { 0 }
+val LocalNavigationMapTopOverlayPx = compositionLocalOf { 0 }
 
 @Composable
 fun MapScreen(
@@ -85,6 +86,7 @@ fun MapScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val routePaddingPx = with(LocalDensity.current) { 64.dp.roundToPx() }
     val bottomOcclusionPx = LocalNavigationMapBottomOcclusionPx.current
+    val topOverlayPx = LocalNavigationMapTopOverlayPx.current
     var basemapState by remember {
         mutableStateOf(
             if (basemapConfig.mode == BasemapMode.FALLBACK) {
@@ -211,7 +213,7 @@ fun MapScreen(
     SideEffect {
         controller.updateBasemap(basemapConfig)
         controller.updateDeviceHeading(deviceHeadingOverride ?: if (deviceCompassEnabled) deviceHeading else null)
-        controller.update(location, isFollowingLocation, recenterRequestId, navigationCamera, bottomOcclusionPx)
+        controller.update(location, isFollowingLocation, recenterRequestId, navigationCamera, bottomOcclusionPx, topOverlayPx)
         controller.updateRoute(activeRoute, routeOverviewRequestId)
         controller.updateDetour(detourOverlay)
         controller.updateTraffic(trafficEvents)
@@ -230,7 +232,8 @@ fun MapScreen(
         )
         MapControls(navigationCamera, cameraBearing, onToggleOrientation, controller::resetNorth,
             controller::zoomBy, ruler, Modifier.align(Alignment.TopEnd)
-                .padding(bottom = with(LocalDensity.current) { bottomOcclusionPx.toDp() }).padding(8.dp))
+                .padding(top = with(LocalDensity.current) { topOverlayPx.toDp() },
+                    bottom = with(LocalDensity.current) { bottomOcclusionPx.toDp() }).padding(8.dp))
         BasemapStatusOverlay(
             failureHint = basemapConfig.failureHint,
             state = basemapState,
