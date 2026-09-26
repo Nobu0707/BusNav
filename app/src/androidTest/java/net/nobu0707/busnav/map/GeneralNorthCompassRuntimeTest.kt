@@ -35,6 +35,10 @@ class GeneralNorthCompassRuntimeTest {
     // Check rendered pixels, not a duplicate semantics rotation or a screenshot golden.
     private fun assertPointer(bearing: Double, name: String) {
         val image = rule.onNodeWithTag("general_north_compass").captureToImage()
+        val directory = File(rule.activity.getExternalFilesDir(null), "general-north-compass").apply { mkdirs() }
+        File(directory, "$name.png").outputStream().use {
+            image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
         val pixels = image.toPixelMap()
         var dx = 0.0
         var dy = 0.0
@@ -53,10 +57,6 @@ class GeneralNorthCompassRuntimeTest {
         val expected = Math.toRadians(northScreenRotation(bearing))
         assertTrue("North pointer points in wrong direction at $bearing",
             (dx * sin(expected) - dy * cos(expected)) / hypot(dx, dy) > 0.97)
-        val directory = File(rule.activity.getExternalFilesDir(null), "general-north-compass").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use {
-            image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
-        }
     }
 
     @Test fun renderedCardinalsKeepUprightLabelAndFixedTouchTarget() {
@@ -78,9 +78,11 @@ class GeneralNorthCompassRuntimeTest {
                 assertPointer(degrees, "isolated-$night-${degrees.toInt()}")
                 assertEquals(bounds, rule.onNodeWithTag("general_north_compass").fetchSemanticsNode().boundsInRoot)
                 assertEquals(labelBounds, rule.onNodeWithText("N", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot)
-                rule.onNodeWithTag("general_north_compass").performClick()
             }
         }
+        // Tap ripples can tint the needle for several frames on physical devices.
+        // Finish every pixel assertion before exercising clicks; do not weaken color matching.
+        repeat(8) { rule.onNodeWithTag("general_north_compass").performClick() }
         rule.runOnIdle { assertEquals(8, taps) }
     }
 
