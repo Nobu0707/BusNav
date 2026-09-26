@@ -8,10 +8,9 @@ At the start of each Codex implementation task, record the current commit:
 $base = git rev-parse HEAD
 ```
 
-Pass that value to every final check and archive command:
+Pass that value to archive commands after final validation:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\run-review-checks.ps1 -BaseRef $base
 powershell -ExecutionPolicy Bypass -File scripts\make-review-archive.ps1 -BaseRef $base -SkipChecks
 powershell -ExecutionPolicy Bypass -File scripts\make-full-review-archive.ps1 -BaseRef $base -SkipChecks
 ```
@@ -28,30 +27,50 @@ the same phase-range diff. Full archives still store the complete tracked
 `HEAD` tree under `repo/`.
 
 All ZIP entry names use `/`, including archives produced on Windows. Archive
-self-checks reject raw entry names containing `\`. `-SkipChecks` accepts
+self-checks reject raw entry names containing `\`.
 BusNav のレビュー資料は Windows 11 上の PowerShell で生成する。通常のレビューでは差分中心の軽量版を共有し、差分だけで判断できない場合に限り、Git 追跡済みのリポジトリ一式を含む Full 版を共有する。
 
 ## 通常の開発サイクル
 
 1. ChatGPT が仕様と実装プロンプトを作成する。
 2. Codex が実装する。
-3. Codex が test、lint、build を実行する。
+3. Codex が最終コードに対し test、lint、各 build をそれぞれ1 successful run、connected tests を Emulator / Physical 各1 successful run まで実行し、ログを保存する。
 4. Codex が実装をコミットする。
-5. `run-review-checks.ps1` で最終 HEAD を検証する。
-6. `make-review-archive.ps1` で軽量版を生成する。
+5. Review に端末別 attempts / result / test count を記録し、検証済みコードと最終 HEAD の対応を summary に記録する。docs-only commit の場合はコードに差分がないことを確認し、成功済みテストを再実行しない。
+6. `make-review-archive.ps1 -BaseRef $base -SkipChecks` で軽量版を生成する。Full 版も同じ BaseRef と -SkipChecks を使う。
 7. `busnav-review-latest.zip` を ChatGPT へ渡す。
 8. ChatGPT がアーカイブを査読する。
 9. 必要なら修正プロンプトを作成する。
 10. Codex が修正し、検証から繰り返す。
 
+## Test execution と archive generation の分離（今後の全 Phase）
+
+Review archive 生成は test execution と分離する。connected tests は最終実装検証で
+1 successful run/device。archive generation では rerun しない。
+PASS 後の再実行は行わず、FAIL / timeout / install failure / device disconnect /
+infrastructure failure またはその原因修正時だけ、必要な範囲を再実行する。
+
+既に個別に検証済みなら `run-review-checks.ps1` を後から実行しない。このスクリプトは
+static checks と adb / connectedDebugAndroidTest を実行するため、証跡収集だけの用途には使えない。
+両 archive scripts は `-SkipChecks` を省略するとこの runner を呼ぶ。
+`-SkipChecks` は既存ログを検査して使用し、テストを呼ばない。
+ZIP self-check と Android review signals はファイル / Git の読み取りだけで、adb を呼ばない。
+
+`build/review-checks/` には各 command の結果・時刻・exit code と required logs を保存する。
+summary の HEAD SHA / Diff base は生成対象と一致させる。docs-only commit に証跡を引き継ぐ場合は、
+tested code の SHA または tree hash とコード差分がないことを明記する。
+未実施・失敗・古い結果を PASS に置き換えない。Review には Emulator / Physical の
+attempts・final result・test count と `Archive connected tests rerun: NO` を記載する。
+
 ## 検証ログ
 
 `scripts/run-review-checks.ps1` は、常にリポジトリルートを基準に次を実行し、`build/review-checks/` に再現可能なログを保存する。
 
-- `git diff --check <HEAD の親> HEAD`
+- `git diff --check <BaseRef（省略時は HEAD の親）> HEAD`
 - `.\gradlew.bat test --console=plain`
 - `.\gradlew.bat lint --console=plain`
 - `.\gradlew.bat assembleDebug --console=plain`
+- `.\gradlew.bat assembleRelease --console=plain`
 - `.\gradlew.bat assembleDebugAndroidTest --console=plain`
 - `adb devices` と、オンライン端末がある場合だけ `.\gradlew.bat connectedDebugAndroidTest --console=plain`
 - debug APK と androidTest APK の存在、サイズ、更新日時の一覧
@@ -65,17 +84,17 @@ adb がない場合、または `adb devices` が正常終了してオンライ�
 Windows PowerShell 5.1:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\make-review-archive.ps1
-powershell -ExecutionPolicy Bypass -File scripts\make-review-archive.ps1 -ExpectedHeadSubject "chore: add Windows review archive tooling"
+powershell -ExecutionPolicy Bypass -File scripts\make-review-archive.ps1 -BaseRef $base -SkipChecks
+powershell -ExecutionPolicy Bypass -File scripts\make-review-archive.ps1 -BaseRef $base -SkipChecks -ExpectedHeadSubject "chore: add Windows review archive tooling"
 ```
 
 PowerShell 7+:
 
 ```powershell
-pwsh -File scripts\make-review-archive.ps1
+pwsh -File scripts\make-review-archive.ps1 -BaseRef $base -SkipChecks
 ```
 
-既存のチェックログを再利用する場合は `-SkipChecks` を付けられる。ただし、必須ログが揃い、すべての必須結果が `PASS`、connected test が `PASS` または `SKIP` でなければ生成しない。
+検証済みログを再利用する archive 生成では必ず `-SkipChecks` を付ける。ただし、必須ログが揃い、すべての必須結果が `PASS`、connected test が `PASS` または `SKIP` でなければ生成しない。
 
 成功時に次を生成する。
 
@@ -87,8 +106,8 @@ pwsh -File scripts\make-review-archive.ps1
 `scripts/make-full-review-archive.ps1` は `git archive HEAD` を使用し、Git 追跡済みファイルを `repo/` に収録する。作業ツリーの untracked ファイル、`.git/`、ビルド生成物は取得元の時点で含まれない。Gradle bootstrap に必要な `gradle/wrapper/gradle-wrapper.jar` は例外として保持する。
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\make-full-review-archive.ps1
-pwsh -File scripts\make-full-review-archive.ps1 -SkipChecks
+powershell -ExecutionPolicy Bypass -File scripts\make-full-review-archive.ps1 -BaseRef $base -SkipChecks
+pwsh -File scripts\make-full-review-archive.ps1 -BaseRef $base -SkipChecks
 ```
 
 成功時に次を生成する。
