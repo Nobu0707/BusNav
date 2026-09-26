@@ -36,7 +36,7 @@ class HighwayGuidanceCardTest {
         } else {
             rule.onNodeWithTag("highway_schematic", useUnmergedTree = true).assertIsDisplayed()
             rule.onNodeWithText("700 m", useUnmergedTree = true).assertIsDisplayed()
-            rule.onNodeWithText("E20", useUnmergedTree = true).assertIsDisplayed()
+            rule.onNodeWithText("E20", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         }
     }
 }

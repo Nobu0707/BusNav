@@ -186,7 +186,7 @@ class NavigationConsolidationTest {
                 rule.waitUntil(15_000) { rule.activity.resources.configuration.orientation == expected }
                 rule.runOnUiThread {
                     ready = false; native = null; reduced.value = false
-                    state.value = state.value.copy(location = state.value.location!!.copy(elapsedRealtimeMillis = SystemClock.elapsedRealtime()))
+                    state.value = state.value.copy(navigationMode = NavigationMode.FREE, location = state.value.location!!.copy(elapsedRealtimeMillis = SystemClock.elapsedRealtime()))
                     content()
                 }
                 verify("orientation-$orientation")

@@ -36,9 +36,11 @@ fun NavigationGuidanceCard(state: NavigationUiState, modifier: Modifier = Modifi
                 else if (highway == null) Text(state.guidance.symbol, style = MaterialTheme.typography.titleMedium)
                 distance?.let { Text(it, fontWeight = FontWeight.Bold, modifier = Modifier.testTag(
                     if (highway == null) "guidance_distance" else "highway_distance")) }
+                Text(primary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).testTag("guidance_instruction"))
             }
-            Text(primary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
-                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("guidance_instruction"))
+
             if (highway != null) {
                 val facility = listOfNotNull(highway.sign.exitNumber?.let { "出口 $it" },
                     highway.sign.facilityNames.joinToString(" / ").ifEmpty { null }).joinToString(" · ")
