@@ -1,6 +1,5 @@
 package net.nobu0707.busnav.ui.search
 
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
