@@ -22,6 +22,7 @@ enum class FreeNavigationStage { IDLE, SELECTING, CALCULATING, PREVIEW }
 data class FreeNavigationUiState(
     val stage: FreeNavigationStage = FreeNavigationStage.IDLE,
     val plan: FreeNavigationPlan? = null,
+    val destinationNearby: String? = null,
     val calculation: RouteCalculationState = RouteCalculationState.Idle,
     val previewRoute: ScheduledRoute? = null,
     val isRecalculation: Boolean = false,
@@ -90,7 +91,7 @@ class FreeNavigationStateHolder(
     fun selectDestination(point: GeoPoint, name: String? = null) {
         if (_state.value.stage != FreeNavigationStage.SELECTING || _state.value.isRecalculation) return
         invalidate()
-        _state.value = _state.value.copy(plan = FreeNavigationPlan(point, name), error = null,
+        _state.value = _state.value.copy(plan = FreeNavigationPlan(point, name), destinationNearby = null, error = null,
             calculation = RouteCalculationState.Idle, previewRoute = null)
     }
 
@@ -98,7 +99,7 @@ class FreeNavigationStateHolder(
         val current = _state.value
         if (current.stage == FreeNavigationStage.SELECTING && current.plan?.destination == point &&
             current.plan.destinationName == null) {
-            _state.value = current.copy(plan = FreeNavigationPlan(point, nearby))
+            _state.value = current.copy(destinationNearby = nearby)
         }
     }
 
@@ -152,7 +153,7 @@ class FreeNavigationStateHolder(
         invalidate()
         navigation.beginFreeSelection()
         _state.value = _state.value.copy(stage = FreeNavigationStage.SELECTING, previewRoute = null,
-            calculation = RouteCalculationState.Idle, cameraRequest = null, error = null)
+            calculation = RouteCalculationState.Idle, cameraRequest = null, destinationNearby = null, error = null)
     }
 
     fun cancel() {

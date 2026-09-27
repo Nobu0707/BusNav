@@ -84,6 +84,15 @@ class FreeNavigationTest {
         assertEquals("東京駅", h.free.state.value.plan?.destinationName)
         assertTrue(h.requests.isEmpty())
     }
+    @Test fun reverseNearbyHintDoesNotChangeCursorDestinationIntent() = runTest {
+        val h = Harness(this); h.ready()
+        assertTrue(h.free.beginSelection())
+        h.free.selectDestination(destination)
+        val plan = h.free.state.value.plan
+        h.free.enrichDestination(destination, "付近: 東京駅")
+        assertEquals(plan, h.free.state.value.plan)
+        assertEquals("付近: 東京駅", h.free.state.value.destinationNearby)
+    }
     @Test fun previewDoesNotStartGuidanceOrNightTheme() = runTest {
         val h = Harness(this); h.ready(); h.preview()
         val state = h.nav.uiState.value

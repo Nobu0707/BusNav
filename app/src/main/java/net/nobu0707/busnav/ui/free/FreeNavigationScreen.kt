@@ -48,6 +48,7 @@ fun FreeNavigationScreen(
                     FreeNavigationStage.SELECTING -> {
                         if (!state.isRecalculation) Text("地図を動かして中央の十字を目的地に合わせます")
                         state.plan?.let { Text(it.destinationName ?: "選択した目的地", Modifier.testTag("free_destination")) }
+                        state.destinationNearby?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                     }
                     FreeNavigationStage.CALCULATING -> {
                         LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -56,6 +57,7 @@ fun FreeNavigationScreen(
                     FreeNavigationStage.PREVIEW -> {
                         Text("案内経路のプレビュー", Modifier.testTag("free_preview"), style = MaterialTheme.typography.titleMedium)
                         Text("目的地：" + (state.plan?.destinationName ?: "地図で選択した地点"))
+                        state.destinationNearby?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                         (state.calculation as? RouteCalculationState.Success)?.summary?.let {
                             Text(String.format(Locale.JAPAN, "%.1f km ・ 約%.0f分", it.distanceMeters / 1000, it.durationSeconds / 60))
                         }

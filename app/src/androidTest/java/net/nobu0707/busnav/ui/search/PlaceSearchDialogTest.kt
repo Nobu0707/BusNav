@@ -28,7 +28,7 @@ class PlaceSearchDialogTest {
         }
         compose.onNodeWithTag("place_search_field").performTextInput("東京駅")
         assertEquals("東京駅", query)
-        compose.onNodeWithText("駅", substring = false).assertExists()
+        compose.onNodeWithText("駅 / station").assertExists()
         compose.onNodeWithText("千代田区、東京都").assertExists()
         compose.onNodeWithText("© OpenStreetMap contributors").assertExists()
         compose.onNodeWithTag("place_search_result_N123").performClick()
