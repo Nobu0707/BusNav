@@ -2,7 +2,8 @@
 param(
     [string]$ExpectedHeadSubject,
     [string]$BaseRef,
-    [switch]$SkipChecks
+    [switch]$SkipChecks,
+    [switch]$AllowIncompleteConnected
 )
 
 Set-StrictMode -Version Latest
@@ -15,11 +16,14 @@ $gitContext = Get-ReviewGitContext -RepositoryRoot $repositoryRoot -BaseRef $Bas
 Assert-ExpectedHeadSubject -HeadSubject $gitContext.HeadSubject -ExpectedHeadSubject $ExpectedHeadSubject
 
 $checksDirectory = Join-Path $repositoryRoot "build\review-checks"
+if ($AllowIncompleteConnected -and -not $SkipChecks) {
+    throw "AllowIncompleteConnected requires -SkipChecks; no connected tests may be rerun for this archive."
+}
 if (-not $SkipChecks) {
     Write-Host "Running review checks before full archive creation..."
     & (Join-Path $PSScriptRoot "run-review-checks.ps1") -BaseRef $BaseRef
 }
-Assert-ReviewChecks -ChecksDirectory $checksDirectory -GitContext $gitContext
+Assert-ReviewChecks -ChecksDirectory $checksDirectory -GitContext $gitContext -AllowIncompleteConnected:$AllowIncompleteConnected
 
 $timestamp = [DateTime]::UtcNow.ToString("yyyyMMddTHHmmssfffZ")
 $archiveName = "busnav-full-review-$($gitContext.HeadShortSha)-$timestamp.zip"

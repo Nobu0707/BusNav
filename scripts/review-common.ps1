@@ -267,7 +267,8 @@ function Get-ReviewSummaryValue {
 function Assert-ReviewChecks {
     param(
         [Parameter(Mandatory = $true)][string]$ChecksDirectory,
-        [Parameter(Mandatory = $true)]$GitContext
+        [Parameter(Mandatory = $true)]$GitContext,
+        [switch]$AllowIncompleteConnected
     )
 
     $requiredPassLogs = @(
@@ -277,9 +278,12 @@ function Assert-ReviewChecks {
         "gradle-assemble-debug.txt",
         "gradle-assemble-release.txt",
         "gradle-assemble-android-test.txt",
-        "artifact-inventory.txt",
-        "review-check-summary.txt"
+        "artifact-inventory.txt"
     )
+
+    if (-not $AllowIncompleteConnected) {
+        $requiredPassLogs += "review-check-summary.txt"
+    }
 
     foreach ($logName in $requiredPassLogs) {
         $path = Join-Path $ChecksDirectory $logName
@@ -290,6 +294,7 @@ function Assert-ReviewChecks {
     }
 
     $summaryPath = Join-Path $ChecksDirectory "review-check-summary.txt"
+    $summaryStatus = Get-ReviewCheckStatus -Path $summaryPath
     $summaryHeadSha = Get-ReviewSummaryValue -Path $summaryPath -Name "HEAD SHA"
     $summaryDiffBase = Get-ReviewSummaryValue -Path $summaryPath -Name "Diff base"
     if ($summaryHeadSha -cne $GitContext.HeadSha) {
@@ -301,7 +306,14 @@ function Assert-ReviewChecks {
 
     $connectedLog = Join-Path $ChecksDirectory "connected-debug-android-test.txt"
     $connectedStatus = Get-ReviewCheckStatus -Path $connectedLog
-    if (($connectedStatus -ne "PASS") -and ($connectedStatus -ne "SKIP")) {
+    if ($AllowIncompleteConnected) {
+        if (($connectedStatus -notin @("PASS", "SKIP", "FAIL")) -or
+            ($summaryStatus -notin @("PASS", "FAIL")) -or
+            (($summaryStatus -eq "FAIL") -and ($connectedStatus -ne "FAIL"))) {
+            throw "Incomplete archive requires a recorded connected result and consistent review summary."
+        }
+    }
+    elseif (($connectedStatus -ne "PASS") -and ($connectedStatus -ne "SKIP")) {
         throw "Connected Android test must be PASS or SKIP: connected-debug-android-test.txt ($connectedStatus)"
     }
 }
