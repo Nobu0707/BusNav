@@ -4,9 +4,9 @@ import kotlin.math.abs
 
 object MapControlsPolicy {
     const val ZOOM_STEP = 1.0
-    const val RULER_CARD_WIDTH_DP = 68f
-    const val RULER_MIN_BAR_DP = 28f
-    const val RULER_MAX_BAR_DP = 56f
+    const val RULER_CARD_WIDTH_DP = 60f
+    const val RULER_MIN_BAR_DP = 22f
+    const val RULER_MAX_BAR_DP = 48f
 
     fun generalCompassVisible(navigationActive: Boolean, bearing: Double): Boolean =
         !navigationActive && bearing.isFinite() &&

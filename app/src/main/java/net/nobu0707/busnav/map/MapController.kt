@@ -382,17 +382,18 @@ class MapController(
         val frame = navigationMapFrame(location, navigationCamera, camera.bearing,
             mapView?.height ?: 0, bottomOcclusionPx,
             mapView?.resources?.displayMetrics?.density ?: 1f, VehicleMarkerGeometry().radius + 3.5f,
-            topOverlayPx)
+            topOverlayPx, mapView?.width ?: 0)
         if (initialNavigationFollow || !hasCenteredOnFirstLocation || recenter || changed || previous != navigationCamera ||
             (navigationCamera.active && (lastFrameHeight != mapView?.height || overlayChanged)) ||
-            (navigationCamera.active && (native.cameraPosition.padding?.getOrNull(3) ?: 0.0) != frame.bottomPaddingPx)) {
+            (navigationCamera.active && ((native.cameraPosition.padding?.getOrNull(3) ?: 0.0) != frame.bottomPaddingPx ||
+                (native.cameraPosition.padding?.getOrNull(0) ?: 0.0) != frame.leftPaddingPx))) {
             lastFrameHeight = mapView?.height ?: 0
             val next = CameraPosition.Builder(camera)
                 .target(frame.cameraTarget.toLatLng())
                 .bearing(if (previous.active && !navigationCamera.active) 0.0 else frame.cameraBearing)
                 .tilt(0.0)
                 .zoom(if (initialNavigationFollow || (!hasCenteredOnFirstLocation && initialCamera == null)) FOLLOW_ZOOM else camera.zoom)
-                .padding(0.0, frame.topPaddingPx, 0.0, frame.bottomPaddingPx)
+                .padding(frame.leftPaddingPx, frame.topPaddingPx, 0.0, frame.bottomPaddingPx)
                 .build()
             native.cancelTransitions()
             if (navigationCamera.active) {

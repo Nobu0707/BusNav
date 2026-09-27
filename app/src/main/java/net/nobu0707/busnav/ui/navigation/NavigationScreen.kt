@@ -278,8 +278,9 @@ fun NavigationRoute(
     val isNight = net.nobu0707.busnav.ui.theme.rememberIsNight(uiState.location?.point, presentationClock)
     var isTunnel by remember { mutableStateOf(false) }
     LaunchedEffect(navigationActive) { if (!navigationActive) isTunnel = false }
-    val dark = uiState.location != null && net.nobu0707.busnav.ui.theme.ThemeModeResolver.isDark(
-        navigationActive, isNight, isTunnel,
+    val dark = net.nobu0707.busnav.ui.theme.ThemeModeResolver.isDark(
+        screen == BusNavScreen.NAVIGATION && !showConnections,
+        uiState.isNavigationStarted, uiState.activeRoute != null, isNight, isTunnel,
     )
     SideEffect {
         (context as? android.app.Activity)?.window?.let { window ->
@@ -290,6 +291,7 @@ fun NavigationRoute(
         }
     }
     BusNavTheme(darkTheme = dark) {
+      Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (showTraffic) TrafficPanel(trafficState,
             uiState.navigationActive && uiState.navigationMode == NavigationMode.PRESCRIBED && uiState.activeDetour == null,
             ::considerTraffic, { showTraffic = false }, { TrafficDeveloperControls(trafficHolder.provider) })
@@ -595,6 +597,7 @@ fun NavigationRoute(
                     navigationActive = uiState.navigationActive)
             }
         }
+      }
     }
 }
 
@@ -685,9 +688,9 @@ private fun PortraitNavigationLayout(
             onRouteOverview = onRouteOverview,
             modifier = Modifier.fillMaxWidth().weight(1f).testTag(NavigationTestTags.MAP),
             onFreeRecalculate = onFreeRecalculate, onEndNavigation = onEndNavigation,
-            topOverlay = {
+            topOverlay = { landscape, availableHeight ->
                 NavigationTopOverlay(uiState, trafficState, onConsiderTraffic, onTraffic,
-                    onDetour, onEndDetour, detourMessage)
+                    onDetour, onEndDetour, detourMessage, landscape, availableHeight)
             },
             mapContent = mapContent,
         )
@@ -729,9 +732,9 @@ private fun LandscapeNavigationLayout(
             onRouteOverview = onRouteOverview,
             modifier = Modifier.fillMaxHeight().weight(1f).testTag(NavigationTestTags.MAP),
             onFreeRecalculate = onFreeRecalculate, onEndNavigation = onEndNavigation,
-            topOverlay = {
+            topOverlay = { landscape, availableHeight ->
                 NavigationTopOverlay(uiState, trafficState, onConsiderTraffic, onTraffic,
-                    onDetour, onEndDetour, detourMessage)
+                    onDetour, onEndDetour, detourMessage, landscape, availableHeight)
             },
             mapContent = mapContent,
         )
@@ -754,7 +757,7 @@ private fun MapArea(
     modifier: Modifier,
     onFreeRecalculate: () -> Unit,
     onEndNavigation: () -> Unit,
-    topOverlay: (@Composable () -> Unit)? = null,
+    topOverlay: (@Composable (Boolean, androidx.compose.ui.unit.Dp) -> Unit)? = null,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.BottomEnd) {
@@ -762,21 +765,23 @@ private fun MapArea(
         val rightHeight = remember { mutableIntStateOf(0) }
         val topHeight = remember { mutableIntStateOf(0) }
         val horizontalActions = maxWidth >= 560.dp
+        val landscape = maxWidth > maxHeight
+        val availableHeight = maxHeight
         val freeActions = uiState.navigationActive && uiState.navigationMode == NavigationMode.FREE
         val bottomOcclusion = maxOf(if (freeActions) leftHeight.intValue else 0, rightHeight.intValue)
         CompositionLocalProvider(
             net.nobu0707.busnav.map.LocalNavigationMapBottomOcclusionPx provides bottomOcclusion,
-            net.nobu0707.busnav.map.LocalNavigationMapTopOverlayPx provides topHeight.intValue,
+            net.nobu0707.busnav.map.LocalNavigationMapTopOverlayPx provides if (landscape) 0 else topHeight.intValue,
         ) {
             mapContent(Modifier.fillMaxSize())
         }
 
         if (topOverlay != null) {
-            Column(Modifier.align(Alignment.TopStart).fillMaxWidth()
+            Column(Modifier.align(Alignment.TopStart).width(maxWidth * (if (landscape) 0.54f else 1f))
                 .onSizeChanged { topHeight.intValue = it.height }.padding(horizontal = 8.dp, vertical = 8.dp)
-                .heightIn(max = maxHeight * 0.30f).verticalScroll(rememberScrollState())
+                .heightIn(max = maxHeight * (if (landscape) 0.72f else 0.30f)).verticalScroll(rememberScrollState())
                 .testTag("navigation_top_overlay"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                topOverlay()
+                topOverlay(landscape, availableHeight)
             }
         }
         if (freeActions) {
@@ -793,7 +798,7 @@ private fun MapArea(
             )
         }
 
-        MapActionGroup(horizontalActions,
+        MapActionGroup(false,
             Modifier.onSizeChanged { rightHeight.intValue = it.height }
                 .testTag("navigation_right_actions").padding(start = 4.dp, end = 8.dp, bottom = 32.dp)) {
             OutlinedButton(
@@ -990,8 +995,8 @@ private fun FreeNavigationActions(state: NavigationUiState, recalculate: () -> U
 @Composable
 private fun NavigationTopOverlay(state: NavigationUiState, traffic: TrafficUiState,
     onConsider: (TrafficRouteImpact) -> Unit, onTraffic: () -> Unit,
-    onDetour: () -> Unit, onEndDetour: () -> Unit, detourMessage: String?) {
-    DeviationBanner(state.deviation)
+    onDetour: () -> Unit, onEndDetour: () -> Unit, detourMessage: String?,
+    landscape: Boolean, availableHeight: androidx.compose.ui.unit.Dp) {
     if (state.arrival.state == ArrivalState.ARRIVED && state.navigationMode == NavigationMode.FREE) {
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f))) {
             Text("目的地周辺です", Modifier.padding(8.dp).testTag("free_arrived"))
@@ -1000,6 +1005,7 @@ private fun NavigationTopOverlay(state: NavigationUiState, traffic: TrafficUiSta
     if (traffic.alert != null || traffic.highwayWarning != null)
         TrafficAlert(traffic, state.navigationActive && state.navigationMode == NavigationMode.PRESCRIBED && state.activeDetour == null,
             onConsider, onTraffic)
-    NavigationGuidanceCard(state, Modifier.fillMaxWidth(), compact = true)
+    NavigationGuidanceCard(state, Modifier.fillMaxWidth(), compact = true,
+        landscape = landscape, availableHeight = availableHeight)
     DetourNavigationActions(state, onDetour, onEndDetour, detourMessage)
 }

@@ -95,4 +95,20 @@ class NavigationControlsRefinementTest {
         }
     }
 
+    @Test fun landscapeHeadingAnchorMovesRightAndNearActionCenterWhilePortraitStaysPut() {
+        val fix = LocationState(GeoPoint(35.68, 139.76), 5f, 90f, 8f, 1, 1)
+        val heading = NavigationCameraState(true, true, NavigationMapOrientation.HEADING_UP, 90.0)
+        val landscape = navigationMapFrame(fix, heading, 90.0, 400, 80, mapWidthPx = 900)
+        val x = (landscape.leftPaddingPx + 900) / 2
+        val y = (landscape.topPaddingPx + 400 - landscape.bottomPaddingPx) / 2
+        assertEquals(900 * 0.75, x, 0.001)
+        assertEquals(400 - 56.0, y, 0.001)
+        assertEquals(fix.point, landscape.cameraTarget)
+        val portrait = navigationMapFrame(fix, heading, 90.0, 900, 80, mapWidthPx = 400)
+        assertEquals(0.0, portrait.leftPaddingPx, 0.0)
+        val north = navigationMapFrame(fix, heading.copy(orientation = NavigationMapOrientation.NORTH_UP),
+            90.0, 400, 80, mapWidthPx = 900)
+        assertEquals(0.0, north.leftPaddingPx, 0.0)
+    }
+
 }

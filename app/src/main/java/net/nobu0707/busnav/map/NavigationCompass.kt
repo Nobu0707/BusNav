@@ -24,12 +24,12 @@ fun NavigationCompass(orientation: NavigationMapOrientation, cameraBearing: Doub
     val needle = MaterialTheme.colorScheme.error
     val outline = MaterialTheme.colorScheme.onSurface
     FilledTonalButton(onClick = onToggle,
-        modifier = modifier.size(width = 64.dp, height = 80.dp).testTag("navigation_compass")
+        modifier = modifier.size(width = 56.dp, height = 64.dp).testTag("navigation_compass")
             .semantics { contentDescription = description },
         contentPadding = PaddingValues(4.dp),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(44.dp).rotate(northScreenRotation(cameraBearing).toFloat()), contentAlignment = Alignment.TopCenter) {
+            Box(Modifier.size(36.dp).rotate(northScreenRotation(cameraBearing).toFloat()), contentAlignment = Alignment.TopCenter) {
                 Canvas(Modifier.fillMaxSize()) {
                     drawCircle(outline.copy(alpha = 0.45f), radius = size.minDimension / 2 - 2.dp.toPx(),
                         style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))

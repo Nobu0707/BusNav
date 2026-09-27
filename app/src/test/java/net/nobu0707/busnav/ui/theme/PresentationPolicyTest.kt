@@ -16,6 +16,18 @@ class PresentationPolicyTest {
             assertEquals(active && (night || tunnel), ThemeModeResolver.isDark(active, night, tunnel))
         }
     }
+    @Test fun onlyStartedNavigationUsesNightOrTunnelPalette() {
+        for (screen in listOf(false, true)) for (started in listOf(false, true))
+            for (route in listOf(false, true)) for (night in listOf(false, true))
+                for (tunnel in listOf(false, true)) {
+                    assertEquals(screen && started && route && (night || tunnel),
+                        ThemeModeResolver.isDark(screen, started, route, night, tunnel))
+                }
+        val neutral = androidx.compose.ui.graphics.Color.Gray
+        assertEquals(neutral, navigationWarningColor(false, true, neutral))
+        assertEquals(NavigationWarningRedLight, navigationWarningColor(true, false, neutral))
+        assertEquals(NavigationWarningRedDark, navigationWarningColor(true, true, neutral))
+    }
     @Test fun tokyoSeasonalSolarRangesAndExactBoundaries() {
         // Approximate public Tokyo times, minutes after midnight JST; tolerance 15 minutes.
         listOf(Triple("2026-03-20", 346, 1073), Triple("2026-06-21", 265, 1140),

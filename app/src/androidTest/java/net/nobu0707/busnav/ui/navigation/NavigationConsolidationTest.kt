@@ -136,13 +136,26 @@ class NavigationConsolidationTest {
                 val padding = requireNotNull(camera.padding)
 
                 val visibleBottom = view.height - occlusion
-                val y = map.projection.toScreenLocation(LatLng(point.latitude, point.longitude)).y
-                assertEquals("$label bottom margin", 33.9 * view.resources.displayMetrics.density, (visibleBottom - y).toDouble(), 3.0)
+                val projected = map.projection.toScreenLocation(LatLng(point.latitude, point.longitude))
+                val y = projected.y
+                val landscape = view.width > view.height
+                if (landscape) {
+                    assertEquals("$label vehicle x", view.width * 0.75, projected.x.toDouble(), 3.0)
+                    val expectedY = minOf(view.height - 56.0 * view.resources.displayMetrics.density,
+                        view.height - 33.9 * view.resources.displayMetrics.density)
+                    assertEquals("$label action centerline", expectedY, y.toDouble(), 3.0)
+                    assertTrue("$label vehicle clears right actions",
+                        projected.x + 25.9f * view.resources.displayMetrics.density < right.left - container.left)
+                } else {
+                    assertEquals("$label portrait x", view.width * 0.5, projected.x.toDouble(), 3.0)
+                    assertEquals("$label portrait bottom margin", 33.9 * view.resources.displayMetrics.density,
+                        (visibleBottom - y).toDouble(), 3.0)
+                }
                 val evidence = "$label orientation=HEADING_UP following=true active=true mapHeight=${view.height} " +
                     "bottomOcclusion=$occlusion topOverlay=$topBounds " +
-                    "padding=${padding.toList()} pointY=$y visibleBottom=$visibleBottom bottomDistance=${visibleBottom-y} isotropy=$ratio"
+                    "padding=${padding.toList()} pointX=${projected.x} pointY=$y visibleBottom=$visibleBottom bottomDistance=${visibleBottom-y} isotropy=$ratio"
                 android.util.Log.i("NavigationOverlayEvidence", evidence)
-                val evidenceDir = File(rule.activity.getExternalFilesDir(null), "phase0106f").apply { mkdirs() }
+                val evidenceDir = File(rule.activity.getExternalFilesDir(null), "phase0106g").apply { mkdirs() }
                 File(evidenceDir, "projection.txt").appendText(evidence + "\n")
             }
             fun bounds(tag: String) = rule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
@@ -151,19 +164,21 @@ class NavigationConsolidationTest {
             val overlay = bounds("navigation_top_overlay")
             val margin = 8 * rule.density.density
             assertEquals(mapBounds.left + margin, overlay.left, 1f)
-            assertEquals(mapBounds.right - margin, overlay.right, 1f)
+            val landscape = mapBounds.width > mapBounds.height
+            assertEquals(mapBounds.left + mapBounds.width * (if (landscape) 0.54f else 1f) - margin,
+                overlay.right, 1f)
             val guidance = bounds(NavigationTestTags.NEXT_GUIDANCE)
             assertEquals(overlay.left, guidance.left, 1f)
             assertEquals(overlay.right, guidance.right, 1f)
             rule.onAllNodesWithTag("deviation_banner").fetchSemanticsNodes().firstOrNull()?.let {
-                assertEquals(overlay.left, it.boundsInRoot.left, 1f)
-                assertEquals(overlay.right, it.boundsInRoot.right, 1f)
+                assertTrue(guidance.contains(it.boundsInRoot.center))
             }
             for (tag in listOf("navigation_compass", "map_zoom_in", "map_zoom_out", "map_scale_ruler")) {
                 val node = rule.onNodeWithTag(tag)
                 if (container.height / rule.density.density < 420) node.performScrollTo()
                 node.assertIsDisplayed()
-                assertTrue("$label $tag below overlay", bounds(tag).top >= overlay.bottom + margin - 1f)
+                if (landscape) assertTrue("$label $tag right of overlay", bounds(tag).left >= overlay.right)
+                else assertTrue("$label $tag below overlay", bounds(tag).top >= overlay.bottom + margin - 1f)
             }
             rule.onNodeWithTag(NavigationTestTags.OPERATIONS).assertDoesNotExist()
             val ruler = rule.onNodeWithTag("map_scale_ruler").fetchSemanticsNode().boundsInRoot
@@ -175,7 +190,7 @@ class NavigationConsolidationTest {
             // Semantics can settle before the GL frame reaches the display.
             SystemClock.sleep(500)
             val bitmap = instrumentation.uiAutomation.takeScreenshot()
-            val dir = File(rule.activity.getExternalFilesDir(null), "phase0106f").apply { mkdirs() }
+            val dir = File(rule.activity.getExternalFilesDir(null), "phase0106g").apply { mkdirs() }
             File(dir, "$label.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
         try {

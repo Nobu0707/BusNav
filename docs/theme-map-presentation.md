@@ -3,7 +3,7 @@
 ## Theme policy
 
 基本LIGHT。OSのダーク設定はテーマ判定に使わない。
-dark = navigationActive && (isNight || isTunnel)。位置未取得時はLIGHT。
+dark = currentScreen == NAVIGATION && isNavigationStarted && activeRoute != null && (isNight || isTunnel)。位置未取得では夜判定がfalseで、トンネル判定も有効な観測がなければfalse。
 
 | State | Result |
 | --- | --- |
@@ -80,8 +80,10 @@ MBTilesやrouting graphの再生成は不要。fallbackにも明暗別assetを�
 MapControllerはMapViewとcamera、latestRoute、latestRoutePlan、latestLocationを保持し、
 style load後にroute、START/DEST/VIA/SHAPING、vehicleのsource/layerを再登録・再描画する。
 candidateは既存のactiveRoute描画引数で同じ復元経路を通る。
-Phase008のdeviation overlayはnative layerではなくCompose DeviationBannerであり、
+Phase010.6Gではdeviation文言をCompose NavigationGuidanceCard内へ統合した。
 style reloadの外側に保持される。routing/matching/deviationの状態はstyle変更で再初期化しない。
+
+Free選択・プレビュー、所定経路一覧、エディタ、開発画面は常にLIGHT。これらの画面は元々ライトの文字色と色スキームを受けていたが、画面ルートが透明で暗いwindow背景が透け、文字のコントラストを損ねていた。NavigationRouteのルートBoxに現在のcolorScheme.backgroundを描画して解消する。DialogとBottomSheetはMaterialThemeの配色を継承する。
 
 ## Colors / arrow / road width / bottom bar
 

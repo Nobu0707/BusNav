@@ -11,3 +11,8 @@ val NightText = Color(0xFFD9E2E8)
 val NightMutedText = Color(0xFF9EADB7)
 val WarningAmber = Color(0xFFE6A84B)
 val AlertRed = Color(0xFFE27D7D)
+val NavigationWarningRedLight = Color(0xFFD80E2F)
+val NavigationWarningRedDark = Color(0xFFFF5C6C)
+
+fun navigationWarningColor(prominent: Boolean, dark: Boolean, neutral: Color): Color =
+    if (!prominent) neutral else if (dark) NavigationWarningRedDark else NavigationWarningRedLight

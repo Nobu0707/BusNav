@@ -1,6 +1,7 @@
 package net.nobu0707.busnav.map
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
@@ -29,17 +30,19 @@ internal fun MapControls(navigationCamera: NavigationCameraState, cameraBearing:
         }
     }
     val zoom: @Composable () -> Unit = {
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            for (direction in listOf(1, -1)) {
-                FilledTonalButton(onClick = { onZoom(direction) },
-                    modifier = Modifier.size(64.dp, 48.dp)
-                        .testTag(if (direction > 0) "map_zoom_in" else "map_zoom_out")
-                        .semantics { contentDescription = if (direction > 0) "地図を拡大" else "地図を縮小" },
-                    contentPadding = PaddingValues(2.dp), shape = RoundedCornerShape(12.dp)) {
-                    Text(if (direction > 0) "+" else "−", style = MaterialTheme.typography.titleLarge)
+        Surface(Modifier.width(MapControlsPolicy.RULER_CARD_WIDTH_DP.dp).testTag("zoom_scale_control"),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+            tonalElevation = 3.dp) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                ZoomButton(1, onZoom)
+                if (ruler != null) {
+                    HorizontalDivider()
+                    ScaleRuler(ruler)
                 }
+                HorizontalDivider()
+                ZoomButton(-1, onZoom)
             }
-            if (ruler != null) ScaleRuler(ruler)
         }
     }
     BoxWithConstraints(modifier) {
@@ -56,12 +59,21 @@ internal fun MapControls(navigationCamera: NavigationCameraState, cameraBearing:
 }
 
 @Composable
+private fun ZoomButton(direction: Int, onZoom: (Int) -> Unit) {
+    Box(Modifier.size(MapControlsPolicy.RULER_CARD_WIDTH_DP.dp, 48.dp)
+        .testTag(if (direction > 0) "map_zoom_in" else "map_zoom_out")
+        .semantics { contentDescription = if (direction > 0) "地図を拡大" else "地図を縮小" }
+        .clickable { onZoom(direction) }, contentAlignment = Alignment.Center) {
+        Text(if (direction > 0) "+" else "−", style = MaterialTheme.typography.titleLarge)
+    }
+}
+
+@Composable
 private fun ScaleRuler(reading: ScaleRulerReading) {
     val width = with(LocalDensity.current) { reading.widthPx.toDp() }
     val color = MaterialTheme.colorScheme.onSurface
-    Card(Modifier.width(MapControlsPolicy.RULER_CARD_WIDTH_DP.dp).testTag("map_scale_ruler"),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f))) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 3.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(Modifier.fillMaxWidth().testTag("map_scale_ruler").padding(horizontal = 6.dp, vertical = 3.dp),
+        horizontalAlignment = Alignment.CenterHorizontally) {
             Text(reading.label, style = MaterialTheme.typography.labelSmall, maxLines = 1, softWrap = false)
             Canvas(Modifier.width(width).height(9.dp)) {
                 val stroke = 2.dp.toPx()
@@ -70,6 +82,5 @@ private fun ScaleRuler(reading: ScaleRulerReading) {
                 drawLine(color, Offset(0f, 0f), Offset(0f, bottom), stroke)
                 drawLine(color, Offset(size.width, 0f), Offset(size.width, bottom), stroke)
             }
-        }
     }
 }

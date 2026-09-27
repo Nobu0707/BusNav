@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -14,6 +15,7 @@ import net.nobu0707.busnav.data.route.createDevelopmentSampleRoute
 import net.nobu0707.busnav.location.LocationState
 import net.nobu0707.busnav.ui.theme.BusNavTheme
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -44,8 +46,27 @@ class NavigationScreenTest {
         composeRule.onNodeWithTag(NavigationTestTags.PERMISSION).assertIsDisplayed()
     }
 
+    @Test fun portraitWarningIsInsideSingleLargerGuidanceCard() {
+        composeRule.setContent { BusNavTheme {
+            NavigationScreen(NavigationUiState(
+                guidance = GuidanceUiState(GuidanceStatus.RELIABLE, "右折", "国道1号", "350 m", symbol = "→"),
+                deviation = DeviationUiState("案内経路から外れている可能性があります", true),
+                locationPermissionState = LocationPermissionState.Granted), {}, {}, {}, {},
+                modifier = Modifier.requiredSize(400.dp, 800.dp), mapContent = { Box(it) })
+        } }
+        val cards = composeRule.onAllNodesWithTag(NavigationTestTags.NEXT_GUIDANCE).fetchSemanticsNodes()
+        assertEquals(1, cards.size)
+        val card = cards.single().boundsInRoot
+        val warning = composeRule.onNodeWithTag("deviation_banner").fetchSemanticsNode().boundsInRoot
+        val map = composeRule.onNodeWithTag(NavigationTestTags.MAP).fetchSemanticsNode().boundsInRoot
+        assertTrue(card.contains(warning.center))
+        assertTrue(card.height >= map.height * 0.20f)
+        assertTrue(card.height <= map.height * 0.30f)
+        composeRule.onNodeWithTag("guidance_distance").assertIsDisplayed()
+    }
+
     @Test
-    fun landscapeLayoutUsesFullWidthMapOverlay() {
+    fun landscapeLayoutReservesRightMapForVehicleAndControls() {
         composeRule.setContent {
             BusNavTheme {
                 NavigationScreen(
@@ -64,7 +85,8 @@ class NavigationScreenTest {
         val guidance = composeRule.onNodeWithTag(NavigationTestTags.NEXT_GUIDANCE).fetchSemanticsNode().boundsInRoot
         val map = composeRule.onNodeWithTag(NavigationTestTags.MAP).fetchSemanticsNode().boundsInRoot
         assertTrue(map.contains(guidance.center))
-        assertTrue(guidance.width > map.width * 0.9f)
+        assertTrue(guidance.width >= map.width * 0.50f)
+        assertTrue(guidance.width <= map.width * 0.55f)
         composeRule.onNodeWithTag(NavigationTestTags.MAP).assertIsDisplayed()
         composeRule.onNodeWithTag(NavigationTestTags.AUXILIARY).fetchSemanticsNode()
     }

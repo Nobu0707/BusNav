@@ -8,18 +8,24 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import net.nobu0707.busnav.ui.theme.navigationWarningColor
 
 @Composable
-fun NavigationGuidanceCard(state: NavigationUiState, modifier: Modifier = Modifier, compact: Boolean = false) {
+fun NavigationGuidanceCard(state: NavigationUiState, modifier: Modifier = Modifier, compact: Boolean = false,
+    landscape: Boolean = false, availableHeight: androidx.compose.ui.unit.Dp = 700.dp) {
     val highway = state.highwayGuidance
     if (!compact) {
         if (highway == null) GuidanceCard(state.guidance, modifier) else HighwayGuidanceCard(highway, modifier)
@@ -27,18 +33,46 @@ fun NavigationGuidanceCard(state: NavigationUiState, modifier: Modifier = Modifi
     }
     val primary = highway?.primaryText ?: state.guidance.primaryText
     val distance = if (highway != null) highway.distanceText else state.guidance.distanceText
-    Card(modifier.testTag(if (highway == null) NavigationTestTags.NEXT_GUIDANCE else "highway_guidance")
+    val portraitMinHeight = (availableHeight * 0.22f).coerceAtMost(180.dp)
+    val cardModifier = if (landscape) modifier else modifier.heightIn(min = portraitMinHeight,
+        max = availableHeight * 0.28f)
+    Card(cardModifier.testTag(if (highway == null) NavigationTestTags.NEXT_GUIDANCE else "highway_guidance")
         .semantics { if (highway != null) contentDescription = highway.contentDescription },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f))) {
-        Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (highway?.schematic != null) JunctionSchematic(highway.schematic, Modifier.size(36.dp))
-                else if (highway == null) Text(state.guidance.symbol, style = MaterialTheme.typography.titleMedium)
-                distance?.let { Text(it, fontWeight = FontWeight.Bold, modifier = Modifier.testTag(
-                    if (highway == null) "guidance_distance" else "highway_distance")) }
-                Text(primary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).testTag("guidance_instruction"))
+        Column(Modifier.fillMaxWidth()
+            .then(if (landscape) Modifier else Modifier.verticalScroll(rememberScrollState()))
+            .padding(if (landscape) 8.dp else 12.dp),
+            verticalArrangement = Arrangement.spacedBy(if (landscape) 2.dp else 6.dp)) {
+            state.deviation.message?.let { warning ->
+                val warningColor = navigationWarningColor(state.deviation.isProminent,
+                    MaterialTheme.colorScheme.background.luminance() < 0.5f,
+                    MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(warning, Modifier.fillMaxWidth().testTag("deviation_banner")
+                    .semantics { liveRegion = LiveRegionMode.Polite },
+                    color = warningColor, fontSize = if (landscape) 18.sp else 21.sp,
+                    fontWeight = if (state.deviation.isProminent) FontWeight.Bold else FontWeight.Medium,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            if (state.deviation.message == null || state.guidance.status != GuidanceStatus.NO_ROUTE || highway != null) {
+                if (landscape) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (highway?.schematic != null) JunctionSchematic(highway.schematic, Modifier.size(36.dp))
+                    else if (highway == null) Text(state.guidance.symbol, fontSize = 28.sp)
+                    distance?.let { Text(it, fontSize = 24.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.testTag(if (highway == null) "guidance_distance" else "highway_distance")) }
+                    Text(primary, fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).testTag("guidance_instruction"))
+                } else {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (highway?.schematic != null) JunctionSchematic(highway.schematic, Modifier.size(52.dp))
+                        else if (highway == null) Text(state.guidance.symbol, fontSize = 40.sp)
+                        Text(primary, fontSize = 28.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f).testTag("guidance_instruction"))
+                    }
+                    distance?.let { Text(it, fontSize = 32.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.testTag(if (highway == null) "guidance_distance" else "highway_distance")) }
+                }
             }
 
             if (highway != null) {
@@ -56,7 +90,7 @@ fun NavigationGuidanceCard(state: NavigationUiState, modifier: Modifier = Modifi
                 }
             }
             (if (highway != null) highway.secondaryText else state.guidance.secondaryText)?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(it, fontSize = if (landscape) 14.sp else 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             (if (highway != null) highway.nextText else state.guidance.nextNextInstruction)?.let {
                 Text("その次: $it", style = MaterialTheme.typography.bodySmall, maxLines = 1,

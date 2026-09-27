@@ -71,22 +71,12 @@ fun FreeNavigationScreen(
                 Text(if (approximatePermission) "正確な位置情報を許可" else "位置情報を許可")
             }
             // Actions stay outside the scrolling details, including in short landscape viewports.
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                when (state.stage) {
-                    FreeNavigationStage.SELECTING -> {
-                        if (!state.isRecalculation) OutlinedButton(onClick = onSetDestination, enabled = cursorReady,
-                            modifier = Modifier.testTag("free_set_destination")) { Text("目的地に設定") }
-                        if (state.plan != null) Button(onClick = onCalculate,
-                            modifier = Modifier.testTag("free_calculate")) { Text("経路を計算") }
-                    }
-                    FreeNavigationStage.PREVIEW -> {
-                        Button(onClick = onStart, enabled = startAllowed, modifier = Modifier.testTag("free_start")) {
-                            Text(if (state.isRecalculation) "新しい経路を使用" else "案内開始")
-                        }
-                        if (!state.isRecalculation) TextButton(onClick = onChangeDestination) { Text("目的地を変更") }
-                    }
-                    else -> Unit
-                }
+            if (landscape) Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                FreeNavigationActionButtons(state, cursorReady, startAllowed, onSetDestination,
+                    onCalculate, onStart, onChangeDestination)
+            } else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FreeNavigationActionButtons(state, cursorReady, startAllowed, onSetDestination,
+                    onCalculate, onStart, onChangeDestination)
             }
         }
     }
@@ -104,12 +94,33 @@ fun FreeNavigationScreen(
         }
         if (landscape) {
             Row(Modifier.fillMaxWidth().weight(1f)) {
-                map(Modifier.fillMaxHeight().weight(0.58f))
-                controls(Modifier.fillMaxHeight().weight(0.42f))
+                map(Modifier.fillMaxHeight().weight(0.76f))
+                controls(Modifier.fillMaxHeight().weight(0.24f))
             }
         } else {
             map(Modifier.fillMaxWidth().weight(1f))
             controls(Modifier.fillMaxWidth().heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.42f).dp))
         }
+    }
+}
+
+@Composable
+private fun FreeNavigationActionButtons(state: FreeNavigationUiState, cursorReady: Boolean,
+    startAllowed: Boolean, onSetDestination: () -> Unit, onCalculate: () -> Unit,
+    onStart: () -> Unit, onChangeDestination: () -> Unit) {
+    when (state.stage) {
+        FreeNavigationStage.SELECTING -> {
+            if (!state.isRecalculation) OutlinedButton(onClick = onSetDestination, enabled = cursorReady,
+                modifier = Modifier.testTag("free_set_destination")) { Text("目的地に設定") }
+            if (state.plan != null) Button(onClick = onCalculate,
+                modifier = Modifier.testTag("free_calculate")) { Text("経路を計算") }
+        }
+        FreeNavigationStage.PREVIEW -> {
+            Button(onClick = onStart, enabled = startAllowed, modifier = Modifier.testTag("free_start")) {
+                Text(if (state.isRecalculation) "新しい経路を使用" else "案内開始")
+            }
+            if (!state.isRecalculation) TextButton(onClick = onChangeDestination) { Text("目的地を変更") }
+        }
+        else -> Unit
     }
 }

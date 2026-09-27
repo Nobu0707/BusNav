@@ -16,9 +16,9 @@ Circular deltas use the shortest arc: 359→1 is +2°, 1→359 is -2°. Changes 
 
 ## Camera, gestures and lifecycle
 
-MapController owns animation. HEADING_UP follows the resolved bearing; NORTH_UP follows location at 0°. The first navigation follow establishes the existing 16.5 zoom once; a recreated active navigation camera keeps its saved zoom. Toggle/recenter preserve zoom, and tilt stays at 0°. HEADING_UP following places the raw marker 33.9dp above the visible bottom, excluding the maximum measured left/right bottom overlay height. The margin includes the ring outer stroke plus 8dp clearance. Tiny viewports prioritize safety. NORTH_UP stays centered. Both orientations use the same raw location for camera target and marker. See [Visible map viewport](map-visible-viewport.md).
+MapController owns animation. HEADING_UP follows the resolved bearing; NORTH_UP follows location at 0°. The first navigation follow establishes the existing 16.5 zoom once; a recreated active navigation camera keeps its saved zoom. Toggle/recenter preserve zoom, and tilt stays at 0°. Portrait HEADING_UP following places the raw marker 33.9dp above the visible bottom, excluding the maximum measured left/right bottom overlay height. The margin includes the ring outer stroke plus 8dp clearance. Tiny viewports prioritize safety. NORTH_UP stays centered. Both orientations use the same raw location for camera target and marker. See [Visible map viewport](map-visible-viewport.md).
 
-Move/rotate/zoom gestures suspend follow immediately. The orientation preference remains unchanged. Current location restores follow and the selected orientation. The camera-start gesture reason also covers pinch, rotation and double-tap zoom. MapLibre's built-in compass is disabled to avoid a competing reset action.
+Move/rotate/zoom gestures suspend follow immediately. The orientation preference remains unchanged. Current location restores follow and the selected orientation. The camera-start gesture reason also covers pinch, rotation and double-tap zoom. MapLibre's built-in compass is disabled to avoid a competing reset action. Phase010.6G changes the landscape HEADING_UP screen anchor as described below; the preceding 33.9dp rule remains the portrait anchor.
 
 Each active navigation fix cancels previous camera transitions and moves camera and marker in one UI update. No old easing transition can chase a newer fix. Manual camera interaction still stops following. Style changes reinstall overlays without resetting camera or selected mode. The navigation ViewModel retains its own camera across Activity recreation, separate from editor camera state. Traffic/settings dialogs hide the compass and suspend camera following while open; returning preserves preference and follow intent.
 
@@ -28,7 +28,7 @@ The original Canvas marker is 56dp square with a 22.4dp radius ring, dark outlin
 
 Viewport alignment avoids double rotation. While following HEADING_UP, iconRotate=0 throughout camera animation. NORTH_UP displays resolved heading; manual exploration displays heading minus actual camera bearing. At rest, unreliable raw bearings do not rotate the navigation marker.
 
-The independently designed 64×80dp map-edge control has a rotating N/needle and a mode caption. North is `normalize(-cameraBearing)`. Instrumentation verifies this against actual MapLibre projections of a geographic north point at 0/90/180/270°, and separately checks rendered arrow pixels in both modes. Japanese content descriptions name the current mode and the tap action. The control is inside the map pane, below the measured full-width guidance/warning overlay.
+The independently designed 56×64dp map-edge control has a rotating N/needle and a mode caption. North is `normalize(-cameraBearing)`. Instrumentation verifies this against actual MapLibre projections of a geographic north point at 0/90/180/270°, and separately checks rendered arrow pixels in both modes. Japanese content descriptions name the current mode and the tap action. In portrait the control is below guidance; in landscape it is to its right.
 
 `images/reference_navigation_heading_up.jpg` was viewed for **marker reference only**. Camera behavior, compass, layout and UI are independent BusNav designs. No reference pixels, logos or screenshot crops are runtime assets.
 
@@ -64,3 +64,7 @@ stale-location/follow state in the user's screenshot.
 positions against measured Compose corner groups, rotation, full-width overlays,
 control placement and native bounds/isotropy. For impossible viewport sizes, bottom
 safety takes precedence; small control regions scroll and top cards cap at 30%.
+
+## Phase010.6G landscape follow target
+
+Only active, following, landscape HEADING_UP applies horizontal camera padding. The raw GPS point remains both the camera target and marker GeoPoint. Left padding equal to half the MapView width projects that point at approximately 75% of the map width. Vertical padding projects it 56dp above the physical MapArea bottom, the bottom action centerline, capped by the marker radius and safety margin. Right actions stack at the map edge to clear the marker. Portrait keeps the existing horizontal center and visible-bottom minus 33.9dp rule. NORTH_UP and manual map exploration do not use the new offset. Actual MapLibre `projection.toScreenLocation` assertions verify both coordinates and the map's local isotropy.

@@ -53,7 +53,8 @@ applyCalculatedRoute は旧テスト等の明示適用用互換入口で、内�
 一般道 NavigationProgress、HighwayGuidance、RouteMatcher / Deviation は共通です。経路置換で index と matcher/deviation/highway/arrival をリセットします。
 raw marker を経路に吸着させません。lane count の推定等も追加しません。
 
-プレビュー・editor・library は LIGHT。案内画面で明示開始済み、かつ現在地がある場合だけ夜間/トンネルに DARK が適用されます。
+選択・プレビュー・editor・library は LIGHT。案内画面で明示開始済み、activeRouteがある場合だけ夜間/トンネルに DARK が適用されます。画面ルートにはcolorScheme.backgroundを描画し、ウィンドウ背景の透過で文字が読めなくなることを防ぎます。
+横画面のFREE選択・プレビューは地図に幅76%、操作欄に24%を割り当てます。操作ボタンを縦積みにし、中央カーソルと登録地点の一致を維持します。
 「所定経路」と「案内経路」を operations、全体表示の contentDescription、逸脱の疑い・逸脱・復帰確認文言で使い分けます。
 
 ## 再計算と到着

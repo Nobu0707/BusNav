@@ -45,9 +45,22 @@ class MapControlsViewportRuntimeTest {
             }
         }
         rule.waitUntil(30_000) { ready && reader != null }
+        val compass = rule.onNodeWithTag("general_north_compass").fetchSemanticsNode().boundsInRoot
+        assertTrue(compass.width >= 48 * rule.density.density)
+        assertTrue(compass.height >= 48 * rule.density.density)
         rule.onNodeWithTag("general_north_compass").assertExists().performClick()
         rule.waitUntil(10_000) { rule.onAllNodesWithTag("general_north_compass").fetchSemanticsNodes().isEmpty() }
         rule.onNodeWithTag("map_scale_ruler").assertExists()
+        val surface = rule.onNodeWithTag("zoom_scale_control").fetchSemanticsNode().boundsInRoot
+        for (tag in listOf("map_zoom_in", "map_scale_ruler", "map_zoom_out")) {
+            val child = rule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+            assertTrue(surface.contains(child.center))
+        }
+        for (tag in listOf("map_zoom_in", "map_zoom_out")) {
+            val target = rule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+            assertTrue(target.width >= 48 * rule.density.density)
+            assertTrue(target.height >= 48 * rule.density.density)
+        }
         rule.onNodeWithTag("map_zoom_in").performClick()
         rule.onNodeWithTag("map_zoom_out").performClick()
         rule.onNodeWithTag("map_scale_preset").assertDoesNotExist()

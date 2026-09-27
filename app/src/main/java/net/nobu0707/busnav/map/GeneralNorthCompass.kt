@@ -23,10 +23,10 @@ internal fun northUpCamera(current: CameraPosition): CameraPosition =
 internal fun GeneralNorthCompass(cameraBearing: Double, onResetNorth: () -> Unit) {
     val needle = MaterialTheme.colorScheme.error
     FilledTonalButton(onClick = onResetNorth,
-        modifier = Modifier.size(64.dp, 56.dp).testTag("general_north_compass")
+        modifier = Modifier.size(56.dp, 56.dp).testTag("general_north_compass")
             .semantics { contentDescription = "北を上に戻す" },
         contentPadding = PaddingValues(0.dp), shape = RoundedCornerShape(16.dp)) {
-        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
             // Same clockwise screen rotation as NavigationCompass. Only the pointer rotates;
             // the centered N and the touch target stay upright, including at 180 degrees.
             Canvas(Modifier.fillMaxSize().rotate(northScreenRotation(cameraBearing).toFloat())) {
