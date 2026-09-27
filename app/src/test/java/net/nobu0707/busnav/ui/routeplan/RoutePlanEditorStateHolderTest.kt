@@ -82,7 +82,9 @@ class RoutePlanEditorStateHolderTest {
         assertEquals(listOf("東京駅", "海老名SA"), points.map { it.name })
         holder.addPoint(GeoPoint(35.2, 139.2))
         assertEquals(3, holder.uiState.value.currentPlan.points.size)
+        val revision = holder.uiState.value.revision
         holder.enrichUnnamedPoint(GeoPoint(35.2, 139.2), "付近: 東京都庁")
         assertEquals("付近: 東京都庁", holder.uiState.value.currentPlan.points.last().name)
+        assertEquals(revision, holder.uiState.value.revision)
     }
 }

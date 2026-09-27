@@ -71,7 +71,10 @@ class RoutePlanEditorStateHolder(
 
     fun enrichUnnamedPoint(position: GeoPoint, nearby: String) {
         val point = _uiState.value.currentPlan.points.lastOrNull { it.position == position && it.name == null } ?: return
-        updatePlan { plan -> plan.copy(points = plan.points.map { if (it.id == point.id) it.copy(name = nearby) else it }) }
+        // A late place label cannot invalidate a route calculation: geometry did not change.
+        update { copy(currentPlan = currentPlan.copy(points = currentPlan.points.map {
+            if (it.id == point.id) it.copy(name = nearby) else it
+        }), hasUnsavedChanges = true) }
     }
 
     fun removePoint(id: String) {
