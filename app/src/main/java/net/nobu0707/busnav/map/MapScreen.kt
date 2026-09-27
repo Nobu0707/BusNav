@@ -32,6 +32,8 @@ import net.nobu0707.busnav.location.LocationState
 import net.nobu0707.busnav.domain.route.ScheduledRoute
 import net.nobu0707.busnav.domain.routeplan.RoutePlan
 import net.nobu0707.busnav.domain.model.GeoPoint
+import net.nobu0707.busnav.domain.search.GeoBounds
+import net.nobu0707.busnav.domain.search.PlaceSearchItem
 import net.nobu0707.busnav.BuildConfig
 import net.nobu0707.busnav.map.basemap.AndroidLogMapDiagnostics
 import net.nobu0707.busnav.map.basemap.BasemapAttribution
@@ -78,6 +80,9 @@ fun MapScreen(
     selectionMode: MapSelectionMode = if (onMapLongPress != null) MapSelectionMode.ROUTE_POINT else MapSelectionMode.NONE,
     monitorTunnel: Boolean = false,
     onTunnelChanged: (Boolean) -> Unit = {},
+    onSearchClick: ((GeoBounds?) -> Unit)? = null,
+    searchSelection: PlaceSearchItem? = null,
+    searchFocusId: Long = 0,
     onMapReady: () -> Unit,
     onMapGesture: () -> Unit,
     onMapError: (String) -> Unit,
@@ -218,6 +223,7 @@ fun MapScreen(
         controller.updateDetour(detourOverlay)
         controller.updateTraffic(trafficEvents)
         controller.updateRoutePlan(routePlan, planOverviewRequestId)
+        controller.updateSearchSelection(searchSelection, searchFocusId)
         controller.updateEditorCamera(editorCameraRequest, editorBottomPadding, onEditorCameraApplied)
     }
 
@@ -233,7 +239,8 @@ fun MapScreen(
         MapControls(navigationCamera, cameraBearing, onToggleOrientation, controller::resetNorth,
             controller::zoomBy, ruler, Modifier.align(Alignment.TopEnd)
                 .padding(top = with(LocalDensity.current) { topOverlayPx.toDp() },
-                    bottom = with(LocalDensity.current) { bottomOcclusionPx.toDp() }).padding(8.dp))
+                    bottom = with(LocalDensity.current) { bottomOcclusionPx.toDp() }).padding(8.dp),
+            onSearch = onSearchClick?.let { callback -> { callback(controller.searchBounds()) } })
         BasemapStatusOverlay(
             failureHint = basemapConfig.failureHint,
             state = basemapState,

@@ -71,4 +71,18 @@ class RoutePlanEditorStateHolderTest {
         holder.removePoint(holder.uiState.value.currentPlan.points.single().id)
         assertEquals(2, holder.uiState.value.revision)
     }
+
+    @Test fun `search results keep names for via and shaping and reverse failure leaves point`() {
+        val via = GeoPoint(35.0, 139.0)
+        val shaping = GeoPoint(35.1, 139.1)
+        holder.addSearchPoint(via, "東京駅", RoutePlanPointType.VIA)
+        holder.addSearchPoint(shaping, "海老名SA", RoutePlanPointType.SHAPING)
+        val points = holder.uiState.value.currentPlan.points
+        assertEquals(listOf(RoutePlanPointType.VIA, RoutePlanPointType.SHAPING), points.map { it.type })
+        assertEquals(listOf("東京駅", "海老名SA"), points.map { it.name })
+        holder.addPoint(GeoPoint(35.2, 139.2))
+        assertEquals(3, holder.uiState.value.currentPlan.points.size)
+        holder.enrichUnnamedPoint(GeoPoint(35.2, 139.2), "付近: 東京都庁")
+        assertEquals("付近: 東京都庁", holder.uiState.value.currentPlan.points.last().name)
+    }
 }

@@ -94,6 +94,14 @@ class FreeNavigationStateHolder(
             calculation = RouteCalculationState.Idle, previewRoute = null)
     }
 
+    fun enrichDestination(point: GeoPoint, nearby: String) {
+        val current = _state.value
+        if (current.stage == FreeNavigationStage.SELECTING && current.plan?.destination == point &&
+            current.plan.destinationName == null) {
+            _state.value = current.copy(plan = FreeNavigationPlan(point, nearby))
+        }
+    }
+
     fun calculate(): Boolean {
         val current = _state.value
         if (current.stage != FreeNavigationStage.SELECTING) return false

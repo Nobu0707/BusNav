@@ -34,6 +34,8 @@ import org.maplibre.geojson.Point
 import net.nobu0707.busnav.location.LocationState
 import net.nobu0707.busnav.domain.route.ScheduledRoute
 import net.nobu0707.busnav.domain.model.GeoPoint
+import net.nobu0707.busnav.domain.search.GeoBounds
+import net.nobu0707.busnav.domain.search.PlaceSearchItem
 import net.nobu0707.busnav.domain.model.MapViewportInsets
 import net.nobu0707.busnav.domain.model.VisibleMapViewport
 import net.nobu0707.busnav.domain.routeplan.RoutePlan
@@ -91,6 +93,8 @@ class MapController(
     private val routePlanOverlay = RoutePlanOverlayController()
     private val detourOverlay = DetourOverlayController()
     private val trafficOverlay = TrafficOverlayController()
+    private val searchOverlay = SearchResultOverlayController()
+    private var lastSearchFocusId: Long = -1
     private val basemapController = BasemapController(
         config = basemapConfig,
         diagnostics = mapDiagnostics,
@@ -137,6 +141,27 @@ class MapController(
         val rect = visibleViewport().rect
         val point = map?.projection?.fromScreenLocation(PointF(rect.centerX, rect.centerY)) ?: return null
         return GeoPoint(point.latitude, point.longitude)
+    }
+
+    fun searchBounds(): GeoBounds? {
+        val native = map ?: return null
+        val bounds = native.projection.visibleRegion.latLngBounds
+        return runCatching { GeoBounds(bounds.longitudeWest, bounds.latitudeSouth, bounds.longitudeEast, bounds.latitudeNorth) }.getOrNull()
+    }
+
+    fun updateSearchSelection(item: PlaceSearchItem?, focusId: Long) {
+        if (searchOverlay.selected != item) {
+            searchOverlay.selected = item
+            style?.let(searchOverlay::render)
+        }
+        if (item != null && focusId != lastSearchFocusId) {
+            lastSearchFocusId = focusId
+            map?.let { native ->
+                val camera = native.cameraPosition
+                native.easeCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.Builder(camera)
+                    .target(item.point.toLatLng()).zoom(camera.zoom.coerceAtLeast(15.0)).build()), 650)
+            }
+        }
     }
 
     private fun visibleViewport(): VisibleMapViewport {
@@ -338,6 +363,7 @@ class MapController(
             trafficOverlay.install(loadedStyle)
             routePlanOverlay.setRoutePlan(latestRoutePlan)
             routePlanOverlay.install(loadedStyle)
+            searchOverlay.install(loadedStyle)
             installVehicleLayer(loadedStyle)
             OverlayLayerOrder.restore(loadedStyle)
             updateMapDetails()

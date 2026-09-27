@@ -77,6 +77,13 @@ class FreeNavigationTest {
         assertFalse(h.nav.uiState.value.isNavigationStarted)
         assertEquals(0, h.requests.size)
     }
+    @Test fun searchSelectionPreservesNameWithoutCalculatingRoute() = runTest {
+        val h = Harness(this); h.ready()
+        assertTrue(h.free.beginSelection())
+        h.free.selectDestination(destination, "東京駅")
+        assertEquals("東京駅", h.free.state.value.plan?.destinationName)
+        assertTrue(h.requests.isEmpty())
+    }
     @Test fun previewDoesNotStartGuidanceOrNightTheme() = runTest {
         val h = Harness(this); h.ready(); h.preview()
         val state = h.nav.uiState.value

@@ -21,7 +21,8 @@ import net.nobu0707.busnav.domain.navigation.NavigationCameraState
 @Composable
 internal fun MapControls(navigationCamera: NavigationCameraState, cameraBearing: Double,
     onToggleOrientation: (() -> Unit)?, onResetNorth: () -> Unit,
-    onZoom: (Int) -> Unit, ruler: ScaleRulerReading?, modifier: Modifier = Modifier) {
+    onZoom: (Int) -> Unit, ruler: ScaleRulerReading?, modifier: Modifier = Modifier,
+    onSearch: (() -> Unit)? = null) {
     val compass: @Composable () -> Unit = {
         if (navigationCamera.active && onToggleOrientation != null) {
             NavigationCompass(navigationCamera.orientation, cameraBearing, onToggleOrientation)
@@ -45,14 +46,20 @@ internal fun MapControls(navigationCamera: NavigationCameraState, cameraBearing:
             }
         }
     }
+    val search: @Composable () -> Unit = {
+        if (onSearch != null) OutlinedButton(onClick = onSearch,
+            modifier = Modifier.testTag("map_search").semantics { contentDescription = "場所を検索" }) {
+            Text("検索")
+        }
+    }
     BoxWithConstraints(modifier) {
         // Short landscape maps keep the vertical zoom pair beside the compass,
         // so this group stays above the bottom-right location controls.
         if (maxHeight < 260.dp) {
-            Row(Modifier.verticalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) { compass(); zoom() }
+            Row(Modifier.verticalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) { compass(); search(); zoom() }
         } else {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                compass(); zoom()
+                compass(); search(); zoom()
             }
         }
     }

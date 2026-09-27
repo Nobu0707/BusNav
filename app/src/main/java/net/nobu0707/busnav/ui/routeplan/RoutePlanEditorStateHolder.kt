@@ -58,6 +58,22 @@ class RoutePlanEditorStateHolder(
         }
     }
 
+    fun addSearchPoint(position: GeoPoint, name: String, type: RoutePlanPointType) {
+        updatePlan { plan ->
+            when (type) {
+                RoutePlanPointType.START -> operations.setStart(plan, position, name)
+                RoutePlanPointType.DESTINATION -> operations.setDestination(plan, position, name)
+                RoutePlanPointType.VIA -> operations.addVia(plan, position, name)
+                RoutePlanPointType.SHAPING -> operations.addShaping(plan, position, name)
+            }
+        }
+    }
+
+    fun enrichUnnamedPoint(position: GeoPoint, nearby: String) {
+        val point = _uiState.value.currentPlan.points.lastOrNull { it.position == position && it.name == null } ?: return
+        updatePlan { plan -> plan.copy(points = plan.points.map { if (it.id == point.id) it.copy(name = nearby) else it }) }
+    }
+
     fun removePoint(id: String) {
         updatePlan { operations.removePoint(it, id) }
         update { if (selectedPointId == id) copy(selectedPointId = null) else this }

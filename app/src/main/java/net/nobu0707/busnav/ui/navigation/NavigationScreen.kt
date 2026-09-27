@@ -86,6 +86,9 @@ import net.nobu0707.busnav.location.LocationProvider
 import net.nobu0707.busnav.domain.route.ScheduledRouteRepository
 import net.nobu0707.busnav.domain.routing.RoutingEngine
 import net.nobu0707.busnav.domain.model.GeoPoint
+import net.nobu0707.busnav.domain.search.*
+import net.nobu0707.busnav.ui.search.*
+import net.nobu0707.busnav.domain.routeplan.RoutePlanPointType
 import net.nobu0707.busnav.ui.routeplan.EditorSheetState
 import net.nobu0707.busnav.ui.routing.RouteCalculationViewModel
 import net.nobu0707.busnav.map.MapScreen
@@ -139,6 +142,8 @@ fun NavigationRoute(
     var detourCursorReader by remember { mutableStateOf<(() -> GeoPoint?)?>(null) }
     var freeCursorReader by remember { mutableStateOf<(() -> GeoPoint?)?>(null) }
     val routePlanHolder = viewModel<RoutePlanEditorViewModel>().stateHolder
+    val searchHolder = viewModel<PlaceSearchViewModel>().holder
+    val searchState by searchHolder.state.collectAsState()
     val routePlanUiState by routePlanHolder.uiState.collectAsState()
     val calculationHolder = viewModel { RouteCalculationViewModel(routingEngine) }.stateHolder
     val calculationState by calculationHolder.state.collectAsState()
@@ -161,6 +166,41 @@ fun NavigationRoute(
     }
     var showConnections by rememberSaveable { mutableStateOf(false) }
     var screen by rememberSaveable { mutableStateOf(BusNavScreen.NAVIGATION) }
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var selectedPlaceOpen by rememberSaveable { mutableStateOf(false) }
+    var searchOrigin by rememberSaveable { mutableStateOf(BusNavScreen.NAVIGATION) }
+    var searchFocusId by rememberSaveable { mutableStateOf(0L) }
+    val driving = uiState.location?.speedMetersPerSecond?.let { it.isFinite() && it > 2.0f } == true
+    fun openSearch(bounds: GeoBounds?) {
+        searchOrigin = screen
+        searchHolder.open(PlaceSearchContext(uiState.location?.point, bounds,
+            if (bounds != null) SearchBiasMode.VISIBLE_MAP else SearchBiasMode.NONE))
+        searchOpen = true
+    }
+    fun applySearchPoint(type: RoutePlanPointType, item: PlaceSearchItem) {
+        when (searchOrigin) {
+            BusNavScreen.FREE -> if (type == RoutePlanPointType.DESTINATION) freeHolder.selectDestination(item.point, item.routePointName())
+            BusNavScreen.DETOUR -> {
+                detourHolder.selectMapMode(if (type == RoutePlanPointType.SHAPING) DetourMapMode.SHAPING else DetourMapMode.VIA)
+                detourHolder.setCursor(item.point)
+            }
+            BusNavScreen.ROUTE_EDIT -> routePlanHolder.addSearchPoint(item.point, item.routePointName(), type)
+            BusNavScreen.NAVIGATION -> {
+                if (type == RoutePlanPointType.DESTINATION) {
+                    if (freeHolder.beginSelection()) {
+                        freeHolder.selectDestination(item.point, item.routePointName())
+                        screen = BusNavScreen.FREE
+                    }
+                } else if (!uiState.isNavigationStarted) {
+                    routePlanHolder.enterEditor(uiState.activeRoute, candidateRoute)
+                    routePlanHolder.addSearchPoint(item.point, item.routePointName(), type)
+                    screen = BusNavScreen.ROUTE_EDIT
+                }
+            }
+            BusNavScreen.LIBRARY -> Unit
+        }
+        selectedPlaceOpen = false
+    }
     var routeMenu by rememberSaveable { mutableStateOf(false) }
     var pendingScreen by rememberSaveable { mutableStateOf<BusNavScreen?>(null) }
     val showActiveNavigation = screen == BusNavScreen.NAVIGATION && !showConnections
@@ -351,6 +391,9 @@ fun NavigationRoute(
                 onEditRoute = { routeMenu = true },
                 mapContent = { modifier ->
                     MapScreen(
+                        onSearchClick = ::openSearch,
+                        searchSelection = searchState.selected,
+                        searchFocusId = searchFocusId,
                         trafficEvents = trafficState.activeEvents,
                         navigationCamera = NavigationCameraState(
                             active = screen == BusNavScreen.NAVIGATION && uiState.isNavigationStarted,
@@ -398,6 +441,9 @@ fun NavigationRoute(
                 mapContent = { modifier ->
                     androidx.compose.runtime.key(detourState.stage == DetourSessionState.PREVIEW) {
                         MapScreen(
+                            onSearchClick = ::openSearch,
+                            searchSelection = searchState.selected,
+                            searchFocusId = searchFocusId,
                             trafficEvents = trafficState.activeEvents,
                             deviceCompassEnabled = false,
                             location = uiState.location, isFollowingLocation = false, recenterRequestId = 0,
@@ -422,7 +468,10 @@ fun NavigationRoute(
             BusNavScreen.FREE -> FreeNavigationScreen(
                 state = freeState,
                 onCancel = { freeHolder.cancel(); screen = BusNavScreen.NAVIGATION },
-                onSetDestination = { freeCursorReader?.invoke()?.let { freeHolder.selectDestination(it) } },
+                onSetDestination = { freeCursorReader?.invoke()?.let { point ->
+                    freeHolder.selectDestination(point)
+                    searchHolder.enrichPoint(point) { freeHolder.enrichDestination(point, it) }
+                } },
                 onCalculate = { freeHolder.calculate() },
                 onStart = { if (freeHolder.start()) screen = BusNavScreen.NAVIGATION },
                 onChangeDestination = freeHolder::changeDestination,
@@ -440,6 +489,9 @@ fun NavigationRoute(
                     // The preview has different bounds from selection/calculation. Fit a laid-out preview viewport.
                     androidx.compose.runtime.key(freeState.stage == FreeNavigationStage.PREVIEW) {
                         MapScreen(
+                            onSearchClick = ::openSearch,
+                            searchSelection = searchState.selected,
+                            searchFocusId = searchFocusId,
                             trafficEvents = trafficState.activeEvents,
                             deviceCompassEnabled = !uiState.navigationActive,
                             initialCamera = freeHolder.camera ?: uiState.location?.let { net.nobu0707.busnav.ui.routeplan.EditorCamera(it.point, 14.0) },
@@ -498,7 +550,10 @@ fun NavigationRoute(
                 uiState = routePlanUiState,
                 onOpenConnections = if (BuildConfig.DEBUG && connectionRepository != null) ({ showConnections = true }) else null,
                 onBack = { cancelEditing() },
-                onRegisterCursor = { cursorReader?.invoke()?.let(routePlanHolder::registerCursor) },
+                onRegisterCursor = { cursorReader?.invoke()?.let { point ->
+                    routePlanHolder.registerCursor(point)
+                    searchHolder.enrichPoint(point) { routePlanHolder.enrichUnnamedPoint(point, it) }
+                } },
                 onSheetStateChanged = routePlanHolder::setSheetState,
                 onSheetHeightChanged = { state, height -> editorViewport = state to height },
                 onSelectAddMode = routePlanHolder::selectAddMode,
@@ -552,6 +607,9 @@ fun NavigationRoute(
                 },
                 mapContent = { modifier ->
                     MapScreen(
+                        onSearchClick = ::openSearch,
+                        searchSelection = searchState.selected,
+                        searchFocusId = searchFocusId,
                         trafficEvents = trafficState.activeEvents,
                         initialCamera = routePlanHolder.camera,
                         onCameraChanged = routePlanHolder::saveCamera,
@@ -567,7 +625,10 @@ fun NavigationRoute(
                         onCursorReader = { cursorReader = it },
                         routePlan = routePlanUiState.currentPlan.takeIf { candidateRoute == null },
                         planOverviewRequestId = 0,
-                        onMapLongPress = routePlanHolder::addPoint,
+                        onMapLongPress = { point ->
+                            routePlanHolder.addPoint(point)
+                            searchHolder.enrichPoint(point) { routePlanHolder.enrichUnnamedPoint(point, it) }
+                        },
                         onMapReady = stateHolder::onMapReady,
                         onMapGesture = {},
                         onMapError = stateHolder::onMapError,
@@ -575,6 +636,34 @@ fun NavigationRoute(
                     )
                 },
             )
+        }
+        if (searchOpen) PlaceSearchDialog(searchState, driving,
+            onQuery = { if (!driving) searchHolder.setQuery(it) },
+            onBias = searchHolder::setBias, onSubmit = { if (!driving) searchHolder.submit() },
+            onSelect = { item ->
+                searchHolder.close()
+                searchHolder.select(item)
+                if (searchOrigin == BusNavScreen.NAVIGATION) stateHolder.onManualMapGesture()
+                searchFocusId++
+                searchOpen = false
+                selectedPlaceOpen = true
+            }, onDismiss = { searchHolder.close(); searchOpen = false })
+        searchState.selected?.takeIf { selectedPlaceOpen }?.let { item ->
+            val actions: List<Pair<String, () -> Unit>> = when (searchOrigin) {
+                BusNavScreen.FREE -> listOf("目的地に設定" to { applySearchPoint(RoutePlanPointType.DESTINATION, item) })
+                BusNavScreen.ROUTE_EDIT -> RoutePlanPointType.entries.map { type ->
+                    item.routePointTypeLabel(type) to { applySearchPoint(type, item) }
+                }
+                BusNavScreen.DETOUR -> listOf(
+                    "経由地" to { applySearchPoint(RoutePlanPointType.VIA, item) },
+                    "通過指定" to { applySearchPoint(RoutePlanPointType.SHAPING, item) })
+                BusNavScreen.NAVIGATION -> if (uiState.isNavigationStarted) emptyList() else listOf(
+                    "目的地に設定" to { applySearchPoint(RoutePlanPointType.DESTINATION, item) },
+                    "経由地に設定" to { applySearchPoint(RoutePlanPointType.VIA, item) },
+                    "通過指定" to { applySearchPoint(RoutePlanPointType.SHAPING, item) })
+                BusNavScreen.LIBRARY -> emptyList()
+            }
+            SelectedPlaceDialog(item, actions) { selectedPlaceOpen = false }
         }
         if (saveDialog && library != null && libraryState != null) {
             val source = libraryState.draft ?: libraryState.current
