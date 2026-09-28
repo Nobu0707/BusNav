@@ -1,0 +1,9 @@
+# Planned rest stops and operations support (Phase 011B)
+
+The SA/PA sheet allows multiple planned rest stops. Each stores OSM identity, name, type, point, and route progress, ordered by progress. Duplicate identities are rejected. Users can remove a stop from the planned list or its detail. A known speed above 2.0 m/s disables selection, detail, add, remove, and route changes; browsing and approximate distance remain available.
+
+The next upcoming stop appears as a small secondary navigation summary. A reliable matched progress within 3 km triggers one visual `まもなく休憩予定` notice per stop and route session. Passing the stop marks it `PASSED`; it is not automatically removed, and no GPS observation is interpreted as proof that the vehicle stopped. The rest-stop plan is an operations memo, not an automatic legal compliance decision or reroute instruction. Voice guidance belongs to Phase 012.
+
+FREE plans live in the navigation ViewModel session. Prescribed plans are stored in the existing Room record's versioned JSON payload. Version 2 adds `plannedStops`; loading version 1 yields an empty list and later saves version 2. The Room table version remains 1 because its columns did not change. Editing and saving a prescribed route retains the newest stored stops. Once candidates for new geometry arrive, matching OSM identities refresh progress and point. Missing identities remain in the plan with `NOT_ON_CURRENT_ROUTE_CANDIDATES`, visibly marked for review. Detours and rejoin queries use the active geometry, with the same reconciliation rules.
+
+The facility service is optional to navigation. An offline or IPv6-unreachable result leaves route guidance operating and marks only the SA/PA panel unavailable. Data is from OpenStreetMap contributors. The corridor service does not establish carriageway direction, legal access, facility capacity, or suitability for a particular vehicle.

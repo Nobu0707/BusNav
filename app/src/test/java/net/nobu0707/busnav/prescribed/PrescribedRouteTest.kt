@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
 import net.nobu0707.busnav.data.storage.prescribed.*
 import net.nobu0707.busnav.domain.prescribed.*
+import net.nobu0707.busnav.domain.facility.*
 import net.nobu0707.busnav.domain.routeplan.*
 import net.nobu0707.busnav.domain.routing.*
 import net.nobu0707.busnav.domain.route.ScheduledRouteRepository
@@ -84,9 +85,25 @@ class PrescribedRouteTest {
             r.copy(vehicleProfile = r.vehicleProfile.copy(heightMeters = Double.POSITIVE_INFINITY)).validate()
         }
     }
+    @Test fun versionOnePayloadMigratesWithNoPlannedStops() {
+        val original = prescribedFixture()
+        val old = PrescribedRouteCodec.encode(original)
+            .replace("\"schemaVersion\":2", "\"schemaVersion\":1")
+            .replace(",\"plannedStops\":[]", "")
+        val restored = PrescribedRouteCodec.record(original.id, original.name, original.description,
+            original.createdAtEpochMillis, original.updatedAtEpochMillis, PrescribedRouteCodec.decode(old))
+        assertEquals(2, restored.schemaVersion)
+        assertTrue(restored.plannedStops.isEmpty())
+    }
+    @Test fun plannedStopsSurvivePayloadRoundtrip() {
+        val original = prescribedFixture()
+        val stop = PlannedRestStop(RouteFacilityId('N', 42), "Test SA", RouteFacilityType.SERVICE_AREA,
+            original.route.geometry.points[1], 1200.0)
+        assertEquals(listOf(stop), roundtrip(original.copy(plannedStops = listOf(stop))).plannedStops)
+    }
     @Test fun malformedJsonRejected() { assertThrows(IllegalArgumentException::class.java) { PrescribedRouteCodec.decode("{bad") } }
     @Test fun unknownPayloadSchemaRejected() {
-        val text = PrescribedRouteCodec.encode(prescribedFixture()).replace("\"schemaVersion\":1", "\"schemaVersion\":999")
+        val text = PrescribedRouteCodec.encode(prescribedFixture()).replace("\"schemaVersion\":2", "\"schemaVersion\":999")
         assertThrows(IllegalArgumentException::class.java) { PrescribedRouteCodec.decode(text) }
     }
     @Test fun unknownEnumRejectedDuringMapping() {

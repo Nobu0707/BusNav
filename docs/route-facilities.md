@@ -1,0 +1,13 @@
+# Route-aware SA/PA candidates (Phase 011B)
+
+The active route alone triggers `RouteFacilityProvider.findFacilities`. The production provider posts one continuous polyline6 to `https://search-busnav.nobu0707.net/busnav/v1/route-facilities` with a 1,200 m corridor, both SA/PA types, and a 100-candidate limit. The fixed HTTPS host currently needs global IPv6. Network failure never stops navigation or chooses another search service.
+
+`RouteFacilityPolyline` encodes the application's continuous `ScheduledRoute.geometry`; its `joinLegs` helper decodes Valhalla leg shapes, removes a repeated boundary point, and re-encodes to precision 6. A SHA-256 fingerprint of the normalized geometry and query options keys an in-memory success cache. A route generation guards late responses. GPS fixes, camera changes, heading changes, and route matcher updates only recalculate local distances; they never post another request. Route replacement, FREE recalculation, detour activation, and rejoin change the active route and refresh candidates. Returning to an already queried route uses the session cache.
+
+The JSON parser checks the optional response version, stable OSM identity, type, coordinate bounds, finite nonnegative progress and corridor distance, and `GEOMETRIC_CANDIDATE`. Invalid candidates are dropped without discarding valid neighbors. Results are ordered by `route_progress_m`. HTTP 400/413/429, 5xx, timeout, network, and parse failures have separate domain states. An empty 200 response is a valid result.
+
+Displayed distance is `candidate.routeProgressMeters - reliableMatchedRouteProgressMeters`. The existing route matcher supplies that progress; an unreliable or ambiguous match shows `距離を確認中` and cannot advance passed state. A facility becomes passed after more than 500 m behind reliable progress and stays passed until the route changes. The sheet shows up to 20 upcoming candidates, using approximate meters or kilometers.
+
+These are **corridor candidates**. `GEOMETRIC_CANDIDATE` does not prove the same carriageway, legal access, or an available entrance. Names containing `上り` or `下り` are not treated as direction proof. The sheet and detail state the direction caveat and credit OpenStreetMap contributors. SA and PA markers appear while the sheet is open; selected and planned markers remain visible. Selecting a row moves the map camera and suspends follow under the existing recenter policy.
+
+No route geometry, polyline, exact GPS fix, request body, or device serial is logged or placed in review material. Phase 011C may add topology-based direction verification. Live traffic, occupancy, closures, weather, scraping, and company synchronization are outside this phase.

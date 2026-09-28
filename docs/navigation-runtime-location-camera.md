@@ -48,3 +48,7 @@ stale-location/follow state in the user's screenshot.
 positions against measured Compose corner groups, rotation, full-width overlays,
 control placement and native bounds/isotropy. For impossible viewport sizes, bottom
 safety takes precedence; small control regions scroll and top cards cap at 30%.
+
+## Phase 011B SA/PA progress
+
+The route matcher remains the only source of reliable distance-along-route progress for route facility candidates. NavigationRoute passes its existing `trafficProgressMeters` when reliable to the facility state holder; ambiguous or unavailable matches hold the last value and display a checking message. GPS updates do not request the facility endpoint. Route geometry changes do, including FREE recalculation, detour activation, and rejoin. Facility service failure does not change guidance or camera state. See [route-facilities](route-facilities.md).

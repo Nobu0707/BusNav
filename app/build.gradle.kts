@@ -9,6 +9,7 @@ plugins {
 
 val valhallaBaseUrl = providers.gradleProperty("busnavValhallaBaseUrl")
 val basemapStyleUrl = providers.gradleProperty("busnavBasemapStyleUrl")
+val debugApplicationIdSuffix = providers.gradleProperty("busnavDebugApplicationIdSuffix").orElse("").get()
 
 android {
     namespace = "net.nobu0707.busnav"
@@ -26,6 +27,10 @@ android {
 
     buildTypes {
         debug {
+            if (debugApplicationIdSuffix.isNotEmpty()) {
+                require(Regex("^\\.[a-z][a-z0-9_]*$").matches(debugApplicationIdSuffix))
+                applicationIdSuffix = debugApplicationIdSuffix
+            }
             val debugUrl = valhallaBaseUrl.orElse("https://routing-busnav.nobu0707.net").get()
             val debugBasemapUrl = basemapStyleUrl
                 .orElse("https://maps-busnav.nobu0707.net/styles/busnav/style.json")

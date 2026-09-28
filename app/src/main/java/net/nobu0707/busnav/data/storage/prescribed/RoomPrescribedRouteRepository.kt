@@ -14,7 +14,7 @@ class RoomPrescribedRouteRepository(
     override fun observeAll() = db.routes().observeAll()
     override suspend fun getById(id: String): PrescribedRouteLoad = withContext(dispatcher) {
         val entity = db.routes().get(id) ?: return@withContext PrescribedRouteLoad.Missing
-        if (entity.schemaVersion != 1) return@withContext PrescribedRouteLoad.Unsupported
+        if (entity.schemaVersion !in 1..2) return@withContext PrescribedRouteLoad.Unsupported
         try {
             PrescribedRouteLoad.Found(PrescribedRouteCodec.record(entity.id, entity.name, entity.description,
                 entity.createdAtEpochMillis, entity.updatedAtEpochMillis, PrescribedRouteCodec.decode(entity.payloadJson)))

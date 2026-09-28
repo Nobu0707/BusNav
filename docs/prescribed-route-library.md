@@ -90,3 +90,7 @@ Phase009の[Detour/Rejoin](detour-rejoin.md)はstable prescribedRouteId、元rou
 
 NavigationMode.FREE が通常ナビとして有効になりました。保存済みレコードは PRESCRIBED と stable UUID を維持し、FREE 計算/開始/終了は repository に書き込みません。activePrescribedRouteId から mode を推測しません。
 案内中にライブラリへ移る操作は終了確認を経由します。確認キャンセルで元の session を保持し、FREE 終了後に前の所定経路を勝手に復元しません。保存経路の「開く」は preview、「ナビに使用」は明示開始です。[Free Navigation](free-navigation.md) を参照してください。
+
+## Phase 011B planned rest stops
+
+The versioned JSON payload is now version 2 and adds `plannedStops` (OSM identity, name, type, point, route progress, status). Version 1 payloads load with an empty planned-stop list and upgrade when saved. The Room table remains version 1 because its columns did not change; repository loading accepts payload versions 1 and 2. A route edit retains saved stops, and a new candidate query refreshes matching OSM identities or marks a missing identity `NOT_ON_CURRENT_ROUTE_CANDIDATES`. See [operations support](operations-support.md).

@@ -70,7 +70,7 @@ class PrescribedRouteDatabaseTest {
             assertEquals(PrescribedRouteLoad.Unsupported, repo.getById(entity.id))
             assertEquals(99, db.routes().get(entity.id)!!.schemaVersion)
             db.routes().put(entity.copy(payloadJson = "{\"schemaVersion\":2,\"futureField\":true}"))
-            assertEquals(PrescribedRouteLoad.Unsupported, repo.getById(entity.id))
+            assertEquals(PrescribedRouteLoad.Corrupt, repo.getById(entity.id))
         } finally { db.close() }
     }
     @Test fun concurrentRenameDeleteDoesNotResurrectAndStaleSaveFails() = runBlocking {

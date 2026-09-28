@@ -5,6 +5,7 @@ import net.nobu0707.busnav.domain.route.ScheduledRoute
 import net.nobu0707.busnav.domain.routeplan.RoutePlan
 import net.nobu0707.busnav.domain.routeplan.validateForRouting
 import net.nobu0707.busnav.domain.routing.VehicleProfile
+import net.nobu0707.busnav.domain.facility.PlannedRestStop
 
 enum class NavigationMode { PRESCRIBED, FREE }
 
@@ -17,11 +18,14 @@ data class PrescribedRouteRecord(
     val vehicleProfile: VehicleProfile,
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,
-    val schemaVersion: Int = 1,
+    val schemaVersion: Int = 2,
+    val plannedStops: List<PlannedRestStop> = emptyList(),
 ) {
     fun validate() {
         require(id.isNotBlank() && name.isNotBlank()) { "名前を入力してください" }
-        require(schemaVersion == 1)
+        require(schemaVersion in 1..2)
+        require(plannedStops.distinctBy { it.facilityId }.size == plannedStops.size)
+        require(plannedStops.all { it.routeProgressMeters.isFinite() && it.routeProgressMeters >= 0 })
         require(routePlan.validateForRouting().isRoutingReady) { "出発地と目的地を確認してください" }
         require(route.geometry.points.size >= 2)
         route.guidance?.maneuvers?.forEachIndexed { index, m ->

@@ -102,3 +102,7 @@ FREE navigation uses the default HEADING_UP camera and persisted NORTH_UP toggle
 # Phase 010.6B location start
 
 FREE route calculation and explicit preview start use the shared [location quality policy](location-quality-policy.md). A fresh 100–150 m raw fix may start in degraded mode; the route START remains a raw coordinate and strong guidance waits for reliable matching. Detour planning and arrival keep their stricter requirements.
+
+## Phase 011B route facilities
+
+A calculated or manually recalculated FREE route queries the fixed route-facilities endpoint once per new geometry. GPS fixes only update the local distance to candidates. FREE planned rest stops remain in the ViewModel session. The facility sheet and map markers share the active route; an unavailable facility service does not end navigation. See [route-facilities](route-facilities.md) and [operations support](operations-support.md).

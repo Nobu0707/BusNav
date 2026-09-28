@@ -29,3 +29,7 @@ When known speed exceeds 2.0 m/s, the search text field is disabled and the dial
 ## Limits and Phase 011
 
 Search requires reachability of the IPv6-only production host. OSM coverage and Nominatim ranking determine available candidates. The current implementation has no corridor SA/PA search, live occupancy, custom ranking, voice input, private address database, or search-history sync. Corridor and operational support remain for Phase 011.
+
+## Route facility separation
+
+Phase 011B route-aware SA/PA candidates use the dedicated POST `/busnav/v1/route-facilities` service and the active route geometry. Place Search remains an arbitrary location search with `/search`, `/reverse`, and `/lookup`; its candidates are not used to infer same-direction access. See [route-facilities](route-facilities.md).

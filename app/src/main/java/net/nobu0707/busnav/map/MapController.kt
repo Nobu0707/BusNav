@@ -36,6 +36,8 @@ import net.nobu0707.busnav.domain.route.ScheduledRoute
 import net.nobu0707.busnav.domain.model.GeoPoint
 import net.nobu0707.busnav.domain.search.GeoBounds
 import net.nobu0707.busnav.domain.search.PlaceSearchItem
+import net.nobu0707.busnav.domain.facility.RouteFacilityCandidate
+import net.nobu0707.busnav.domain.facility.RouteFacilityId
 import net.nobu0707.busnav.domain.model.MapViewportInsets
 import net.nobu0707.busnav.domain.model.VisibleMapViewport
 import net.nobu0707.busnav.domain.routeplan.RoutePlan
@@ -94,6 +96,8 @@ class MapController(
     private val detourOverlay = DetourOverlayController()
     private val trafficOverlay = TrafficOverlayController()
     private val searchOverlay = SearchResultOverlayController()
+    private val facilityOverlay = RouteFacilityOverlayController()
+    private var lastFacilityFocusId: Long = -1
     private var lastSearchFocusId: Long = -1
     private val basemapController = BasemapController(
         config = basemapConfig,
@@ -160,6 +164,27 @@ class MapController(
                 val camera = native.cameraPosition
                 native.easeCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.Builder(camera)
                     .target(item.point.toLatLng()).zoom(camera.zoom.coerceAtLeast(15.0)).build()), 650)
+            }
+        }
+    }
+
+    fun updateFacilities(candidates: List<RouteFacilityCandidate>, planned: Set<RouteFacilityId>,
+        selected: RouteFacilityId?, expanded: Boolean, focusId: Long) {
+        if (facilityOverlay.candidates != candidates || facilityOverlay.planned != planned ||
+            facilityOverlay.selected != selected || facilityOverlay.expanded != expanded) {
+            facilityOverlay.candidates = candidates
+            facilityOverlay.planned = planned
+            facilityOverlay.selected = selected
+            facilityOverlay.expanded = expanded
+            style?.let(facilityOverlay::render)
+        }
+        if (selected != null && focusId != lastFacilityFocusId) {
+            lastFacilityFocusId = focusId
+            val point = candidates.firstOrNull { it.id == selected }?.point ?: return
+            map?.let { native ->
+                val camera = native.cameraPosition
+                native.easeCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.Builder(camera)
+                    .target(point.toLatLng()).zoom(camera.zoom.coerceAtLeast(14.0)).build()), 650)
             }
         }
     }
@@ -364,6 +389,7 @@ class MapController(
             routePlanOverlay.setRoutePlan(latestRoutePlan)
             routePlanOverlay.install(loadedStyle)
             searchOverlay.install(loadedStyle)
+            facilityOverlay.install(loadedStyle)
             installVehicleLayer(loadedStyle)
             OverlayLayerOrder.restore(loadedStyle)
             updateMapDetails()

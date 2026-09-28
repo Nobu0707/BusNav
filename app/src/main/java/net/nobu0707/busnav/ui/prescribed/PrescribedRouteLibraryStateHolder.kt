@@ -45,6 +45,11 @@ class PrescribedRouteLibraryStateHolder(
     }
     fun cancelDraft() { _state.update { it.copy(draft = null, error = null) } }
     fun clearCurrent() { _state.update { it.copy(current = null, draft = null) } }
+    fun syncPlannedStops(id: String, stops: List<net.nobu0707.busnav.domain.facility.PlannedRestStop>) {
+        _state.update { state -> state.copy(current = state.current?.let {
+            if (it.id == id && it.plannedStops != stops) it.copy(plannedStops = stops) else it
+        }) }
+    }
     fun acceptCandidate(plan: RoutePlan, route: ScheduledRoute, vehicle: VehicleProfile): Boolean {
         val draft = _state.value.draft
         val snapshot = (draft ?: PrescribedRouteRecord(newId(), route.name, null, plan, route, vehicle, now(), now()))
@@ -68,9 +73,13 @@ class PrescribedRouteLibraryStateHolder(
             name = name.trim(), description = description?.takeIf { it.isNotBlank() },
             createdAtEpochMillis = if (asNew || !exists) now() else source.createdAtEpochMillis,
             updatedAtEpochMillis = now())
-        repository.save(record, existingOnly = !asNew && exists)
-        _state.update { it.copy(current = record, draft = null) }
-        saved(record)
+        val latestStops = if (!asNew && exists) (repository.getById(record.id) as? PrescribedRouteLoad.Found)?.record?.plannedStops
+            else null
+        val currentStops = _state.value.current?.takeIf { it.id == source.id }?.plannedStops
+        val merged = record.copy(plannedStops = currentStops ?: latestStops ?: record.plannedStops)
+        repository.save(merged, existingOnly = !asNew && exists)
+        _state.update { it.copy(current = merged, draft = null) }
+        saved(merged)
     }
     fun rename(id: String, name: String) = action {
         repository.rename(id, name)

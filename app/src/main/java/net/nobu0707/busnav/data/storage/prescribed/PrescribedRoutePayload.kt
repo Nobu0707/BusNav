@@ -6,6 +6,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.int
 import net.nobu0707.busnav.domain.model.GeoPoint
+import net.nobu0707.busnav.domain.facility.*
 import net.nobu0707.busnav.domain.navigation.*
 import net.nobu0707.busnav.domain.prescribed.PrescribedRouteRecord
 import net.nobu0707.busnav.domain.route.*
@@ -32,9 +33,14 @@ import net.nobu0707.busnav.domain.routing.VehicleProfile
     val id: String, val name: String, val lengthMeters: Double, val widthMeters: Double,
     val heightMeters: Double, val weightMetricTons: Double, val axleLoadMetricTons: Double?,
 )
+@Serializable data class PlannedStopPayload(
+    val osmType: String, val osmId: Long, val name: String, val type: String,
+    val point: PointPayload, val routeProgressMeters: Double, val status: String,
+)
 @Serializable data class PrescribedRoutePayloadV1(
-    val schemaVersion: Int = 1, val plan: RoutePlanPayload,
+    val schemaVersion: Int = 2, val plan: RoutePlanPayload,
     val route: ScheduledRoutePayload, val vehicle: VehicleProfilePayload,
+    val plannedStops: List<PlannedStopPayload> = emptyList(),
 )
 
 class UnsupportedPrescribedRouteSchema : IllegalArgumentException("Unsupported prescribed route schema")
@@ -47,7 +53,7 @@ object PrescribedRouteCodec {
         // Inspect version before mapping future DTO fields. Future migrations dispatch here.
         val version = element.jsonObject["schemaVersion"]?.jsonPrimitive?.int
             ?: throw IllegalArgumentException("Missing payload schema version")
-        if (version != 1) throw UnsupportedPrescribedRouteSchema()
+        if (version !in 1..2) throw UnsupportedPrescribedRouteSchema()
         return json.decodeFromJsonElement(PrescribedRoutePayloadV1.serializer(), element)
     }
 
@@ -65,12 +71,15 @@ object PrescribedRouteCodec {
                     m.streetNames, m.distanceMeters, m.durationSeconds, m.signs.map { SignPayload(it.type.name, it.text, it.consecutiveCount) }) }),
             vehicle = VehicleProfilePayload(vehicle.id, vehicle.name, vehicle.lengthMeters, vehicle.widthMeters,
                 vehicle.heightMeters, vehicle.weightMetricTons, vehicle.axleLoadMetricTons),
+            plannedStops = record.plannedStops.map { stop -> PlannedStopPayload(stop.facilityId.osmType.toString(),
+                stop.facilityId.osmId, stop.name, stop.facilityType.name, stop.point.payload(),
+                stop.routeProgressMeters, stop.status.name) },
         )
     }
 
     fun record(id: String, name: String, description: String?, created: Long, updated: Long,
         payload: PrescribedRoutePayloadV1): PrescribedRouteRecord {
-        require(payload.schemaVersion == 1)
+        require(payload.schemaVersion in 1..2)
         val p = payload.plan
         val r = payload.route
         val v = payload.vehicle
@@ -83,7 +92,11 @@ object PrescribedRouteCodec {
                     m.instruction, m.beginGeometryIndex, m.endGeometryIndex, m.verbalPreTransitionInstruction, m.verbalPostTransitionInstruction,
                     m.streetNames, m.distanceMeters, m.durationSeconds, m.signs.map { HighwaySign(HighwaySignType.valueOf(it.type), it.text, it.consecutiveCount) }) }) }),
             VehicleProfile(v.id, v.name, v.lengthMeters, v.widthMeters, v.heightMeters, v.weightMetricTons, v.axleLoadMetricTons),
-            created, updated).also { it.validate() }
+            created, updated, schemaVersion = 2, plannedStops = payload.plannedStops.map { stop ->
+                PlannedRestStop(RouteFacilityId(stop.osmType.single(), stop.osmId), stop.name,
+                    RouteFacilityType.valueOf(stop.type), stop.point.domain(), stop.routeProgressMeters,
+                    PlannedStopStatus.valueOf(stop.status))
+            }).also { it.validate() }
     }
     private fun GeoPoint.payload() = PointPayload(latitude, longitude)
 }

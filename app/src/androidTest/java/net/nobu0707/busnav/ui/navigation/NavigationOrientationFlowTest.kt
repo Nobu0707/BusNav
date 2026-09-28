@@ -103,6 +103,8 @@ class NavigationOrientationFlowTest {
             rule.runOnUiThread { content() }
             rule.waitUntil(15_000) { rule.onAllNodesWithTag("navigation_compass").fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithContentDescription("地図表示：北が上。タップで進行方向を上にする").assertIsDisplayed()
+            positions.value = LocationUpdate.Position((positions.value as LocationUpdate.Position).location.copy(speedMetersPerSecond = 0f))
+            rule.waitUntil(5_000) { ViewModelProvider(rule.activity)[NavigationViewModel::class.java].stateHolder.uiState.value.location?.speedMetersPerSecond == 0f }
             // Existing screen navigation ends the session explicitly before entering the editor.
             rule.onNodeWithTag(NavigationTestTags.ROUTE_EDIT).performClick()
             rule.onNodeWithText("経路編集").performClick()

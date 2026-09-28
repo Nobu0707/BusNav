@@ -88,6 +88,8 @@ import net.nobu0707.busnav.domain.routing.RoutingEngine
 import net.nobu0707.busnav.domain.model.GeoPoint
 import net.nobu0707.busnav.domain.search.*
 import net.nobu0707.busnav.ui.search.*
+import net.nobu0707.busnav.ui.facility.*
+import net.nobu0707.busnav.domain.facility.PlannedStopStatus
 import net.nobu0707.busnav.domain.routeplan.RoutePlanPointType
 import net.nobu0707.busnav.ui.routeplan.EditorSheetState
 import net.nobu0707.busnav.ui.routing.RouteCalculationViewModel
@@ -121,7 +123,7 @@ fun NavigationRoute(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val navigationViewModel = viewModel { NavigationViewModel(locationProvider, routeRepository) }
+    val navigationViewModel = viewModel { NavigationViewModel(locationProvider, routeRepository, prescribedRouteRepository) }
     val stateHolder = navigationViewModel.stateHolder
     val mapPreferences = remember(context) { net.nobu0707.busnav.data.navigationMapPreferenceRepository(context) }
     val orientationFlow = remember(mapPreferences) {
@@ -130,6 +132,14 @@ fun NavigationRoute(
     val orientation by orientationFlow.collectAsState(null)
     val preferenceScope = androidx.compose.runtime.rememberCoroutineScope()
     val uiState by stateHolder.uiState.collectAsState()
+    val facilityHolder = navigationViewModel.facilities
+    val facilityState by facilityHolder.state.collectAsState()
+    LaunchedEffect(facilityState.nearNotice) {
+        if (facilityState.nearNotice != null) {
+            kotlinx.coroutines.delay(5_000)
+            facilityHolder.clearNearNotice()
+        }
+    }
 
     SideEffect { if (!uiState.isNavigationStarted) navigationViewModel.hasNavigationCamera = false }
     val freeHolder = viewModel { FreeNavigationViewModel(routingEngine, stateHolder) }.holder
@@ -153,6 +163,14 @@ fun NavigationRoute(
         } }.holder
     }
     val libraryState = library?.state?.collectAsState()?.value
+    SideEffect { facilityHolder.onPlannedStopsChanged = { id, stops -> library?.syncPlannedStops(id, stops) } }
+    LaunchedEffect(uiState.activeRoute, uiState.activePrescribedRouteId, libraryState?.current?.plannedStops) {
+        val record = libraryState?.current?.takeIf { it.id == uiState.activePrescribedRouteId }
+        facilityHolder.activate(uiState.activeRoute?.geometry, record?.plannedStops.orEmpty(), uiState.activePrescribedRouteId)
+    }
+    LaunchedEffect(uiState.trafficProgressMeters, uiState.activeRoute) {
+        facilityHolder.updateProgress(uiState.trafficProgressMeters, uiState.trafficProgressMeters != null)
+    }
     LaunchedEffect(libraryState?.current) {
         libraryState?.current?.let { stateHolder.refreshPrescribedRecord(it) }
     }
@@ -202,6 +220,8 @@ fun NavigationRoute(
         selectedPlaceOpen = false
     }
     var routeMenu by rememberSaveable { mutableStateOf(false) }
+    var showFacilities by rememberSaveable { mutableStateOf(false) }
+    var facilityFocusId by rememberSaveable { mutableStateOf(0L) }
     var pendingScreen by rememberSaveable { mutableStateOf<BusNavScreen?>(null) }
     val showActiveNavigation = screen == BusNavScreen.NAVIGATION && !showConnections
     DisposableEffect(context, uiState.keepScreenOn, showActiveNavigation) {
@@ -338,9 +358,10 @@ fun NavigationRoute(
         if (routeMenu) AlertDialog(onDismissRequest = { routeMenu = false },
             title = { Text("ルート") },
             text = { Column {
-                TextButton(onClick = { requestScreen(BusNavScreen.FREE) }, modifier = Modifier.testTag("open_free")) { Text("現在地からナビ") }
-                if (library != null) TextButton(onClick = { requestScreen(BusNavScreen.LIBRARY) }) { Text("所定経路・一覧と保存") }
-                TextButton(onClick = { requestScreen(BusNavScreen.ROUTE_EDIT) }) { Text("経路編集") }
+                TextButton(onClick = { requestScreen(BusNavScreen.FREE) }, enabled = !driving, modifier = Modifier.testTag("open_free")) { Text("現在地からナビ") }
+                if (library != null) TextButton(onClick = { requestScreen(BusNavScreen.LIBRARY) }, enabled = !driving) { Text("所定経路・一覧と保存") }
+                TextButton(onClick = { requestScreen(BusNavScreen.ROUTE_EDIT) }, enabled = !driving) { Text("経路編集") }
+                if (uiState.activeRoute != null) TextButton(onClick = { routeMenu = false; showFacilities = true }) { Text("この先のSA/PA") }
                 if (uiState.activeRoute != null && !uiState.isNavigationStarted) {
                     uiState.startLocationMessage?.let { Text(it) }
                     if (uiState.startLocationAllowed && uiState.startLocationQuality in listOf(
@@ -375,7 +396,7 @@ fun NavigationRoute(
                 onDetour = { beginDetour() },
                 onEndDetour = detourHolder::endDetour,
                 detourMessage = if (detourState.stage == DetourSessionState.COMPLETED) "所定経路に復帰しました" else detourState.error,
-                onFreeRecalculate = { freeHolder.recalculate(); if (freeHolder.state.value.stage != FreeNavigationStage.IDLE) screen = BusNavScreen.FREE },
+                onFreeRecalculate = { if (!driving) { freeHolder.recalculate(); if (freeHolder.state.value.stage != FreeNavigationStage.IDLE) screen = BusNavScreen.FREE } },
                 onEndNavigation = { freeHolder.endNavigation(); library?.clearCurrent() },
                 onLayoutModeChanged = stateHolder::setLayoutMode,
                 onRequestPermission = {
@@ -394,6 +415,11 @@ fun NavigationRoute(
                         onSearchClick = ::openSearch,
                         searchSelection = searchState.selected,
                         searchFocusId = searchFocusId,
+                        facilityCandidates = facilityState.candidates,
+                        facilityPlanned = facilityState.plannedStops.map { it.facilityId }.toSet(),
+                        facilitySelected = facilityState.selectedId,
+                        facilityExpanded = showFacilities,
+                        facilityFocusId = facilityFocusId,
                         trafficEvents = trafficState.activeEvents,
                         navigationCamera = NavigationCameraState(
                             active = screen == BusNavScreen.NAVIGATION && uiState.isNavigationStarted,
@@ -636,6 +662,20 @@ fun NavigationRoute(
                     )
                 },
             )
+        }
+        if (showFacilities) RouteFacilitySheet(facilityState, driving,
+            onDismiss = { showFacilities = false },
+            onSelect = { facilityHolder.select(it); stateHolder.onManualMapGesture(); facilityFocusId++ },
+            onAdd = { facilityHolder.addPlannedStop(it, driving) },
+            onRemove = { facilityHolder.removePlannedStop(it, driving) })
+        if (screen == BusNavScreen.NAVIGATION && uiState.navigationActive) {
+            val nextStop = facilityState.plannedStops.firstOrNull { it.status == PlannedStopStatus.UPCOMING }
+            if (nextStop != null) Card(Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 84.dp)) {
+                val near = facilityState.nearNotice == nextStop.facilityId
+                Text((if (near) "まもなく休憩予定 ・ " else "次の休憩予定 ・ ") + nextStop.name + " " +
+                    distanceLabel(facilityState.distances[nextStop.facilityId]?.distanceAheadMeters, facilityState.distancesReliable),
+                    Modifier.padding(8.dp), style = MaterialTheme.typography.labelMedium)
+            }
         }
         if (searchOpen) PlaceSearchDialog(searchState, driving,
             onQuery = { if (!driving) searchHolder.setQuery(it) },

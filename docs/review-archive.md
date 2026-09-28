@@ -124,3 +124,7 @@ pwsh -File scripts\make-full-review-archive.ps1 -BaseRef $base -SkipChecks
 アーカイブには `local.properties`、`.env`、keystore、秘密鍵、credential/secret/password を示すファイル名、APK/AAB、データベース、ログ、ZIP、`build/`、`.gradle/`、`.idea/`、`.git/` を含めない。軽量版の変更ファイルスナップショットではバイナリも除外し、除外理由を `meta/excluded-files.txt` に記録する。
 
 `checks/android-review-signals.txt` は位置情報権限、MapLibre、WebView、平文 HTTP、秘密情報を示す語、TODO/FIXME などを検索するレビュー補助であり、文字列が見つかっただけでは失敗にしない。
+
+## Phase 011B physical-only connected policy
+
+For Phase 011B and later, connected/instrumentation testing uses a physical Android device only. Do not launch or test on an emulator. One successful full physical suite is the final gate; rerun only after a failure, timeout, installation or connection failure, infrastructure failure, or a fix to a failed target. Archive generation uses `-SkipChecks` and must not rerun physical tests. The historical Emulator/Physical instructions above describe earlier phases and do not apply to Phase 011B.
